@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+.env
+.venv
+*.db
+*.sqlite3
+
+# Node
+node_modules/
+dist/
+build/
+*.log
+
+# Flutter / Dart
+*.pub-cache/
+build/
+*.lock
+*.iml
+.idea/
+*.swp
+.DS_Store
+
+# Docker
+*.pid
+*.pid.lock
+
+# IDE
+.vscode/
+.idea/
