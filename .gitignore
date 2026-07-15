@@ -24,6 +24,9 @@ build/
 # Docker
 *.pid
 *.pid.lock
+.env.dev
+.env.prod
+.env.test
 
 # IDE
 .vscode/
