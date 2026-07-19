@@ -10,19 +10,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Clean Flutter project
-        run: |
-          cd mobile/delivery_app
-          flutter clean
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.22.0'
-      - run: |
-          cd mobile/delivery_app
-          flutter pub get
-          flutter build apk --release
-      - uses: actions/upload-artifact@v4
+          channel: 'stable'
+
+      - name: Install dependencies
+        run: flutter pub get
+        working-directory: mobile/delivery_app
+
+      - name: Clean build (optional)
+        run: flutter clean
+        working-directory: mobile/delivery_app
+
+      - name: Build APK
+        run: flutter build apk --release
+        working-directory: mobile/delivery_app
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
           name: app-release
           path: mobile/delivery_app/build/app/outputs/flutter-apk/app-release.apk
