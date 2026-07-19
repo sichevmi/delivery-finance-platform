@@ -13,16 +13,14 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
+    // Блок kotlinOptions убран из android — теперь он на уровне файла
 
     defaultConfig {
         applicationId = "com.example.delivery_app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        versionCode = flutter.versionCode()   // <-- скобки
+        versionName = flutter.versionName()   // <-- скобки
         ndk {
             abiFilters.clear()
         }
@@ -32,6 +30,13 @@ android {
         release {
             signingConfig = signingConfigs.getByName("debug")
         }
+    }
+}
+
+// Настройка Kotlin перенесена сюда (вне android)
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
 }
 
