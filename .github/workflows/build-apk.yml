@@ -1,8 +1,6 @@
 name: Build APK
 
 on:
-  push:
-    branches: [ develop, main ]
   workflow_dispatch:
 
 jobs:
@@ -19,17 +17,26 @@ jobs:
           flutter-version: '3.22.0'
           channel: 'stable'
 
-      - name: Install dependencies
-        run: flutter pub get
-        working-directory: mobile/delivery_app
+      - name: Clean Flutter project
+        run: |
+          cd mobile/delivery_app
+          flutter clean
 
-      - name: Clean build (optional)
-        run: flutter clean
-        working-directory: mobile/delivery_app
+      - name: Clear Gradle cache
+        run: |
+          rm -rf ~/.gradle/caches/
+          rm -rf mobile/delivery_app/android/.gradle
+
+      - name: Get dependencies with upgrade
+        run: |
+          cd mobile/delivery_app
+          flutter pub upgrade shared_preferences
+          flutter pub get
 
       - name: Build APK
-        run: flutter build apk --release
-        working-directory: mobile/delivery_app
+        run: |
+          cd mobile/delivery_app
+          flutter build apk --release
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
