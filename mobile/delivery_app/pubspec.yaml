@@ -1,0 +1,25 @@
+name: delivery_app
+description: FinFlow delivery app
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  dio: ^5.4.0
+  riverpod: ^2.4.0
+  flutter_riverpod: ^2.4.0
+  shared_preferences: ^2.2.2
+  email_validator: ^2.1.17
+  logger: ^2.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true

@@ -26,6 +26,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-delivery}
       REDIS_URL: redis://redis:6379/0
+      ENV_FILE: /app/infrastructure/.env.test
+      RUN_MIGRATIONS: "true"
     ports:
       - "8001:8000"
     depends_on:

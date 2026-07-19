@@ -12,6 +12,9 @@ up-prod:
 down:
 	docker-compose -f infrastructure/docker-compose.yml down
 
+down-dev:
+	docker-compose -f infrastructure/docker-compose.yml --env-file infrastructure/.env.dev down
+
 logs:
 	docker-compose -f infrastructure/docker-compose.yml logs -f
 
