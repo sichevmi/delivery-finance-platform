@@ -1,6 +1,8 @@
 name: Build APK
 
 on:
+  push:
+    branches: [ develop, main ]
   workflow_dispatch:
 
 jobs:
@@ -34,7 +36,7 @@ jobs:
           flutter pub get
 
       - name: Build APK
-        run: |  
+        run: | 
           cd mobile/delivery_app
           flutter build apk --release
 
