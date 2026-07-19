@@ -1,10 +1,11 @@
 buildscript {
     repositories {
+        google()
+        mavenCentral()
         maven {
             url = uri("http://dl.google.com/dl/android/maven2")
             isAllowInsecureProtocol = true
         }
-        mavenCentral()
     }
     dependencies {
         classpath("com.android.tools.build:gradle:7.4.2")
@@ -14,11 +15,12 @@ buildscript {
 
 allprojects {
     repositories {
+        google()
+        mavenCentral()
         maven {
             url = uri("http://dl.google.com/dl/android/maven2")
             isAllowInsecureProtocol = true
         }
-        mavenCentral()
     }
 }
 
