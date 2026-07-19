@@ -34,7 +34,7 @@ jobs:
           flutter pub get
 
       - name: Build APK
-        run: |
+        run: |  
           cd mobile/delivery_app
           flutter build apk --release
 
