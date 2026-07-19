@@ -10,10 +10,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Clean Gradle cache
+      - name: Clean Flutter project
         run: |
-          cd mobile/delivery_app/android
-          ./gradlew clean
+          cd mobile/delivery_app
+          flutter clean
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
