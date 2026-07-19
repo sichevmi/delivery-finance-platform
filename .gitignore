@@ -29,7 +29,7 @@ build/
 mobile/delivery_app/build/
 mobile/delivery_app/.dart_tool/
 mobile/delivery_app/.flutter-plugins*
-mobile/delivery_app/pubspec.lock
+
 
 # Android
 android/.gradle/
