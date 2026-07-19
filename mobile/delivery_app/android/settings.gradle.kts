@@ -13,11 +13,7 @@ pluginManagement {
         google()                     // HTTPS, работает на GitHub Actions
         mavenCentral()
         gradlePluginPortal()
-        // Оставляем HTTP как запасной (необязательно)
-        maven {
-            url = uri("http://dl.google.com/dl/android/maven2")
-            isAllowInsecureProtocol = true
-        }
+       
     }
 }
 

@@ -1,8 +1,6 @@
 name: Build APK
 
 on:
-  push:
-    branches: [ develop, main ]
   workflow_dispatch:
 
 jobs:
@@ -10,6 +8,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Clean Gradle cache
+        run: |
+          cd mobile/delivery_app/android
+          ./gradlew clean
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
