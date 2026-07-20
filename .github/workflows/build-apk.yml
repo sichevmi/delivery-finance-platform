@@ -11,6 +11,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.22.0'
@@ -22,22 +23,28 @@ jobs:
           rm -rf pubspec.lock
           flutter pub get
 
-      - name: Build APK
+      - name: Build APK with verbose
         run: |
           cd mobile/delivery_app
-          flutter build apk --release
+          flutter build apk --release --verbose
 
       - name: Find and copy APK
         run: |
           cd mobile/delivery_app
-          # Найдём все APK-файлы и скопируем их в корень для надёжности
-          find . -name "*.apk" -type f -exec cp {} ./app.apk \;
-          # Проверим, что скопировалось
-          ls -la app.apk || echo "No APK found"
+          echo "Searching for APK files..."
+          find . -name "*.apk" -type f
+          # Копируем первый найденный APK в корень с именем app.apk
+          APK_PATH=$(find . -name "*.apk" -type f | head -n 1)
+          if [ -n "$APK_PATH" ]; then
+            cp "$APK_PATH" ./app.apk
+            echo "APK copied from $APK_PATH"
+          else
+            echo "No APK found"
+            exit 1
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release
           path: mobile/delivery_app/app.apk
-        if: success() || failure()   # загрузим даже если сборка упала, но APK есть
