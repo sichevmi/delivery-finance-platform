@@ -40,6 +40,9 @@ mobile/delivery_app/android/.gradle/
 mobile/delivery_app/android/gradle/
 **/.gradle/
 **/build/
+*.apk
+*.zip
+*.tar.gz
 
 # Docker
 *.pid
