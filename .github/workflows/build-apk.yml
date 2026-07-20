@@ -16,17 +16,16 @@ jobs:
         with:
           flutter-version: '3.22.0'
 
-      - name: Clean and get deps
+      - name: Get dependencies
         run: |
           cd mobile/delivery_app
-          flutter clean
-          rm -rf pubspec.lock
           flutter pub get
 
-      - name: Build debug APK
+      - name: Build with Gradle directly
         run: |
-          cd mobile/delivery_app
-          flutter build apk --debug
+          cd mobile/delivery_app/android
+          chmod +x gradlew
+          ./gradlew assembleDebug --info   # --info покажет подробности
 
       - name: Find and upload APK
         run: |
