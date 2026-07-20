@@ -36,6 +36,10 @@ android/.gradle/
 android/.idea/
 android/local.properties
 *.iml
+mobile/delivery_app/android/.gradle/
+mobile/delivery_app/android/gradle/
+**/.gradle/
+**/build/
 
 # Docker
 *.pid

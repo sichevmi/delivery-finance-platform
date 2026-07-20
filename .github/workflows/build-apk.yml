@@ -10,38 +10,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.22.0'
-          channel: 'stable'
 
-      - name: Clean Flutter project
+      - name: Clean and get deps
         run: |
           cd mobile/delivery_app
           flutter clean
-
-      - name: Clear Gradle cache
-        run: |
-          rm -rf ~/.gradle/caches/
-          rm -rf mobile/delivery_app/android/.gradle
-
-      - name: Get dependencies with upgrade
-        run: |
-          cd mobile/delivery_app
-          flutter pub upgrade shared_preferences
+          rm -rf pubspec.lock
           flutter pub get
 
       - name: Build APK
-        run: | 
+        run: |
           cd mobile/delivery_app
-          flutter build apk --release
+          flutter build apk --release --no-tree-shake-icons
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: app-release
           path: mobile/delivery_app/build/app/outputs/flutter-apk/app-release.apk
