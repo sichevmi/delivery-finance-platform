@@ -22,12 +22,20 @@ jobs:
           rm -rf pubspec.lock
           flutter pub get
 
-      - name: Build APK
+      - name: Build APK with verbose output
         run: |
           cd mobile/delivery_app
-          flutter build apk --release --no-tree-shake-icons
+          flutter build apk --release --verbose
+        continue-on-error: true   # позволит продолжить даже при ошибке
 
-      - uses: actions/upload-artifact@v4
+      - name: List build folder (if exists)
+        run: |
+          ls -la mobile/delivery_app/build/ || echo "Build folder not found"
+          ls -la mobile/delivery_app/build/app/outputs/flutter-apk/ || echo "APK folder not found"
+
+      - name: Upload APK if exists
+        uses: actions/upload-artifact@v4
         with:
           name: app-release
           path: mobile/delivery_app/build/app/outputs/flutter-apk/app-release.apk
+        if: success() || failure()   # загружаем даже если сборка упала (если APK всё же создан)
