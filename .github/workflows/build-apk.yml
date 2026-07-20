@@ -22,20 +22,22 @@ jobs:
           rm -rf pubspec.lock
           flutter pub get
 
-      - name: Build APK with verbose output
+      - name: Build APK
         run: |
           cd mobile/delivery_app
-          flutter build apk --release --verbose
-        continue-on-error: true   # позволит продолжить даже при ошибке
+          flutter build apk --release
 
-      - name: List build folder (if exists)
+      - name: Find and copy APK
         run: |
-          ls -la mobile/delivery_app/build/ || echo "Build folder not found"
-          ls -la mobile/delivery_app/build/app/outputs/flutter-apk/ || echo "APK folder not found"
+          cd mobile/delivery_app
+          # Найдём все APK-файлы и скопируем их в корень для надёжности
+          find . -name "*.apk" -type f -exec cp {} ./app.apk \;
+          # Проверим, что скопировалось
+          ls -la app.apk || echo "No APK found"
 
-      - name: Upload APK if exists
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release
-          path: mobile/delivery_app/build/app/outputs/flutter-apk/app-release.apk
-        if: success() || failure()   # загружаем даже если сборка упала (если APK всё же создан)
+          path: mobile/delivery_app/app.apk
+        if: success() || failure()   # загрузим даже если сборка упала, но APK есть
