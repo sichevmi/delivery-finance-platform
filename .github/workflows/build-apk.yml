@@ -21,11 +21,11 @@ jobs:
           cd mobile/delivery_app
           flutter pub get
 
-      - name: Build with Gradle directly
+      - name: Build APK with gradlew
         run: |
           cd mobile/delivery_app/android
           chmod +x gradlew
-          ./gradlew assembleDebug --info   # --info покажет подробности
+          ./gradlew assembleDebug --stacktrace
 
       - name: Find and upload APK
         run: |
