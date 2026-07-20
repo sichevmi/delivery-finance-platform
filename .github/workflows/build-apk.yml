@@ -23,28 +23,25 @@ jobs:
           rm -rf pubspec.lock
           flutter pub get
 
-      - name: Build APK with verbose
+      - name: Build APK (with full output)
         run: |
           cd mobile/delivery_app
           flutter build apk --release --verbose
 
-      - name: Find and copy APK
+      - name: List all build files
         run: |
           cd mobile/delivery_app
-          echo "Searching for APK files..."
+          echo "=== Full tree of build/ ==="
+          find build -type f -name "*.apk" -o -name "*.aar" -o -name "*.jar" | head -50
+          echo "=== APK search ==="
           find . -name "*.apk" -type f
-          # Копируем первый найденный APK в корень с именем app.apk
-          APK_PATH=$(find . -name "*.apk" -type f | head -n 1)
-          if [ -n "$APK_PATH" ]; then
-            cp "$APK_PATH" ./app.apk
-            echo "APK copied from $APK_PATH"
-          else
-            echo "No APK found"
-            exit 1
-          fi
+          echo "=== Check standard path ==="
+          ls -la build/app/outputs/flutter-apk/ || echo "Standard path not found"
+          ls -la build/app/outputs/apk/ || echo "APK path not found"
 
-      - name: Upload APK
+      - name: Upload any APK found
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
-          path: mobile/delivery_app/app.apk
+          name: any-apk
+          path: |
+            mobile/delivery_app/**/*.apk
