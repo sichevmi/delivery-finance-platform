@@ -21,9 +21,21 @@ allprojects {
             url "http://dl.google.com/dl/android/maven2"
             allowInsecureProtocol = true
         }
+        maven {
+            url "http://download.flutter.io"
+            allowInsecureProtocol = true
+        }
     }
 }
 
-tasks.register('clean', Delete) {
+rootProject.buildDir = "../build"
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+}
+subprojects {
+    project.evaluationDependsOn(":app")
+}
+
+tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
