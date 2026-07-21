@@ -1,0 +1,137 @@
+name: Deploy to Test (finflow.ru)
+
+on:
+  push:
+    branches: [ develop ]
+  workflow_dispatch:   # ручной запуск
+
+jobs:
+  # 1. Запуск тестов бэкенда
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run backend tests
+        run: |
+          cd backend
+          pytest tests/ --cov=app --cov-report=xml
+
+      - name: Upload coverage report (optional)
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./backend/coverage.xml
+          flags: backend
+
+  # 2. Запуск тестов Flutter (если есть)
+  test-flutter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
+
+      - name: Install dependencies
+        run: |
+          cd mobile/delivery_app
+          flutter pub get
+
+      - name: Run Flutter tests
+        run: |
+          cd mobile/delivery_app
+          flutter test
+
+  # 3. Сборка и деплой бэкенда (выполняется только если тесты прошли)
+  deploy-backend:
+    needs: [test-backend, test-flutter]
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend Docker image
+        run: |
+          cd backend
+          docker build -t finflow-backend:test .
+
+      - name: Save Docker image to file
+        run: docker save finflow-backend:test -o finflow-backend.tar
+
+      - name: Copy image and docker-compose to server
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.TEST_HOST }}
+          username: ${{ secrets.TEST_USER }}
+          key: ${{ secrets.TEST_SSH_KEY }}
+          source: "finflow-backend.tar, infrastructure/docker-compose.test.yml, backend/.env.test"
+          target: "/home/${{ secrets.TEST_USER }}/finflow"
+
+      - name: Deploy and restart services
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.TEST_HOST }}
+          username: ${{ secrets.TEST_USER }}
+          key: ${{ secrets.TEST_SSH_KEY }}
+          script: |
+            cd /home/${{ secrets.TEST_USER }}/finflow
+            docker load -i finflow-backend.tar
+            # Заменяем переменные в docker-compose (можно через env_file)
+            docker-compose -f docker-compose.test.yml down
+            docker-compose -f docker-compose.test.yml up -d
+
+      - name: Run migrations on server
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.TEST_HOST }}
+          username: ${{ secrets.TEST_USER }}
+          key: ${{ secrets.TEST_SSH_KEY }}
+          script: |
+            cd /home/${{ secrets.TEST_USER }}/finflow
+            docker exec -i $(docker ps -qf "name=backend") alembic upgrade head
+
+  # 4. Сборка APK (можно использовать отдельный workflow или добавить сюда)
+  build-apk:
+    needs: [deploy-backend]
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
+
+      - name: Build APK
+        run: |
+          cd mobile/delivery_app
+          flutter pub get
+          flutter build apk --release
+
+      - name: Upload APK to server (для скачивания)
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.TEST_HOST }}
+          username: ${{ secrets.TEST_USER }}
+          key: ${{ secrets.TEST_SSH_KEY }}
+          source: "mobile/delivery_app/build/app/outputs/flutter-apk/app-release.apk"
+          target: "/var/www/finflow/apk/"
+
+      - name: Upload APK as artifact (опционально)
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: mobile/delivery_app/build/app/outputs/flutter-apk/app-release.apk
