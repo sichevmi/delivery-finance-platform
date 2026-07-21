@@ -20,6 +20,8 @@ services:
       - "6380:6379"
 
   backend:
+    env_file:
+    - ../infrastructure/.env.test
     build:
       context: ../backend
     container_name: delivery_backend
