@@ -46,3 +46,4 @@ jobs:
         with:
           name: app-debug
           path: mobile/delivery_app/app-debug.apk
+          retention-days: 7

@@ -62,3 +62,5 @@ mobile/delivery_app/android/gradle/
 # Системные
 Thumbs.db
 *.log
+hello_app
+android_old

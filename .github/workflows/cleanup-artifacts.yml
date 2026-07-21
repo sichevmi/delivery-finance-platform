@@ -1,0 +1,19 @@
+name: Cleanup old artifacts
+
+on:
+  schedule:
+    - cron: '0 0 * * *'   # каждый день в полночь
+  workflow_dispatch:      # ручной запуск
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete artifacts older than 7 days
+        run: |
+          # Получаем список артефактов старше 7 дней и удаляем их
+          gh api repos/${{ github.repository }}/actions/artifacts --paginate \
+            --jq '.artifacts[] | select(.created_at < "'"$(date -d '7 days ago' --iso-8601=seconds)"'") | .id' \
+            | xargs -I {} gh api -X DELETE repos/${{ github.repository }}/actions/artifacts/{}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
