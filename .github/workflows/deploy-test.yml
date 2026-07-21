@@ -12,6 +12,7 @@ jobs:
   deploy-backend:
     #needs: [test-backend, test-flutter]
     runs-on: ubuntu-latest
+    environment: test
     if: success()
     steps:
       - uses: actions/checkout@v4
@@ -29,7 +30,7 @@ jobs:
         with:
           host: ${{ secrets.TEST_HOST }}
           username: ${{ secrets.TEST_USER }}
-          key: ${{ secrets.TEST_SSH_KEY }}
+          password: ${{ secrets.TEST_PASSWORD }}
           source: "finflow-backend.tar, infrastructure/docker-compose.test.yml, backend/.env.test"
           target: "/home/${{ secrets.TEST_USER }}/finflow"
 
@@ -38,7 +39,7 @@ jobs:
         with:
           host: ${{ secrets.TEST_HOST }}
           username: ${{ secrets.TEST_USER }}
-          key: ${{ secrets.TEST_SSH_KEY }}
+          password: ${{ secrets.TEST_PASSWORD }}
           script: |
             cd /home/${{ secrets.TEST_USER }}/finflow
             docker load -i finflow-backend.tar
@@ -51,7 +52,7 @@ jobs:
         with:
           host: ${{ secrets.TEST_HOST }}
           username: ${{ secrets.TEST_USER }}
-          key: ${{ secrets.TEST_SSH_KEY }}
+          password: ${{ secrets.TEST_PASSWORD }}
           script: |
             cd /home/${{ secrets.TEST_USER }}/finflow
             docker exec -i $(docker ps -qf "name=backend") alembic upgrade head
@@ -79,7 +80,7 @@ jobs:
         with:
           host: ${{ secrets.TEST_HOST }}
           username: ${{ secrets.TEST_USER }}
-          key: ${{ secrets.TEST_SSH_KEY }}
+          password: ${{ secrets.TEST_PASSWORD }}
           source: "mobile/delivery_app/build/app/outputs/flutter-apk/app-release.apk"
           target: "/var/www/finflow/apk/"
 
