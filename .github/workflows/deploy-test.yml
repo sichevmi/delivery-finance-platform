@@ -3,89 +3,37 @@ name: Deploy to Test (finflow.ru)
 on:
   push:
     branches: [ develop ]
-  workflow_dispatch:   # ручной запуск
+  workflow_dispatch:
 
 jobs:
-  
-
-  # 3. Сборка и деплой бэкенда (выполняется только если тесты прошли)
-  deploy-backend:
-    #needs: [test-backend, test-flutter]
+  deploy:
     runs-on: ubuntu-latest
     environment: test
-    if: success()
+
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Build backend Docker image
-        run: |
-          cd backend
-          docker build -t finflow-backend:test .
-
-      - name: Save Docker image to file
-        run: docker save finflow-backend:test -o finflow-backend.tar
-
-      - name: Copy image and docker-compose to server
-        uses: appleboy/scp-action@v0.1.4
-        with:
-          host: ${{ secrets.TEST_HOST }}
-          username: ${{ secrets.TEST_USER }}
-          password: ${{ secrets.TEST_PASSWORD }}
-          source: "finflow-backend.tar, infrastructure/docker-compose.test.yml, backend/.env.test"
-          target: "/home/${{ secrets.TEST_USER }}/finflow"
-
-      - name: Deploy and restart services
+      # 2. Деплой через SSH
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.TEST_HOST }}
           username: ${{ secrets.TEST_USER }}
           password: ${{ secrets.TEST_PASSWORD }}
           script: |
-            cd /home/${{ secrets.TEST_USER }}/finflow
-            docker load -i finflow-backend.tar
-            # Заменяем переменные в docker-compose (можно через env_file)
-            docker-compose -f docker-compose.test.yml down
-            docker-compose -f docker-compose.test.yml up -d
-
-      - name: Run migrations on server
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.TEST_HOST }}
-          username: ${{ secrets.TEST_USER }}
-          password: ${{ secrets.TEST_PASSWORD }}
-          script: |
-            cd /home/${{ secrets.TEST_USER }}/finflow
-            docker exec -i $(docker ps -qf "name=backend") alembic upgrade head
-
-  # 4. Сборка APK (можно использовать отдельный workflow или добавить сюда)
-  build-apk:
-    needs: [deploy-backend]
-    runs-on: ubuntu-latest
-    if: success()
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.22.0'
-
-      - name: Build APK
-        run: |
-          cd mobile/delivery_app
-          flutter pub get
-          flutter build apk --release
-
-      - name: Upload APK to server (для скачивания)
-        uses: appleboy/scp-action@v0.1.4
-        with:
-          host: ${{ secrets.TEST_HOST }}
-          username: ${{ secrets.TEST_USER }}
-          password: ${{ secrets.TEST_PASSWORD }}
-          source: "mobile/delivery_app/build/app/outputs/flutter-apk/app-release.apk"
-          target: "/var/www/finflow/apk/"
-
-      - name: Upload APK as artifact (опционально)
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release
-          path: mobile/delivery_app/build/app/outputs/flutter-apk/app-release.apk
+            cd /var/www/delivery-finance-platform
+            
+            # Обновляем код из репозитория
+            git pull origin develop
+            
+            # Запускаем миграции (если есть изменения)
+            # Предполагается, что у вас есть виртуальное окружение и alembic настроен
+            cd backend
+            source venv/bin/activate
+            alembic upgrade head
+            
+            # Перезапускаем сервисы (если используете docker-compose)
+            cd ../infrastructure
+            docker-compose down
+            docker-compose up -d --build
+            
+            # Или если используете systemd / supervisor, перезапустите процесс
+            # systemctl restart finflow-backend
