@@ -18,7 +18,7 @@ services:
       context: ../backend
     container_name: delivery_backend
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5438/${POSTGRES_DB:-delivery_test}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-delivery_test}
       REDIS_URL: redis://redis:6379/0
       ENV_FILE: /app/infrastructure/.env.test
       RUN_MIGRATIONS: "true"
