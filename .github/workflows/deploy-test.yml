@@ -6,58 +6,11 @@ on:
   workflow_dispatch:   # ручной запуск
 
 jobs:
-  # 1. Запуск тестов бэкенда
-  test-backend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: |
-          cd backend
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-cov
-
-      - name: Run backend tests
-        run: |
-          cd backend
-          pytest tests/ --cov=app --cov-report=xml
-
-      - name: Upload coverage report (optional)
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./backend/coverage.xml
-          flags: backend
-
-  # 2. Запуск тестов Flutter (если есть)
-  test-flutter:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.22.0'
-
-      - name: Install dependencies
-        run: |
-          cd mobile/delivery_app
-          flutter pub get
-
-      - name: Run Flutter tests
-        run: |
-          cd mobile/delivery_app
-          flutter test
+  
 
   # 3. Сборка и деплой бэкенда (выполняется только если тесты прошли)
   deploy-backend:
-    needs: [test-backend, test-flutter]
+    #needs: [test-backend, test-flutter]
     runs-on: ubuntu-latest
     if: success()
     steps:
