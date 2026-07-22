@@ -110,3 +110,26 @@ init:
 	@echo "Building images..."
 	cd infrastructure && $(COMPOSE) --env-file .env.dev build
 	@echo "Done. Please edit .env files if needed."
+
+# ------------------------------
+# Тестовый стенд (finflow.ru)
+# ------------------------------
+
+test-logs:
+	@echo "📋 Логи бэкенда на тестовом сервере..."
+	ssh -i ~/.ssh/id_ed25519 root@finflow.ru 'docker logs delivery_backend --tail=50'
+
+test-upgrade-deps:
+	@echo "⬆️ Обновление bcrypt и passlib в контейнере на тестовом сервере..."
+	ssh -i ~/.ssh/id_ed25519 root@finflow.ru 'docker exec delivery_backend pip install --upgrade bcrypt passlib'
+	@echo "✅ Зависимости обновлены. Перезапустите бэкенд: make test-restart"
+
+test-restart:
+	@echo "🔄 Перезапуск бэкенда на тестовом сервере..."
+	ssh -i ~/.ssh/id_ed25519 root@finflow.ru 'docker restart delivery_backend'
+	@echo "✅ Бэкенд перезапущен."
+
+test-rebuild:
+	@echo "🔨 Пересборка образа бэкенда на тестовом сервере..."
+	ssh -i ~/.ssh/id_ed25519 root@finflow.ru 'cd /var/www/delivery-finance-platform/infrastructure && docker-compose --env-file .env.test build backend && docker-compose --env-file .env.test up -d'
+	@echo "✅ Образ пересобран и контейнеры перезапущены."
