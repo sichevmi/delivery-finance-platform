@@ -9,31 +9,20 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: test
-
     steps:
-      # 2. Деплой через SSH
+      - uses: actions/checkout@v4
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.TEST_HOST }}
           username: ${{ secrets.TEST_USER }}
-          password: ${{ secrets.TEST_PASSWORD }}
+          key: ${{ secrets.TEST_SSH_KEY }}
           script: |
             cd /var/www/delivery-finance-platform
-            
-            # Обновляем код из репозитория
             git pull origin develop
-            
-            # Запускаем миграции (если есть изменения)
-            # Предполагается, что у вас есть виртуальное окружение и alembic настроен
-            cd backend
-            source venv/bin/activate
-            alembic upgrade head
-            
-            # Перезапускаем сервисы (если используете docker-compose)
-            cd ../infrastructure
-            docker-compose down
-            docker-compose up -d --build
-            
-            # Или если используете systemd / supervisor, перезапустите процесс
-            # systemctl restart finflow-backend
+            cd infrastructure
+            docker-compose --env-file .env.test down
+            docker-compose --env-file .env.test up -d
+            sleep 5
+            docker exec delivery_backend alembic upgrade head

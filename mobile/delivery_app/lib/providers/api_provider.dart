@@ -4,7 +4,7 @@ import 'package:delivery_app/services/storage_service.dart';
 
 final dioProvider = Provider<Dio>((ref) {
   final dio = Dio(BaseOptions(
-    baseUrl: 'http://192.168.1.121:8001/api/v1', // замените на ваш IP
+    baseUrl: 'https://тест.финфлоу.рф/api/v1', // замените на ваш IP
     connectTimeout: const Duration(seconds: 10),
     receiveTimeout: const Duration(seconds: 10),
   ));
