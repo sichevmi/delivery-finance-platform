@@ -1,6 +1,7 @@
 import os
-from dotenv import load_dotenv
+
 import pg8000
+from dotenv import load_dotenv
 
 load_dotenv()
 url = os.getenv("DATABASE_URL")
@@ -13,7 +14,7 @@ try:
         port=5438,  # или 5432 – подставьте свой реальный порт
         user="postgres",
         password="postgres",
-        database="delivery"
+        database="delivery",
     )
     print("✅ Подключение успешно!")
     conn.close()

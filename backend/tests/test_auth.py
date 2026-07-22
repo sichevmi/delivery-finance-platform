@@ -1,7 +1,5 @@
-import pytest
-from app.core.config import settings
-from app.modules.users.models import User
 from app.core.security import verify_password
+from app.modules.users.models import User
 
 
 def test_register_success(client, db_session):
@@ -71,6 +69,7 @@ def test_login_missing_fields(client):
     response = client.post("/api/v1/auth/login", json={"email": "test@example.com"})
     assert response.status_code == 422
 
+
 def test_hello_with_valid_token(client, create_test_user, test_user_data):
     login_resp = client.post(
         "/api/v1/auth/login",
@@ -98,6 +97,7 @@ def test_hello_without_token(client):
     response = client.get("/api/v1/auth/hello")
     assert response.status_code == 403
 
+
 def test_refresh_token_success(client, create_test_user, test_user_data):
     """Обновление access токена по refresh токену."""
     # Логинимся
@@ -118,6 +118,7 @@ def test_refresh_with_invalid_token(client):
     """Невалидный refresh токен — 401."""
     response = client.post("/api/v1/auth/refresh", json={"refresh_token": "invalid"})
     assert response.status_code == 401
+
 
 def test_logout_success(client, create_test_user, test_user_data):
     """Успешный логаут: отзыв refresh токена."""

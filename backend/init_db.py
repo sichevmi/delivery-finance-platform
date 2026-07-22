@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import os
 import sys
+
+from app.core.database import Base
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 
@@ -17,9 +19,6 @@ if DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+pg8000://")
 
 print(f"🔗 Подключение: {DATABASE_URL}")
-
-from app.core.database import Base
-from app.modules.users.models import User, RefreshToken
 
 engine = create_engine(DATABASE_URL)
 
@@ -39,6 +38,8 @@ print("✅ Таблицы созданы (или уже существуют)")
 
 # Показываем список таблиц
 with engine.connect() as conn:
-    result = conn.execute(text("SELECT table_name FROM information_schema.tables WHERE table_schema='public'"))
+    result = conn.execute(
+        text("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
+    )
     tables = [row[0] for row in result]
     print(f"📋 Таблицы: {', '.join(tables)}")

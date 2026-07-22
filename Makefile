@@ -144,11 +144,11 @@ run-dev:
 
 run-test:
 	@echo "🚀 Запуск приложения с тестовым бэкендом (finflow.ru)..."
-	cd mobile/delivery_app && flutter run -d chrome --dart-define=API_BASE_URL="http://тест.финфлоу.рф:8001/api/v1"
+	cd mobile/delivery_app && flutter run -d chrome --dart-define=API_BASE_URL="http://195.19.20.178:8001/api/v1"
 
 apk-test:
 	@echo "📱 Сборка APK для тестового стенда..."
-	cd mobile/delivery_app && flutter build apk --release --dart-define=API_BASE_URL="http://тест.финфлоу.рф:8001/api/v1"
+	cd mobile/delivery_app && flutter build apk --release --dart-define=API_BASE_URL="http://195.19.20.178:8001/api/v1"
 	@echo "APK готов: mobile/delivery_app/build/app/outputs/flutter-apk/app-release.apk"
 
 apk-dev:

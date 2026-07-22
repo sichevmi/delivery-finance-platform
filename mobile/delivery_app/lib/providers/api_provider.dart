@@ -42,7 +42,8 @@ final dioProvider = Provider<Dio>((ref) {
         final refreshToken = await storage.getRefreshToken();
         if (refreshToken != null) {
           try {
-            final response = await dio.post('/auth/refresh', data: {'refresh_token': refreshToken});
+            final response = await dio
+                .post('/auth/refresh', data: {'refresh_token': refreshToken});
             final newAccess = response.data['access_token'];
             final newRefresh = response.data['refresh_token'] ?? refreshToken;
             await storage.saveTokens(newAccess, newRefresh);
@@ -66,4 +67,5 @@ final dioProvider = Provider<Dio>((ref) {
   return dio;
 });
 
-final storageServiceProvider = Provider<StorageService>((ref) => StorageService());
+final storageServiceProvider =
+    Provider<StorageService>((ref) => StorageService());

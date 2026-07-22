@@ -30,11 +30,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> register(String email, String password) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      await dio.post('/auth/register', data: {'email': email, 'password': password});
+      await dio
+          .post('/auth/register', data: {'email': email, 'password': password});
       // После регистрации сразу логиним?
       await login(email, password);
     } on DioException catch (e) {
-      state = state.copyWith(isLoading: false, error: e.response?.data['detail'] ?? 'Ошибка регистрации');
+      state = state.copyWith(
+          isLoading: false,
+          error: e.response?.data['detail'] ?? 'Ошибка регистрации');
     } catch (e) {
       state = state.copyWith(isLoading: false, error: 'Неизвестная ошибка');
     }
@@ -43,7 +46,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> login(String email, String password) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final response = await dio.post('/auth/login', data: {'email': email, 'password': password});
+      final response = await dio
+          .post('/auth/login', data: {'email': email, 'password': password});
       print('🔐 Login response status: ${response.statusCode}');
       print('🔐 Login response data: ${response.data}');
 

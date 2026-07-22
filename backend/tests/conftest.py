@@ -1,22 +1,17 @@
 import sys
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-import asyncio
-import os
 from typing import AsyncGenerator, Generator
 
 import pytest
+from app.core.database import Base, get_db
+from app.main import app
 from fastapi.testclient import TestClient
 from httpx import AsyncClient
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.core.database import Base, get_db
-from app.core.config import settings
-from app.main import app
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 # Создаём тестовую БД (SQLite в памяти для скорости)
@@ -31,6 +26,7 @@ engine = create_engine(
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+
 # Переопределяем зависимость get_db для тестов
 def override_get_db():
     db = TestingSessionLocal()
@@ -38,6 +34,7 @@ def override_get_db():
         yield db
     finally:
         db.close()
+
 
 app.dependency_overrides[get_db] = override_get_db
 

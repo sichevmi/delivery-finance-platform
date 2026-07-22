@@ -50,7 +50,8 @@ class HomeScreen extends ConsumerWidget {
                   );
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Ошибка получения приветствия')),
+                    const SnackBar(
+                        content: Text('Ошибка получения приветствия')),
                   );
                 }
               },

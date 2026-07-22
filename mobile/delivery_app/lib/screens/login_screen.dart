@@ -26,7 +26,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     if (authState.user != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+        Navigator.pushReplacement(
+            context, MaterialPageRoute(builder: (_) => const HomeScreen()));
       });
     }
 
@@ -42,7 +43,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               TextFormField(
                 controller: _emailController,
                 decoration: const InputDecoration(labelText: 'Email'),
-                validator: (v) => v != null && EmailValidator.validate(v) ? null : 'Введите email',
+                validator: (v) => v != null && EmailValidator.validate(v)
+                    ? null
+                    : 'Введите email',
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -51,28 +54,38 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 decoration: InputDecoration(
                   labelText: 'Пароль',
                   suffixIcon: IconButton(
-                    icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
+                    icon: Icon(
+                        _obscure ? Icons.visibility : Icons.visibility_off),
                     onPressed: () => setState(() => _obscure = !_obscure),
                   ),
                 ),
-                validator: (v) => v != null && v.length >= 6 ? null : 'Минимум 6 символов',
+                validator: (v) =>
+                    v != null && v.length >= 6 ? null : 'Минимум 6 символов',
               ),
               const SizedBox(height: 20),
-              if (authState.error != null) Text(authState.error!, style: const TextStyle(color: Colors.red)),
+              if (authState.error != null)
+                Text(authState.error!,
+                    style: const TextStyle(color: Colors.red)),
               const SizedBox(height: 10),
               ElevatedButton(
                 onPressed: authState.isLoading
                     ? null
                     : () async {
                         if (_formKey.currentState!.validate()) {
-                          await authNotifier.login(_emailController.text, _passwordController.text);
+                          await authNotifier.login(
+                              _emailController.text, _passwordController.text);
                         }
                       },
-                child: authState.isLoading ? const CircularProgressIndicator() : const Text('Войти'),
+                child: authState.isLoading
+                    ? const CircularProgressIndicator()
+                    : const Text('Войти'),
               ),
               TextButton(
                 onPressed: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen()));
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const RegisterScreen()));
                 },
                 child: const Text('Нет аккаунта? Зарегистрироваться'),
               ),
