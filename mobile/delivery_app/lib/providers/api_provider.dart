@@ -1,15 +1,32 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:delivery_app/services/storage_service.dart';
 
+// Базовый URL по умолчанию — для локальной разработки
+const String defaultBaseUrl = 'http://localhost:8001/api/v1';
+
+// Получаем URL из dart-define или используем default
+String get baseUrl {
+  // const String.fromEnvironment работает только если переменная передана через --dart-define
+  const String envBaseUrl = String.fromEnvironment('API_BASE_URL');
+  return envBaseUrl.isNotEmpty ? envBaseUrl : defaultBaseUrl;
+}
+
 final dioProvider = Provider<Dio>((ref) {
   final dio = Dio(BaseOptions(
-    baseUrl: 'http://195.19.20.178:8001/api/v1', // замените на ваш IP
-    connectTimeout: const Duration(seconds: 10),
-    receiveTimeout: const Duration(seconds: 10),
+    baseUrl: baseUrl,
+    connectTimeout: const Duration(seconds: 30),
+    receiveTimeout: const Duration(seconds: 30),
   ));
 
-  // Интерцептор для добавления access токена
+  // Разрешаем самоподписанные сертификаты для тестового стенда (если используете HTTPS)
+  // (dio.httpClientAdapter as DefaultHttpClientAdapter).onHttpClientCreate = (client) {
+  //   client.badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+  //   return client;
+  // };
+
+  // Интерцепторы (без изменений)
   dio.interceptors.add(InterceptorsWrapper(
     onRequest: (options, handler) async {
       final storage = ref.read(storageServiceProvider);
@@ -20,20 +37,15 @@ final dioProvider = Provider<Dio>((ref) {
       return handler.next(options);
     },
     onError: (error, handler) async {
-      // Если 401 – попробуем обновить токен
       if (error.response?.statusCode == 401) {
         final storage = ref.read(storageServiceProvider);
         final refreshToken = await storage.getRefreshToken();
         if (refreshToken != null) {
           try {
-            // Вызываем /auth/refresh
-            final dio2 = Dio(BaseOptions(baseUrl: 'http://195.19.20.178:8001/api/v1'));
-            final response = await dio2.post('/auth/refresh', data: {'refresh_token': refreshToken});
+            final response = await dio.post('/auth/refresh', data: {'refresh_token': refreshToken});
             final newAccess = response.data['access_token'];
-            final newRefresh = response.data['refresh_token'] ?? refreshToken; // или новый refresh, если приходит
+            final newRefresh = response.data['refresh_token'] ?? refreshToken;
             await storage.saveTokens(newAccess, newRefresh);
-
-            // Повторяем исходный запрос с новым токеном
             final opts = error.requestOptions;
             opts.headers['Authorization'] = 'Bearer $newAccess';
             final clone = await dio.request(opts.path,
@@ -42,9 +54,7 @@ final dioProvider = Provider<Dio>((ref) {
                 queryParameters: opts.queryParameters);
             return handler.resolve(clone);
           } catch (e) {
-            // Если обновление не удалось, разлогиниваем
             await storage.clearTokens();
-            // Можно выбросить ошибку или редирект
             return handler.reject(error);
           }
         }

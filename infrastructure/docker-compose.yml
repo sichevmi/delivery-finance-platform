@@ -28,7 +28,6 @@ services:
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: ${SECRET_KEY}
       REFRESH_SECRET_KEY: ${REFRESH_SECRET_KEY}
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
       RUN_MIGRATIONS: "true"
     ports:
       - "${BACKEND_PORT}:8000"

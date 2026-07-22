@@ -133,3 +133,25 @@ test-rebuild:
 	@echo "🔨 Пересборка образа бэкенда на тестовом сервере..."
 	ssh -i ~/.ssh/id_ed25519 root@195.19.20.178 'cd /var/www/delivery-finance-platform/infrastructure && docker-compose --env-file .env.test build backend && docker-compose --env-file .env.test up -d'
 	@echo "✅ Образ пересобран и контейнеры перезапущены."
+
+# ------------------------------
+# Запуск мобильного приложения с разными окружениями
+# ------------------------------
+
+run-dev:
+	@echo "🚀 Запуск приложения с локальным бэкендом (localhost:8001)..."
+	cd mobile/delivery_app && flutter run -d chrome
+
+run-test:
+	@echo "🚀 Запуск приложения с тестовым бэкендом (finflow.ru)..."
+	cd mobile/delivery_app && flutter run -d chrome --dart-define=API_BASE_URL="http://тест.финфлоу.рф:8001/api/v1"
+
+apk-test:
+	@echo "📱 Сборка APK для тестового стенда..."
+	cd mobile/delivery_app && flutter build apk --release --dart-define=API_BASE_URL="http://тест.финфлоу.рф:8001/api/v1"
+	@echo "APK готов: mobile/delivery_app/build/app/outputs/flutter-apk/app-release.apk"
+
+apk-dev:
+	@echo "📱 Сборка APK для локального бэкенда (localhost)..."
+	cd mobile/delivery_app && flutter build apk --release
+	@echo "APK готов: mobile/delivery_app/build/app/outputs/flutter-apk/app-release.apk"
