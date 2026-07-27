@@ -41,14 +41,14 @@ class OrderSummaryScreen extends ConsumerWidget {
     final shopDistance = firstDelivery?.distanceToShop ?? 0.0;
     final receivingTime = firstDelivery?.timeReceiving ?? 0;
 
-    // Рассчитываем стоимость магазина (получение + вес)
+    // Рассчитываем стоимость магазина (получение + вес) с учётом коэффициента
     final shopWeight = firstDelivery?.weight ?? 0.0;
-    final shopCost = pricing.receivingFee + (shopWeight * pricing.pricePerKg);
+    final shopCost = (pricing.receivingFee + (shopWeight * pricing.pricePerKg)) * coefficient;
 
-    // Рассчитываем стоимость каждой доставки
+    // Рассчитываем стоимость каждой доставки с учётом коэффициента
     double totalDeliveriesCost = 0.0;
     for (final d in deliveries) {
-      final deliveryCost = pricing.deliveryFee + (d.distanceToClient * pricing.pricePerKm);
+      final deliveryCost = (pricing.deliveryFee + (d.distanceToClient * pricing.pricePerKm)) * coefficient;
       totalDeliveriesCost += deliveryCost;
     }
 
@@ -151,7 +151,7 @@ class OrderSummaryScreen extends ConsumerWidget {
                       const SizedBox(width: 6),
                       _buildDetailChip(
                         Icons.info_outline,
-                        '(${pricing.receivingFee.toStringAsFixed(0)} руб. + ${shopWeight.toStringAsFixed(1)} кг × ${pricing.pricePerKg.toStringAsFixed(0)} руб.)',
+                        '(${pricing.receivingFee.toStringAsFixed(0)} руб. + ${shopWeight.toStringAsFixed(1)} кг × ${pricing.pricePerKg.toStringAsFixed(0)} руб.) × $coefficient',
                         color: const Color(0xFF888888),
                       ),
                     ],
@@ -168,7 +168,7 @@ class OrderSummaryScreen extends ConsumerWidget {
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
                   final d = deliveries[index];
-                  final deliveryCost = pricing.deliveryFee + (d.distanceToClient * pricing.pricePerKm);
+                  final deliveryCost = (pricing.deliveryFee + (d.distanceToClient * pricing.pricePerKm)) * coefficient;
                   return _buildDeliveryCard(d, deliveryCost, pricing);
                 },
               ),
@@ -355,7 +355,7 @@ class OrderSummaryScreen extends ConsumerWidget {
               _buildDetailChip(Icons.home, 'Выдача: ${_formatTime(d.timeDelivery)}'),
               _buildDetailChip(
                 Icons.attach_money,
-                '${pricing.deliveryFee.toStringAsFixed(0)} руб. + ${d.distanceToClient.toStringAsFixed(1)} км × ${pricing.pricePerKm.toStringAsFixed(0)} руб.',
+                '(${pricing.deliveryFee.toStringAsFixed(0)} руб. + ${d.distanceToClient.toStringAsFixed(1)} км × ${pricing.pricePerKm.toStringAsFixed(0)} руб.) × $coefficient',
                 color: const Color(0xFF888888),
                 fontSize: 10,
               ),

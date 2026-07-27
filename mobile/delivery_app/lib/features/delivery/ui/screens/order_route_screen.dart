@@ -70,6 +70,14 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
   StreamSubscription<double>? _gpsSubscription;
   bool _isGpsInitialized = false;
 
+  // ---- Сохранённые данные по сегментам ----
+  int _timeToShop = 0;
+  double _distanceToShop = 0.0;
+  int _timeReceiving = 0;
+  int _timeToClient = 0;
+  double _distanceToClient = 0.0;
+  int _timeDelivery = 0;
+
   // Общие данные
   late double _coefficient;
   double? _weight;
@@ -88,39 +96,16 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
   String? _shopAddress;
 
   @override
-void initState() {
-  super.initState();
-  WidgetsBinding.instance.addObserver(this);
-  _currentSegment = widget.segmentIndex;
-  _coefficient = widget.coefficient;
-  _baseCost = 250.0;
-  
-  _checkPermissionsAndInit();
-  _startSegment();
-}
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _currentSegment = widget.segmentIndex;
+    _coefficient = widget.coefficient;
+    _baseCost = 250.0;
 
-Future<void> _checkPermissionsAndInit() async {
-  print('🔵 Checking permissions...');
-  final hasPermission = await _gpsService.requestPermissions(context);
-  print('🔵 Permissions result: $hasPermission');
-  if (hasPermission) {
-    _gpsSubscription = _gpsService.distanceStream.listen((distance) {
-      print('📊 GPS distance update: $distance km');
-      if (mounted) {
-        setState(() {
-          _distance = distance;
-        });
-      }
-    });
-    _isGpsInitialized = true;
-    print('🟢 GPS initialized successfully');
-  } else {
-    print('🔴 GPS permission denied, switching to manual input');
-    setState(() {
-      _useGps = false;
-    });
+    _initGps();
+    _startSegment();
   }
-}
 
   @override
   void dispose() {
@@ -161,25 +146,21 @@ Future<void> _checkPermissionsAndInit() async {
   }
 
   void _startSegment() {
-  print('🔵 _startSegment() called for segment $_currentSegment');
-  _segmentStartTime = DateTime.now();
-  _totalPauseDuration = Duration.zero;
-  _isPaused = false;
-  _pauseStartTime = null;
-  
-  _gpsService.resetDistance();
-  _distance = 0.0;
-  _distanceController.text = '';
-  
-  if (_useGps && _currentSegment != 1 && _currentSegment != 3) {
-    print('🟢 Starting GPS tracking for segment $_currentSegment');
-    _gpsService.startTracking();
-  } else {
-    print('🟡 GPS not started: useGps=$_useGps, segment=$_currentSegment');
+    _segmentStartTime = DateTime.now();
+    _totalPauseDuration = Duration.zero;
+    _isPaused = false;
+    _pauseStartTime = null;
+
+    _gpsService.resetDistance();
+    _distance = 0.0;
+    _distanceController.text = '';
+
+    if (_useGps && _currentSegment != 1 && _currentSegment != 3) {
+      _gpsService.startTracking();
+    }
+
+    setState(() {});
   }
-  
-  setState(() {});
-}
 
   void _togglePause() {
     setState(() {
@@ -229,6 +210,28 @@ Future<void> _checkPermissionsAndInit() async {
     }
     if (_useGps) {
       _gpsService.stopTracking();
+    }
+  }
+
+  // ---- Сохранение данных текущего сегмента ----
+  void _saveCurrentSegmentData() {
+    final time = _getSegmentTime();
+    final distance = _getDistance();
+    switch (_currentSegment) {
+      case 0: // В магазин
+        _timeToShop = time;
+        _distanceToShop = distance;
+        break;
+      case 1: // Получение
+        _timeReceiving = time;
+        break;
+      case 2: // К клиенту
+        _timeToClient = time;
+        _distanceToClient = distance;
+        break;
+      case 3: // Выдача
+        _timeDelivery = time;
+        break;
     }
   }
 
@@ -659,9 +662,9 @@ Future<void> _checkPermissionsAndInit() async {
     final deliveryLabel = _deliveryNumber > 1 ? ' (Доставка #$_deliveryNumber)' : '';
 
     final pricing = ref.watch(pricingProvider);
-    double currentCost = pricing.receivingFee;
+    double currentCost = pricing.receivingFee * _coefficient;
     if (_weight != null && _weight! > 0) {
-      currentCost += _weight! * pricing.pricePerKg;
+      currentCost += _weight! * pricing.pricePerKg * _coefficient;
     }
 
     return Column(
@@ -822,7 +825,7 @@ Future<void> _checkPermissionsAndInit() async {
     final deliveryLabel = _deliveryNumber > 1 ? ' (Доставка #$_deliveryNumber)' : '';
 
     final pricing = ref.watch(pricingProvider);
-    double currentCost = pricing.deliveryFee + (_getDistance() * pricing.pricePerKm);
+    double currentCost = (pricing.deliveryFee + (_getDistance() * pricing.pricePerKm)) * _coefficient;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1135,6 +1138,9 @@ Future<void> _checkPermissionsAndInit() async {
   }
 
   void _handleMainAction() {
+    // Сохраняем данные текущего сегмента перед переходом
+    _saveCurrentSegmentData();
+
     switch (_currentSegment) {
       case 0:
         _shopAddress = 'ул. Ленина, 25, г. Москва';
@@ -1172,22 +1178,21 @@ Future<void> _checkPermissionsAndInit() async {
     final apartment = _apartmentController.text.trim();
     if (apartment.isEmpty) return;
 
+    // Сохраняем данные последнего сегмента (Выдача)
+    _saveCurrentSegmentData();
     _finishSegment();
-
-    final segmentTime = _getSegmentTime();
-    final distance = _getDistance();
 
     final delivery = Delivery(
       number: _deliveryNumber,
       clientAddress: _clientAddress ?? 'Неизвестный адрес',
       weight: _weight ?? 0.0,
       apartment: apartment,
-      timeToShop: _currentSegment == 0 ? segmentTime : 0,
-      distanceToShop: _currentSegment == 0 ? distance : 0.0,
-      timeReceiving: _currentSegment == 1 ? segmentTime : 0,
-      timeToClient: _currentSegment == 2 ? segmentTime : 0,
-      distanceToClient: _currentSegment == 2 ? distance : 0.0,
-      timeDelivery: _currentSegment == 3 ? segmentTime : 0,
+      timeToShop: _timeToShop,
+      distanceToShop: _distanceToShop,
+      timeReceiving: _timeReceiving,
+      timeToClient: _timeToClient,
+      distanceToClient: _distanceToClient,
+      timeDelivery: _timeDelivery,
     );
 
     _completedDeliveries.add(delivery);
@@ -1264,11 +1269,13 @@ Future<void> _checkPermissionsAndInit() async {
   double _calculateTotalCost(PricingConfig pricing) {
     if (_completedDeliveries.isEmpty) return 0.0;
 
+    // Стоимость магазина (из первой доставки) с учётом коэффициента
     final first = _completedDeliveries.first;
-    double total = pricing.receivingFee + (first.weight * pricing.pricePerKg);
+    double total = (pricing.receivingFee + (first.weight * pricing.pricePerKg)) * _coefficient;
 
+    // Стоимость каждой доставки с учётом коэффициента
     for (final d in _completedDeliveries) {
-      total += pricing.deliveryFee + (d.distanceToClient * pricing.pricePerKm);
+      total += (pricing.deliveryFee + (d.distanceToClient * pricing.pricePerKm)) * _coefficient;
     }
 
     return total;

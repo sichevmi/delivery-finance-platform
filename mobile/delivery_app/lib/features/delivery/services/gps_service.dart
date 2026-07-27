@@ -14,12 +14,14 @@ class GpsService {
   Position? _lastPosition;
   bool _isPaused = false;
 
-  static const double _alpha = 0.3;
+  // Меньше сглаживания — точнее
+  static const double _alpha = 0.15;
   Position? _smoothedPosition;
 
-  // Минимальная скорость для засчёта движения (м/с) - 0.5 м/с ≈ 1.8 км/ч
-  // Это отсекает дрейф координат при неподвижном телефоне
-  static const double _minSpeed = 0.5;
+  // Минимальное расстояние для засчёта перемещения (0.5 м) - чтобы не игнорировать мелкие движения
+  static const double _minDistance = 0.5;
+  // Минимальная скорость отключаем — будем полагаться только на расстояние
+  // static const double _minSpeed = 0.0; // не используем
 
   double get currentDistance => _totalDistance;
 
@@ -110,9 +112,11 @@ class GpsService {
     _smoothedPosition = null;
     print('🟢 GPS: tracking started, waiting for position...');
 
+    // Настройки для максимальной точности и частоты
     const locationSettings = LocationSettings(
       accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 2,
+      distanceFilter: 0, // обрабатываем все обновления
+      // intervalDuration: Duration(seconds: 1), // если поддерживается
     );
 
     _positionStream = Geolocator.getPositionStream(
@@ -120,8 +124,8 @@ class GpsService {
     ).listen((Position rawPosition) {
       print('📍 GPS: raw position - lat: ${rawPosition.latitude}, lon: ${rawPosition.longitude}');
 
-      // Игнорируем плохой сигнал
-      if (rawPosition.accuracy > 20) {
+      // Фильтр по точности (отбрасываем совсем плохие сигналы)
+      if (rawPosition.accuracy > 25) {
         print('⚠️ GPS: poor accuracy (${rawPosition.accuracy}m), ignoring');
         return;
       }
@@ -131,14 +135,10 @@ class GpsService {
         return;
       }
 
-      // Сглаживаем координаты
       final position = _smoothPosition(rawPosition);
 
-      // Игнорируем, если скорость меньше минимальной (стоим на месте)
-      if (position.speed != null && position.speed! < _minSpeed) {
-        print('⏸️ GPS: speed too low (${position.speed!.toStringAsFixed(2)} m/s), ignoring');
-        return;
-      }
+      // Проверка по скорости больше не используется.
+      // Вместо этого просто смотрим на расстояние.
 
       if (_lastPosition != null) {
         final distance = Geolocator.distanceBetween(
@@ -148,13 +148,13 @@ class GpsService {
           position.longitude,
         );
 
-        // Игнорируем слишком маленькие перемещения (шум)
-        if (distance < 1.0) {
+        // Минимальное расстояние для засчёта (0.5 м)
+        if (distance < _minDistance) {
           print('📏 GPS: distance too small (${distance.toStringAsFixed(2)}m), ignoring');
           return;
         }
 
-        // Если расстояние очень большое (более 500 метров за одно обновление) — считаем выбросом
+        // Экстремальный выброс (>500 м) — игнорируем
         if (distance > 500) {
           print('⚠️ GPS: extreme jump (${distance.toStringAsFixed(2)}m > 500m), ignoring');
           return;
