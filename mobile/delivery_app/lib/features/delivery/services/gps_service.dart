@@ -17,8 +17,9 @@ class GpsService {
   static const double _alpha = 0.3;
   Position? _smoothedPosition;
 
-  // Минимальная скорость для засчёта движения (м/с)
-  static const double _minSpeed = 0.2; // ~0.7 км/ч
+  // Минимальная скорость для засчёта движения (м/с) - 0.5 м/с ≈ 1.8 км/ч
+  // Это отсекает дрейф координат при неподвижном телефоне
+  static const double _minSpeed = 0.5;
 
   double get currentDistance => _totalDistance;
 
@@ -111,7 +112,7 @@ class GpsService {
 
     const locationSettings = LocationSettings(
       accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 5, // увеличили до 5 метров
+      distanceFilter: 2,
     );
 
     _positionStream = Geolocator.getPositionStream(
@@ -119,6 +120,7 @@ class GpsService {
     ).listen((Position rawPosition) {
       print('📍 GPS: raw position - lat: ${rawPosition.latitude}, lon: ${rawPosition.longitude}');
 
+      // Игнорируем плохой сигнал
       if (rawPosition.accuracy > 20) {
         print('⚠️ GPS: poor accuracy (${rawPosition.accuracy}m), ignoring');
         return;
@@ -129,9 +131,10 @@ class GpsService {
         return;
       }
 
+      // Сглаживаем координаты
       final position = _smoothPosition(rawPosition);
 
-      // Проверяем скорость: если скорость меньше минимальной, считаем, что стоим
+      // Игнорируем, если скорость меньше минимальной (стоим на месте)
       if (position.speed != null && position.speed! < _minSpeed) {
         print('⏸️ GPS: speed too low (${position.speed!.toStringAsFixed(2)} m/s), ignoring');
         return;
@@ -145,17 +148,15 @@ class GpsService {
           position.longitude,
         );
 
-        if (distance < 1.5) {
+        // Игнорируем слишком маленькие перемещения (шум)
+        if (distance < 1.0) {
           print('📏 GPS: distance too small (${distance.toStringAsFixed(2)}m), ignoring');
           return;
         }
 
-        const maxSpeed = 3.0; // 10.8 км/ч (пешком)
-        final timeDelta = position.timestamp.difference(_lastPosition!.timestamp).inSeconds;
-        final maxDistancePerUpdate = maxSpeed * timeDelta.clamp(1, 5);
-
-        if (distance > maxDistancePerUpdate) {
-          print('⚠️ GPS: suspicious jump (${distance.toStringAsFixed(2)}m > ${maxDistancePerUpdate.toStringAsFixed(2)}m), ignoring');
+        // Если расстояние очень большое (более 500 метров за одно обновление) — считаем выбросом
+        if (distance > 500) {
+          print('⚠️ GPS: extreme jump (${distance.toStringAsFixed(2)}m > 500m), ignoring');
           return;
         }
 
