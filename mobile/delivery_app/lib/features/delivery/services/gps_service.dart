@@ -45,8 +45,8 @@ class GpsService {
   print('🟢 GPS: tracking started, waiting for position...');
 
   const locationSettings = LocationSettings(
-    accuracy: LocationAccuracy.best,
-    distanceFilter: 5,
+    accuracy: LocationAccuracy.bestForNavigation,
+    distanceFilter: 1, // обновления только при перемещении > 1 метра
   );
 
   _positionStream = Geolocator.getPositionStream(
@@ -65,11 +65,19 @@ class GpsService {
         position.latitude,
         position.longitude,
       );
-        // Игнорируем перемещения меньше 0.5 метра
+      
+      // Игнорируем слишком маленькие перемещения (шум)
       if (distance < 0.5) {
         print('📏 GPS: distance too small (${distance.toStringAsFixed(2)}m), ignoring');
         return;
       }
+      
+      // Игнорируем слишком большие скачки (выбросы)
+      if (distance > 20) { // максимум 20 метров за одно обновление (пешком ~20 км/ч)
+        print('⚠️ GPS: suspicious jump (${distance.toStringAsFixed(2)}m), ignoring');
+        return;
+      }
+
       print('📏 GPS: distance since last update: ${distance.toStringAsFixed(2)} meters');
       _totalDistance += distance / 1000;
       print('📏 GPS: total distance: ${_totalDistance.toStringAsFixed(4)} km');
