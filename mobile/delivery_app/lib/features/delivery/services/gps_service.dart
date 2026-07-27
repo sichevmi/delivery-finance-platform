@@ -66,7 +66,7 @@ class GpsService {
   }
 
   void startTracking() {
-    print('🟢 GPS: startTracking() called (NO FILTERS)');
+    print('🟢 GPS: startTracking() called (MINIMAL FILTERS)');
     if (_isTracking) {
       print('🟡 GPS: already tracking, ignoring');
       return;
@@ -79,7 +79,7 @@ class GpsService {
 
     const locationSettings = LocationSettings(
       accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 0, // НЕТ ФИЛЬТРА
+      distanceFilter: 3, // игнорируем перемещения < 3 метров
     );
 
     _positionStream = Geolocator.getPositionStream(
@@ -94,6 +94,19 @@ class GpsService {
           position.latitude,
           position.longitude,
         );
+
+        // Игнорируем шум меньше 2 метров
+        if (distance < 2.0) {
+          print('📏 GPS: distance too small (${distance.toStringAsFixed(2)}m), ignoring');
+          return;
+        }
+
+        // Игнорируем явные выбросы (> 200 метров)
+        if (distance > 200) {
+          print('⚠️ GPS: extreme jump (${distance.toStringAsFixed(2)}m > 200m), ignoring');
+          return;
+        }
+
         print('📏 GPS: distance: ${distance.toStringAsFixed(2)}m, total: ${_totalDistance.toStringAsFixed(4)}km');
         _totalDistance += distance / 1000;
       }
