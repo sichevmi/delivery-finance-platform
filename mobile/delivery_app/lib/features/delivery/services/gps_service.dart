@@ -32,36 +32,49 @@ class GpsService {
   }
 
   void startTracking() {
-    if (_isTracking) return;
-
-    _isTracking = true;
-    _isPaused = false;
-    _totalDistance = 0.0;
-    _lastPosition = null;
-
-    const locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 5,
-    );
-
-    _positionStream = Geolocator.getPositionStream(
-      locationSettings: locationSettings,
-    ).listen((Position position) {
-      if (_isPaused) return;
-
-      if (_lastPosition != null) {
-        final distance = Geolocator.distanceBetween(
-          _lastPosition!.latitude,
-          _lastPosition!.longitude,
-          position.latitude,
-          position.longitude,
-        );
-        _totalDistance += distance / 1000;
-      }
-      _lastPosition = position;
-      _distanceStreamController.add(_totalDistance);
-    });
+  print('🟢 GPS: startTracking() called');
+  if (_isTracking) {
+    print('🟡 GPS: already tracking, ignoring');
+    return;
   }
+
+  _isTracking = true;
+  _isPaused = false;
+  _totalDistance = 0.0;
+  _lastPosition = null;
+  print('🟢 GPS: tracking started, waiting for position...');
+
+  const locationSettings = LocationSettings(
+    accuracy: LocationAccuracy.bestForNavigation,
+    distanceFilter: 0,
+  );
+
+  _positionStream = Geolocator.getPositionStream(
+    locationSettings: locationSettings,
+  ).listen((Position position) {
+    print('📍 GPS: position received - lat: ${position.latitude}, lon: ${position.longitude}');
+    if (_isPaused) {
+      print('⏸️ GPS: paused, ignoring position');
+      return;
+    }
+
+    if (_lastPosition != null) {
+      final distance = Geolocator.distanceBetween(
+        _lastPosition!.latitude,
+        _lastPosition!.longitude,
+        position.latitude,
+        position.longitude,
+      );
+      print('📏 GPS: distance since last update: ${distance.toStringAsFixed(2)} meters');
+      _totalDistance += distance / 1000;
+      print('📏 GPS: total distance: ${_totalDistance.toStringAsFixed(4)} km');
+    } else {
+      print('🟢 GPS: first position, initializing');
+    }
+    _lastPosition = position;
+    _distanceStreamController.add(_totalDistance);
+  });
+}
 
   void pauseTracking() {
     _isPaused = true;

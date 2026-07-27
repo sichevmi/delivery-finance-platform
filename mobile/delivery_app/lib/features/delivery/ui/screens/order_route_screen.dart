@@ -88,16 +88,39 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
   String? _shopAddress;
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _currentSegment = widget.segmentIndex;
-    _coefficient = widget.coefficient;
-    _baseCost = 250.0;
-    
-    _initGps();
-    _startSegment();
+void initState() {
+  super.initState();
+  WidgetsBinding.instance.addObserver(this);
+  _currentSegment = widget.segmentIndex;
+  _coefficient = widget.coefficient;
+  _baseCost = 250.0;
+  
+  _checkPermissionsAndInit();
+  _startSegment();
+}
+
+Future<void> _checkPermissionsAndInit() async {
+  print('🔵 Checking permissions...');
+  final hasPermission = await _gpsService.requestPermissions();
+  print('🔵 Permissions result: $hasPermission');
+  if (hasPermission) {
+    _gpsSubscription = _gpsService.distanceStream.listen((distance) {
+      print('📊 GPS distance update: $distance km');
+      if (mounted) {
+        setState(() {
+          _distance = distance;
+        });
+      }
+    });
+    _isGpsInitialized = true;
+    print('🟢 GPS initialized successfully');
+  } else {
+    print('🔴 GPS permission denied, switching to manual input');
+    setState(() {
+      _useGps = false;
+    });
   }
+}
 
   @override
   void dispose() {
@@ -138,21 +161,25 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
   }
 
   void _startSegment() {
-    _segmentStartTime = DateTime.now();
-    _totalPauseDuration = Duration.zero;
-    _isPaused = false;
-    _pauseStartTime = null;
-    
-    _gpsService.resetDistance();
-    _distance = 0.0;
-    _distanceController.text = '';
-    
-    if (_useGps && _currentSegment != 1 && _currentSegment != 3) {
-      _gpsService.startTracking();
-    }
-    
-    setState(() {});
+  print('🔵 _startSegment() called for segment $_currentSegment');
+  _segmentStartTime = DateTime.now();
+  _totalPauseDuration = Duration.zero;
+  _isPaused = false;
+  _pauseStartTime = null;
+  
+  _gpsService.resetDistance();
+  _distance = 0.0;
+  _distanceController.text = '';
+  
+  if (_useGps && _currentSegment != 1 && _currentSegment != 3) {
+    print('🟢 Starting GPS tracking for segment $_currentSegment');
+    _gpsService.startTracking();
+  } else {
+    print('🟡 GPS not started: useGps=$_useGps, segment=$_currentSegment');
   }
+  
+  setState(() {});
+}
 
   void _togglePause() {
     setState(() {
