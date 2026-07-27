@@ -24,7 +24,7 @@ jobs:
         working-directory: mobile/delivery_app
         run: flutter pub get
 
-      - name: Build APK (debug)
+      - name: Build APK (debug) 
         working-directory: mobile/delivery_app
         run: flutter build apk --debug -t lib/apps/delivery/main_delivery.dart
 
