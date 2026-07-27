@@ -24,15 +24,11 @@ jobs:
         working-directory: mobile/delivery_app
         run: flutter pub get
 
-      - name: Build APK (debug) 
+      - name: Build APK (debug)
         working-directory: mobile/delivery_app
         run: flutter build apk --debug -t lib/apps/delivery/main_delivery.dart
 
-      - name: Upload to Transfer.sh
-        working-directory: mobile/delivery_app
-        run: |
-          echo "Download APK from:"
-          curl --upload-file build/app/outputs/flutter-apk/app-debug.apk https://transfer.sh/app-debug.apk
+      
 
       - name: Upload APK artifact (try)
         uses: actions/upload-artifact@v4
