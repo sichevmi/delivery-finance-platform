@@ -17,6 +17,9 @@ class GpsService {
   static const double _alpha = 0.3;
   Position? _smoothedPosition;
 
+  // Минимальная скорость для засчёта движения (м/с)
+  static const double _minSpeed = 0.2; // ~0.7 км/ч
+
   double get currentDistance => _totalDistance;
 
   final _distanceStreamController = StreamController<double>.broadcast();
@@ -108,7 +111,7 @@ class GpsService {
 
     const locationSettings = LocationSettings(
       accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 3,
+      distanceFilter: 5, // увеличили до 5 метров
     );
 
     _positionStream = Geolocator.getPositionStream(
@@ -128,6 +131,12 @@ class GpsService {
 
       final position = _smoothPosition(rawPosition);
 
+      // Проверяем скорость: если скорость меньше минимальной, считаем, что стоим
+      if (position.speed != null && position.speed! < _minSpeed) {
+        print('⏸️ GPS: speed too low (${position.speed!.toStringAsFixed(2)} m/s), ignoring');
+        return;
+      }
+
       if (_lastPosition != null) {
         final distance = Geolocator.distanceBetween(
           _lastPosition!.latitude,
@@ -136,12 +145,12 @@ class GpsService {
           position.longitude,
         );
 
-        if (distance < 1.0) {
+        if (distance < 1.5) {
           print('📏 GPS: distance too small (${distance.toStringAsFixed(2)}m), ignoring');
           return;
         }
 
-        const maxSpeed = 2.5;
+        const maxSpeed = 3.0; // 10.8 км/ч (пешком)
         final timeDelta = position.timestamp.difference(_lastPosition!.timestamp).inSeconds;
         final maxDistancePerUpdate = maxSpeed * timeDelta.clamp(1, 5);
 
