@@ -1,8 +1,8 @@
 name: Build APK
 
 on:
-  #push:
-   # branches: [ develop, main ]
+  push:
+    branches: [ develop, main ]
   workflow_dispatch:
 
 jobs:
@@ -10,40 +10,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - uses: subosito/flutter-action@v2
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.0'
+          flutter-version: '3.44.8'   # или '3.44.8', если обновились
+          channel: 'stable'
+          cache: true
 
-      - name: Get dependencies
-        run: |
-          cd mobile/delivery_app
-          flutter pub get
+      - name: Install dependencies
+        run: flutter pub get
 
-      - name: Build APK with gradlew
-        run: |
-          cd mobile/delivery_app/android
-          chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
-
-      - name: Find and upload APK
-        run: |
-          cd mobile/delivery_app
-          echo "=== Searching for APK ==="
-          find . -name "*.apk" -type f
-          APK_PATH=$(find . -name "*.apk" -type f | head -n 1)
-          if [ -n "$APK_PATH" ]; then
-            cp "$APK_PATH" ./app-debug.apk
-            echo "APK found and copied: $APK_PATH"
-          else
-            echo "No APK found!"
-            exit 1
-          fi
+      - name: Build APK (debug)
+        run: flutter build apk --debug -t lib/apps/delivery/main_delivery.dart
 
       - name: Upload APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: app-debug
-          path: mobile/delivery_app/app-debug.apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 7
