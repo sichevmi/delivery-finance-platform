@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -13,13 +14,44 @@ class GpsService {
   Position? _lastPosition;
   bool _isPaused = false;
 
+  // Альфа-фильтр для сглаживания координат (0.3 = 30% новый, 70% старый)
+  static const double _alpha = 0.3;
+  Position? _smoothedPosition;
+
   double get currentDistance => _totalDistance;
 
   final _distanceStreamController = StreamController<double>.broadcast();
   Stream<double> get distanceStream => _distanceStreamController.stream;
 
-  Future<bool> requestPermissions() async {
-    final status = await Permission.locationAlways.request();
+  Future<bool> requestPermissions(BuildContext context) async {
+    var status = await Permission.location.status;
+    
+    if (status.isDenied) {
+      final shouldRequest = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Нужен доступ к геолокации'),
+          content: const Text(
+            'Приложению нужен доступ к вашему местоположению для отслеживания маршрута доставки.\n\n'
+            'Данные используются только во время активной доставки.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Отмена'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Разрешить'),
+            ),
+          ],
+        ),
+      );
+      
+      if (shouldRequest != true) return false;
+      status = await Permission.location.request();
+    }
+    
     if (status.isGranted) {
       if (await Geolocator.isLocationServiceEnabled()) {
         return true;
@@ -28,90 +60,145 @@ class GpsService {
         return false;
       }
     }
+    
+    if (status.isPermanentlyDenied) {
+      await openAppSettings();
+      return false;
+    }
+    
     return false;
   }
 
-  void startTracking() {
-  print('🟢 GPS: startTracking() called');
-  if (_isTracking) {
-    print('🟡 GPS: already tracking, ignoring');
-    return;
+  // Сглаживание координат (альфа-фильтр)
+  Position _smoothPosition(Position newPos) {
+    if (_smoothedPosition == null) {
+      _smoothedPosition = newPos;
+      return newPos;
+    }
+
+    final smoothedLat = _smoothedPosition!.latitude + _alpha * (newPos.latitude - _smoothedPosition!.latitude);
+    final smoothedLon = _smoothedPosition!.longitude + _alpha * (newPos.longitude - _smoothedPosition!.longitude);
+
+    _smoothedPosition = Position(
+      latitude: smoothedLat,
+      longitude: smoothedLon,
+      timestamp: newPos.timestamp,
+      accuracy: newPos.accuracy,
+      altitude: newPos.altitude,
+      heading: newPos.heading,
+      speed: newPos.speed,
+      speedAccuracy: newPos.speedAccuracy,
+      altitudeAccuracy: newPos.altitudeAccuracy,
+      headingAccuracy: newPos.headingAccuracy,
+    );
+    return _smoothedPosition!;
   }
 
-  _isTracking = true;
-  _isPaused = false;
-  _totalDistance = 0.0;
-  _lastPosition = null;
-  print('🟢 GPS: tracking started, waiting for position...');
-
-  const locationSettings = LocationSettings(
-    accuracy: LocationAccuracy.bestForNavigation,
-    distanceFilter: 1, // обновления только при перемещении > 1 метра
-  );
-
-  _positionStream = Geolocator.getPositionStream(
-    locationSettings: locationSettings,
-  ).listen((Position position) {
-    print('📍 GPS: position received - lat: ${position.latitude}, lon: ${position.longitude}');
-    if (_isPaused) {
-      print('⏸️ GPS: paused, ignoring position');
+  void startTracking() {
+    print('🟢 GPS: startTracking() called');
+    if (_isTracking) {
+      print('🟡 GPS: already tracking, ignoring');
       return;
     }
 
-    if (_lastPosition != null) {
-      final distance = Geolocator.distanceBetween(
-        _lastPosition!.latitude,
-        _lastPosition!.longitude,
-        position.latitude,
-        position.longitude,
-      );
-      
-      // Игнорируем слишком маленькие перемещения (шум)
-      if (distance < 0.5) {
-        print('📏 GPS: distance too small (${distance.toStringAsFixed(2)}m), ignoring');
-        return;
-      }
-      
-      // Игнорируем слишком большие скачки (выбросы)
-      if (distance > 20) { // максимум 20 метров за одно обновление (пешком ~20 км/ч)
-        print('⚠️ GPS: suspicious jump (${distance.toStringAsFixed(2)}m), ignoring');
+    _isTracking = true;
+    _isPaused = false;
+    _totalDistance = 0.0;
+    _lastPosition = null;
+    _smoothedPosition = null;
+    print('🟢 GPS: tracking started, waiting for position...');
+
+    const locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.bestForNavigation,
+      distanceFilter: 3, // обновления только при перемещении > 3 метров
+      intervalDuration: Duration(seconds: 2), // не чаще 1 раза в 2 секунды
+    );
+
+    _positionStream = Geolocator.getPositionStream(
+      locationSettings: locationSettings,
+    ).listen((Position rawPosition) {
+      print('📍 GPS: raw position - lat: ${rawPosition.latitude}, lon: ${rawPosition.longitude}');
+
+      // Проверяем точность: если точность < 20 метров, считаем, что сигнал плохой
+      if (rawPosition.accuracy > 20) {
+        print('⚠️ GPS: poor accuracy (${rawPosition.accuracy}m), ignoring');
         return;
       }
 
-      print('📏 GPS: distance since last update: ${distance.toStringAsFixed(2)} meters');
-      _totalDistance += distance / 1000;
-      print('📏 GPS: total distance: ${_totalDistance.toStringAsFixed(4)} km');
-    } else {
-      print('🟢 GPS: first position, initializing');
-    }
-    _lastPosition = position;
-    _distanceStreamController.add(_totalDistance);
-  });
-}
+      if (_isPaused) {
+        print('⏸️ GPS: paused, ignoring position');
+        return;
+      }
+
+      // Сглаживаем координаты
+      final position = _smoothPosition(rawPosition);
+
+      if (_lastPosition != null) {
+        final distance = Geolocator.distanceBetween(
+          _lastPosition!.latitude,
+          _lastPosition!.longitude,
+          position.latitude,
+          position.longitude,
+        );
+
+        // Минимальное расстояние для засчёта (1 метр)
+        if (distance < 1.0) {
+          print('📏 GPS: distance too small (${distance.toStringAsFixed(2)}m), ignoring');
+          return;
+        }
+
+        // Максимальная скорость пешком: 2.5 м/с (~9 км/ч)
+        const maxSpeed = 2.5;
+        final timeDelta = position.timestamp.difference(_lastPosition!.timestamp).inSeconds;
+        final maxDistancePerUpdate = maxSpeed * timeDelta.clamp(1, 5);
+
+        if (distance > maxDistancePerUpdate) {
+          print('⚠️ GPS: suspicious jump (${distance.toStringAsFixed(2)}m > ${maxDistancePerUpdate.toStringAsFixed(2)}m), ignoring');
+          return;
+        }
+
+        print('📏 GPS: distance since last update: ${distance.toStringAsFixed(2)} meters');
+        _totalDistance += distance / 1000;
+        print('📏 GPS: total distance: ${_totalDistance.toStringAsFixed(4)} km');
+      } else {
+        print('🟢 GPS: first position, initializing');
+      }
+      _lastPosition = position;
+      _distanceStreamController.add(_totalDistance);
+    }, onError: (error) {
+      print('🔴 GPS error: $error');
+    });
+  }
 
   void pauseTracking() {
+    print('⏸️ GPS: pauseTracking()');
     _isPaused = true;
   }
 
   void resumeTracking() {
+    print('▶️ GPS: resumeTracking()');
     _isPaused = false;
     _getCurrentPosition();
   }
 
   void stopTracking() {
+    print('🛑 GPS: stopTracking()');
     _isTracking = false;
     _isPaused = false;
     _positionStream?.cancel();
     _positionStream = null;
     _lastPosition = null;
+    _smoothedPosition = null;
     _distanceStreamController.add(0.0);
   }
 
   double getTotalDistance() => _totalDistance;
 
   void resetDistance() {
+    print('🔄 GPS: resetDistance()');
     _totalDistance = 0.0;
     _lastPosition = null;
+    _smoothedPosition = null;
     _distanceStreamController.add(0.0);
   }
 
@@ -119,8 +206,10 @@ class GpsService {
     try {
       final position = await Geolocator.getCurrentPosition();
       _lastPosition = position;
+      _smoothedPosition = position;
+      print('📍 GPS: current position updated: ${position.latitude}, ${position.longitude}');
     } catch (e) {
-      // Игнорируем
+      print('⚠️ GPS: error getting current position: $e');
     }
   }
 }
