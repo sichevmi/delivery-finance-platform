@@ -14,7 +14,6 @@ class GpsService {
   Position? _lastPosition;
   bool _isPaused = false;
 
-  // Альфа-фильтр для сглаживания координат (0.3 = 30% новый, 70% старый)
   static const double _alpha = 0.3;
   Position? _smoothedPosition;
 
@@ -69,7 +68,6 @@ class GpsService {
     return false;
   }
 
-  // Сглаживание координат (альфа-фильтр)
   Position _smoothPosition(Position newPos) {
     if (_smoothedPosition == null) {
       _smoothedPosition = newPos;
@@ -110,8 +108,7 @@ class GpsService {
 
     const locationSettings = LocationSettings(
       accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 3, // обновления только при перемещении > 3 метров
-      intervalDuration: Duration(seconds: 2), // не чаще 1 раза в 2 секунды
+      distanceFilter: 3,
     );
 
     _positionStream = Geolocator.getPositionStream(
@@ -119,7 +116,6 @@ class GpsService {
     ).listen((Position rawPosition) {
       print('📍 GPS: raw position - lat: ${rawPosition.latitude}, lon: ${rawPosition.longitude}');
 
-      // Проверяем точность: если точность < 20 метров, считаем, что сигнал плохой
       if (rawPosition.accuracy > 20) {
         print('⚠️ GPS: poor accuracy (${rawPosition.accuracy}m), ignoring');
         return;
@@ -130,7 +126,6 @@ class GpsService {
         return;
       }
 
-      // Сглаживаем координаты
       final position = _smoothPosition(rawPosition);
 
       if (_lastPosition != null) {
@@ -141,13 +136,11 @@ class GpsService {
           position.longitude,
         );
 
-        // Минимальное расстояние для засчёта (1 метр)
         if (distance < 1.0) {
           print('📏 GPS: distance too small (${distance.toStringAsFixed(2)}m), ignoring');
           return;
         }
 
-        // Максимальная скорость пешком: 2.5 м/с (~9 км/ч)
         const maxSpeed = 2.5;
         final timeDelta = position.timestamp.difference(_lastPosition!.timestamp).inSeconds;
         final maxDistancePerUpdate = maxSpeed * timeDelta.clamp(1, 5);

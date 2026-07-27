@@ -101,7 +101,7 @@ void initState() {
 
 Future<void> _checkPermissionsAndInit() async {
   print('🔵 Checking permissions...');
-  final hasPermission = await _gpsService.requestPermissions();
+  final hasPermission = await _gpsService.requestPermissions(context);
   print('🔵 Permissions result: $hasPermission');
   if (hasPermission) {
     _gpsSubscription = _gpsService.distanceStream.listen((distance) {
@@ -134,7 +134,7 @@ Future<void> _checkPermissionsAndInit() async {
   }
 
   Future<void> _initGps() async {
-    final hasPermission = await _gpsService.requestPermissions();
+    final hasPermission = await _gpsService.requestPermissions(context);
     if (hasPermission) {
       _gpsSubscription = _gpsService.distanceStream.listen((distance) {
         if (mounted) {
