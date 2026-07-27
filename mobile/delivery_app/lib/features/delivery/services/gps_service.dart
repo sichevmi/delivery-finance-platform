@@ -69,77 +69,47 @@ class GpsService {
   }
 
   void startTracking() {
-    print('🟢 GPS: startTracking() called');
-    if (_isTracking) {
-      print('🟡 GPS: already tracking, ignoring');
-      return;
-    }
-
-    _isTracking = true;
-    _isPaused = false;
-    _totalDistance = 0.0;
-    _lastPosition = null;
-    print('🟢 GPS: tracking started, waiting for position...');
-
-    const locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 5, // обновления при перемещении > 5 метров
-    );
-
-    _positionStream = Geolocator.getPositionStream(
-      locationSettings: locationSettings,
-    ).listen((Position position) {
-      print('📍 GPS: position - lat: ${position.latitude}, lon: ${position.longitude}, acc: ${position.accuracy}m, speed: ${position.speed?.toStringAsFixed(2)} m/s');
-
-      // Игнорируем плохой сигнал (точность хуже 15 метров)
-      if (position.accuracy > 15) {
-        print('⚠️ GPS: poor accuracy (${position.accuracy}m), ignoring');
-        return;
-      }
-
-      if (_isPaused) {
-        print('⏸️ GPS: paused, ignoring position');
-        return;
-      }
-
-      // Игнорируем, если скорость меньше минимальной (стоим на месте)
-      if (position.speed != null && position.speed! < _minSpeed) {
-        print('⏸️ GPS: speed too low (${position.speed!.toStringAsFixed(2)} m/s), ignoring');
-        return;
-      }
-
-      if (_lastPosition != null) {
-        final distance = Geolocator.distanceBetween(
-          _lastPosition!.latitude,
-          _lastPosition!.longitude,
-          position.latitude,
-          position.longitude,
-        );
-
-        // Игнорируем слишком маленькие перемещения (шум)
-        if (distance < 2.0) {
-          print('📏 GPS: distance too small (${distance.toStringAsFixed(2)}m), ignoring');
-          return;
-        }
-
-        // Игнорируем очень большие скачки (> 200 метров за раз)
-        if (distance > 200) {
-          print('⚠️ GPS: extreme jump (${distance.toStringAsFixed(2)}m > 200m), ignoring');
-          return;
-        }
-
-        print('📏 GPS: distance since last update: ${distance.toStringAsFixed(2)} meters');
-        _totalDistance += distance / 1000;
-        print('📏 GPS: total distance: ${_totalDistance.toStringAsFixed(4)} km');
-      } else {
-        print('🟢 GPS: first position, initializing');
-      }
-      _lastPosition = position;
-      _distanceStreamController.add(_totalDistance);
-    }, onError: (error) {
-      print('🔴 GPS error: $error');
-    });
+  print('🟢 GPS: startTracking() called');
+  if (_isTracking) {
+    print('🟡 GPS: already tracking, ignoring');
+    return;
   }
+
+  _isTracking = true;
+  _isPaused = false;
+  _totalDistance = 0.0;
+  _lastPosition = null;
+
+  const locationSettings = LocationSettings(
+    accuracy: LocationAccuracy.bestForNavigation,
+    distanceFilter: 3, // обновления при перемещении > 3 метров
+  );
+
+  _positionStream = Geolocator.getPositionStream(
+    locationSettings: locationSettings,
+  ).listen((Position position) {
+    if (_isPaused) return;
+
+    if (_lastPosition != null) {
+      final distance = Geolocator.distanceBetween(
+        _lastPosition!.latitude,
+        _lastPosition!.longitude,
+        position.latitude,
+        position.longitude,
+      );
+
+      // Единственный фильтр: игнорируем шум меньше 3 метров
+      if (distance < 3.0) return;
+
+      // Единственный фильтр: игнорируем явные выбросы (> 200 метров)
+      if (distance > 200) return;
+
+      _totalDistance += distance / 1000;
+    }
+    _lastPosition = position;
+    _distanceStreamController.add(_totalDistance);
+  });
+}
 
   void pauseTracking() {
     print('⏸️ GPS: pauseTracking()');
