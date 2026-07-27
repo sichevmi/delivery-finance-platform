@@ -1,8 +1,8 @@
 name: Deploy to Test (finflow.ru)
 
 on:
-  push:
-    branches: [ develop ]
+  #push:
+    #branches: [ develop ]
   workflow_dispatch:
 
 jobs:
