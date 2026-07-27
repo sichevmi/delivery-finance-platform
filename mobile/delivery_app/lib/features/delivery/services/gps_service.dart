@@ -45,8 +45,8 @@ class GpsService {
   print('🟢 GPS: tracking started, waiting for position...');
 
   const locationSettings = LocationSettings(
-    accuracy: LocationAccuracy.bestForNavigation,
-    distanceFilter: 0,
+    accuracy: LocationAccuracy.best,
+    distanceFilter: 5,
   );
 
   _positionStream = Geolocator.getPositionStream(
@@ -65,6 +65,11 @@ class GpsService {
         position.latitude,
         position.longitude,
       );
+        // Игнорируем перемещения меньше 0.5 метра
+      if (distance < 0.5) {
+        print('📏 GPS: distance too small (${distance.toStringAsFixed(2)}m), ignoring');
+        return;
+      }
       print('📏 GPS: distance since last update: ${distance.toStringAsFixed(2)} meters');
       _totalDistance += distance / 1000;
       print('📏 GPS: total distance: ${_totalDistance.toStringAsFixed(4)} km');
