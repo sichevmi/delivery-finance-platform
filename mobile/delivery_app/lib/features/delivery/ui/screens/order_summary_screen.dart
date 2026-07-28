@@ -346,13 +346,20 @@ class OrderSummaryScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 8),
+          // ---- ВСЕ ВРЕМЕНА ТЕПЕРЬ ОТОБРАЖАЮТСЯ ----
           Wrap(
             spacing: 6,
             runSpacing: 4,
             children: [
+              // Пробег до клиента
               _buildDetailChip(Icons.route, '${d.distanceToClient.toStringAsFixed(2)} км'),
+              // Время в пути до клиента
               _buildDetailChip(Icons.access_time, 'В пути: ${_formatTime(d.timeToClient)}'),
+              // Время выдачи
               _buildDetailChip(Icons.home, 'Выдача: ${_formatTime(d.timeDelivery)}'),
+              // Время получения в магазине (добавили!)
+              _buildDetailChip(Icons.storefront, 'Получение: ${_formatTime(d.timeReceiving)}'),
+              // Расчёт стоимости
               _buildDetailChip(
                 Icons.attach_money,
                 '(${pricing.deliveryFee.toStringAsFixed(0)} руб. + ${d.distanceToClient.toStringAsFixed(1)} км × ${pricing.pricePerKm.toStringAsFixed(0)} руб.) × $coefficient',
