@@ -1,18 +1,19 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'logger_service.dart';
 
 class GpsService {
   static final GpsService _instance = GpsService._internal();
   factory GpsService() => _instance;
   GpsService._internal();
 
-  Timer? _pollingTimer;
   bool _isTracking = false;
   double _totalDistance = 0.0;
   Position? _lastPosition;
   bool _isPaused = false;
+  bool _isInitialized = false;
 
   static const int _pollInterval = 1;
 
@@ -21,130 +22,23 @@ class GpsService {
   final _distanceStreamController = StreamController<double>.broadcast();
   Stream<double> get distanceStream => _distanceStreamController.stream;
 
-  Future<bool> requestPermissions(BuildContext context) async {
-    // Используем Permission.locationAlways для фона
-    var status = await Permission.locationAlways.status;
-    
-    if (status.isDenied) {
-      final shouldRequest = await _showExplanationDialog(context);
-      if (!shouldRequest) return false;
-      status = await Permission.locationAlways.request();
-    }
-    
-    if (status.isGranted) {
-      // Проверяем, включена ли служба геолокации
-      if (!await Geolocator.isLocationServiceEnabled()) {
-        await _showEnableGpsDialog(context);
-        return false;
-      }
-      return true;
-    }
-    
-    if (status.isPermanentlyDenied) {
-      await _showSettingsDialog(context);
-      return false;
-    }
-    
-    return false;
-  }
-
-  // --- Методы для диалогов (здесь аналогично PermissionService) ---
-  // В реальном проекте можно вынести в отдельный сервис
-
-  Future<bool> _showExplanationDialog(BuildContext context) async {
-    return await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text('Доступ к геолокации'),
-        content: const Text(
-          'Для отслеживания маршрута доставки приложению '
-          'необходим доступ к вашему местоположению в фоновом режиме.\n\n'
-          'Данные используются только во время активной доставки.',
-          style: TextStyle(color: Color(0xFFB0B0B0)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена', style: TextStyle(color: Color(0xFF888888))),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6C63FF),
-            ),
-            child: const Text('Разрешить'),
-          ),
-        ],
-      ),
-    ) ?? false;
-  }
-
-  Future<void> _showEnableGpsDialog(BuildContext context) async {
-    final result = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text('Включите GPS'),
-        content: const Text('Для работы приложения необходимо включить GPS.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена', style: TextStyle(color: Color(0xFF888888))),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6C63FF),
-            ),
-            child: const Text('Включить'),
-          ),
-        ],
-      ),
-    );
-    if (result == true) {
-      await Geolocator.openLocationSettings();
-    }
-  }
-
-  Future<void> _showSettingsDialog(BuildContext context) async {
-    final result = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text('Требуется доступ к геолокации'),
-        content: const Text(
-          'Вы запретили доступ к геолокации.\n'
-          'Пожалуйста, разрешите доступ в настройках устройства.',
-          style: TextStyle(color: Color(0xFFB0B0B0)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена', style: TextStyle(color: Color(0xFF888888))),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6C63FF),
-            ),
-            child: const Text('Открыть настройки'),
-          ),
-        ],
-      ),
-    );
-    if (result == true) {
-      await openAppSettings();
+  Future<void> initLogger() async {
+    if (!_isInitialized) {
+      await LoggerService().init();
+      _isInitialized = true;
+      await LoggerService().logEvent('GPS_SERVICE_INIT');
     }
   }
 
   void startTracking() {
-    print('🟢 GPS: startTracking() called (POLLING 1s)');
+    LoggerService().logEvent('START_TRACKING', data: {
+      'isTracking': _isTracking,
+      'isPaused': _isPaused,
+      'totalDistance': _totalDistance,
+    });
+
     if (_isTracking) {
-      print('🟡 GPS: already tracking, ignoring');
+      LoggerService().log('🟡 GPS: already tracking, ignoring');
       return;
     }
 
@@ -153,114 +47,165 @@ class GpsService {
     _totalDistance = 0.0;
     _lastPosition = null;
 
-    // Запускаем Foreground Service (через Geolocator)
+    LoggerService().log('🟢 GPS: tracking started');
+
+    // Запускаем Foreground Service
     _startForegroundService();
+  }
 
-    _pollingTimer = Timer.periodic(
-      Duration(seconds: _pollInterval),
-      _pollGps,
+  void _startForegroundService() {
+    FlutterForegroundTask.startService(
+      notificationTitle: 'FinFlow Доставка',
+      notificationText: 'Отслеживание маршрута...',
+      callback: _foregroundCallback,
     );
-    print('🟢 GPS: polling started every $_pollInterval second(s)');
+    LoggerService().log('🟢 Foreground Service started');
   }
 
-  void _startForegroundService() async {
-    // Geolocator автоматически запускает foreground service при использовании
-    // getPositionStream с параметрами для фона.
-    // Для polling мы можем вручную запросить foreground service через Android
-    // Но Geolocator предоставляет метод для этого:
-    try {
-      // Это вызовет foreground service, если разрешено
-      await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.bestForNavigation,
-      );
-      print('🟢 GPS: foreground service started');
-    } catch (e) {
-      print('⚠️ GPS: foreground service start error: $e');
-    }
-  }
-
-  Future<void> _pollGps(Timer timer) async {
-    if (!_isTracking || _isPaused) {
-      return;
-    }
-
-    try {
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.bestForNavigation,
-      );
-
-      print('📍 GPS: poll - lat: ${position.latitude}, lon: ${position.longitude}, '
-          'acc: ${position.accuracy}m, speed: ${position.speed?.toStringAsFixed(2) ?? 'N/A'} m/s');
-
-      if (position.accuracy > 25) {
-        print('⚠️ GPS: poor accuracy (${position.accuracy}m), ignoring');
-        return;
-      }
-
-      if (_lastPosition != null) {
-        final distance = Geolocator.distanceBetween(
-          _lastPosition!.latitude,
-          _lastPosition!.longitude,
-          position.latitude,
-          position.longitude,
-        );
-
-        if (distance < 1.0) {
-          print('📏 GPS: distance too small (${distance.toStringAsFixed(2)}m), ignoring');
-          return;
-        }
-
-        if (distance > 500) {
-          print('⚠️ GPS: extreme jump (${distance.toStringAsFixed(2)}m > 500m), ignoring');
-          return;
-        }
-
-        print('📏 GPS: distance: ${distance.toStringAsFixed(2)}m, total: ${_totalDistance.toStringAsFixed(4)}km');
-        _totalDistance += distance / 1000;
-        _distanceStreamController.add(_totalDistance);
-      } else {
-        print('🟢 GPS: first position, initializing');
-      }
-      _lastPosition = position;
-
-    } catch (e) {
-      print('⚠️ GPS: poll error - $e');
-    }
+  @pragma('vm:entry-point')
+  static void _foregroundCallback() {
+    FlutterForegroundTask.setTaskHandler(_GpsForegroundHandler());
   }
 
   void pauseTracking() {
-    print('⏸️ GPS: pauseTracking()');
+    LoggerService().logEvent('PAUSE_TRACKING', data: {
+      'totalDistance': _totalDistance,
+    });
     _isPaused = true;
   }
 
   void resumeTracking() {
-    print('▶️ GPS: resumeTracking()');
+    LoggerService().logEvent('RESUME_TRACKING', data: {
+      'totalDistance': _totalDistance,
+    });
     _isPaused = false;
   }
 
   void stopTracking() {
-    print('🛑 GPS: stopTracking()');
+    LoggerService().logEvent('STOP_TRACKING', data: {
+      'totalDistance': _totalDistance,
+      'lastPosition': _lastPosition?.latitude.toString() ?? 'null',
+    });
     _isTracking = false;
     _isPaused = false;
-    _pollingTimer?.cancel();
-    _pollingTimer = null;
     _lastPosition = null;
     _distanceStreamController.add(0.0);
+    LoggerService().close();
+
+    // Останавливаем Foreground Service
+    FlutterForegroundTask.stopService();
+    LoggerService().log('🛑 Foreground Service stopped');
   }
 
   void forceRefresh() {
-    print('🔄 GPS: forceRefresh() called');
-    if (_isTracking && !_isPaused) {
-      _pollGps(Timer.periodic(Duration(seconds: 1), (timer) {}));
-    }
+    LoggerService().logEvent('FORCE_REFRESH', data: {
+      'isTracking': _isTracking,
+      'isPaused': _isPaused,
+    });
   }
 
   double getTotalDistance() => _totalDistance;
 
   void resetDistance() {
-    print('🔄 GPS: resetDistance()');
+    LoggerService().logEvent('RESET_DISTANCE', data: {
+      'oldDistance': _totalDistance,
+    });
     _totalDistance = 0.0;
     _lastPosition = null;
     _distanceStreamController.add(0.0);
+  }
+
+  Future<String?> getLog() async {
+    return await LoggerService().readLog();
+  }
+
+  Future<String?> getLogPath() async {
+    return await LoggerService().getLogFilePath();
+  }
+
+  // Метод для обновления расстояния из фонового сервиса
+  void updateDistance(double distance) {
+    _totalDistance = distance;
+    _distanceStreamController.add(_totalDistance);
+  }
+}
+
+// ---- Foreground Handler ----
+class _GpsForegroundHandler extends TaskHandler {
+  double _totalDistance = 0.0;
+  Position? _lastPosition;
+  bool _isPaused = false;
+  Timer? _pollingTimer;
+
+  @override
+  Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
+    print('🟢 Foreground: onStart');
+    _startPolling();
+    FlutterForegroundTask.updateService(
+      notificationTitle: 'FinFlow Доставка',
+      notificationText: 'Отслеживание маршрута...',
+    );
+  }
+
+  @override
+  Future<void> onEvent(DateTime timestamp, TaskStarter starter) async {
+    // Обновляем уведомление каждые 5 секунд
+    if (_pollingTimer == null || !_pollingTimer!.isActive) {
+      _startPolling();
+    }
+  }
+
+  @override
+  Future<void> onDestroy(DateTime timestamp, TaskStarter starter) async {
+    print('🛑 Foreground: onDestroy');
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
+  }
+
+  @override
+  void onButtonPressed(String id) {
+    // Обработка нажатия на кнопку в уведомлении
+    print('🔘 Foreground: button pressed - $id');
+  }
+
+  void _startPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(Duration(seconds: 1), (timer) async {
+      if (_isPaused) return;
+
+      try {
+        final position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.bestForNavigation,
+        );
+
+        if (_lastPosition != null) {
+          final distance = Geolocator.distanceBetween(
+            _lastPosition!.latitude,
+            _lastPosition!.longitude,
+            position.latitude,
+            position.longitude,
+          );
+
+          if (distance > 1.0 && distance < 500) {
+            _totalDistance += distance / 1000;
+            LoggerService().log('📏 Foreground: +${distance.toStringAsFixed(2)}m, total: ${_totalDistance.toStringAsFixed(4)}km');
+
+            // Обновляем уведомление с текущим расстоянием
+            FlutterForegroundTask.updateService(
+              notificationTitle: 'FinFlow Доставка',
+              notificationText: '${_totalDistance.toStringAsFixed(2)} км',
+            );
+
+            // Передаём расстояние в основное приложение
+            final gpsService = GpsService();
+            gpsService.updateDistance(_totalDistance);
+          }
+        }
+        _lastPosition = position;
+
+      } catch (e) {
+        print('⚠️ Foreground GPS error: $e');
+      }
+    });
   }
 }
