@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
+import 'package:delivery_app/features/delivery/services/gps_service.dart';  // <-- ДОБАВЛЕН ИМПОРТ
 
 class MoreTab extends ConsumerStatefulWidget {
   const MoreTab({super.key});
@@ -151,7 +152,6 @@ class _MoreTabState extends ConsumerState<MoreTab> {
       return;
     }
 
-    // Копируем путь в буфер обмена
     await Clipboard.setData(ClipboardData(text: path));
     
     ScaffoldMessenger.of(context).showSnackBar(
