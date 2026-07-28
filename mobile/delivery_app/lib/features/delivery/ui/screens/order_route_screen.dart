@@ -6,6 +6,7 @@ import 'package:delivery_app/features/delivery/providers/pricing_provider.dart';
 import 'package:delivery_app/features/delivery/services/gps_service.dart';
 import 'order_summary_screen.dart';
 import 'package:delivery_app/features/delivery/services/permission_service.dart';
+import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 
 class Delivery {
   final int number;
@@ -64,7 +65,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
   bool _isPaused = false;
 
   // GPS
-  final GpsService _gpsService = ref.watch(gpsServiceProvider);
+  late final GpsService _gpsService;
   bool _useGps = true;
   double _distance = 0.0;
   final TextEditingController _distanceController = TextEditingController(text: '');
@@ -104,8 +105,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     _coefficient = widget.coefficient;
     _baseCost = 250.0;
 
+    _gpsService = ref.read(gpsServiceProvider);
     _initGps();
-    _checkPermissionsAndInit();
     _startSegment();
   }
 
@@ -140,7 +141,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
 
   // В _initGps используем метод с диалогами
 Future<void> _initGps() async {
-  final hasPermission = await _gpsService.requestPermissions(context);
+  // В новой версии gps_service нет requestPermissions, используем PermissionService
+  final hasPermission = await PermissionService.requestLocationPermission(context);
   if (hasPermission) {
     _gpsSubscription = _gpsService.distanceStream.listen((distance) {
       if (mounted) {

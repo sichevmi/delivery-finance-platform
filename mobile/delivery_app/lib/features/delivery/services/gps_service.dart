@@ -17,10 +17,9 @@ class GpsService {
 
   static const int _pollInterval = 1;
 
-  // Логирование
   bool _isLoggingEnabled = false;
   String _logBuffer = '';
-  final int _maxLogSize = 500 * 1024; // 500 KB
+  final int _maxLogSize = 500 * 1024;
   File? _logFile;
 
   double get currentDistance => _totalDistance;
@@ -162,7 +161,6 @@ class GpsService {
       _log('🔴 GPS: stack trace: $stack');
     }
 
-    // Сохраняем лог каждые 10 секунд
     if (_isLoggingEnabled && _logBuffer.length > _maxLogSize) {
       await _saveLogToFile();
       _logBuffer = _logBuffer.substring(_logBuffer.length ~/ 2);
