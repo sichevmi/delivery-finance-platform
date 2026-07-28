@@ -530,7 +530,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
                               final parsed = double.tryParse(value.replaceAll(',', '.'));
                               if (parsed != null && parsed >= 0) {
                                 setState(() {
-                                  _distance = parsed);
+                                  _distance = parsed;
                                 });
                               }
                             },
@@ -795,7 +795,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
                               final parsed = double.tryParse(value.replaceAll(',', '.'));
                               if (parsed != null && parsed >= 0) {
                                 setState(() {
-                                  _distance = parsed);
+                                  _distance = parsed;
                                 });
                               }
                             },
