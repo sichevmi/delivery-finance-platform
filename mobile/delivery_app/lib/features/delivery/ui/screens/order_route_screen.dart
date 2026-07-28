@@ -104,8 +104,27 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     _baseCost = 250.0;
 
     _initGps();
+    _checkPermissionsAndInit();
     _startSegment();
   }
+
+  Future<void> _checkPermissionsAndInit() async {
+  final hasPermission = await PermissionService.requestLocationPermission(context);
+  if (hasPermission) {
+    _gpsSubscription = _gpsService.distanceStream.listen((distance) {
+      if (mounted) {
+        setState(() {
+          _distance = distance;
+        });
+      }
+    });
+    _isGpsInitialized = true;
+  } else {
+    setState(() {
+      _useGps = false;
+    });
+  }
+}
 
   @override
   void dispose() {
