@@ -142,11 +142,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
       print('🔵 App went to background');
     } else if (state == AppLifecycleState.resumed) {
       print('🔵 App resumed from background');
-      
-      // Обновляем UI
       setState(() {});
-      
-      // Если GPS включён и не на паузе — принудительно обновляем
       if (_useGps && !_isPaused) {
         print('🔄 Force refreshing GPS on resume');
         _gpsService.forceRefresh();
@@ -156,6 +152,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
 
   void _startSegment() {
     _segmentStartTime = DateTime.now();
+    _segmentEndTime = null;
     _totalPauseDuration = Duration.zero;
     _isPaused = false;
     _pauseStartTime = null;
@@ -226,6 +223,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
   void _saveCurrentSegmentData() {
     final time = _getSegmentTime();
     final distance = _getDistance();
+    print('📊 Saving segment $_currentSegment: time=$time, distance=$distance');
     switch (_currentSegment) {
       case 0: // В магазин
         _timeToShop = time;
@@ -532,7 +530,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
                               final parsed = double.tryParse(value.replaceAll(',', '.'));
                               if (parsed != null && parsed >= 0) {
                                 setState(() {
-                                  _distance = parsed;
+                                  _distance = parsed);
                                 });
                               }
                             },
@@ -797,7 +795,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
                               final parsed = double.tryParse(value.replaceAll(',', '.'));
                               if (parsed != null && parsed >= 0) {
                                 setState(() {
-                                  _distance = parsed;
+                                  _distance = parsed);
                                 });
                               }
                             },
@@ -1147,13 +1145,15 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
   }
 
   void _handleMainAction() {
-    // Сохраняем данные текущего сегмента перед переходом
+    // Сначала завершаем текущий сегмент (устанавливаем _segmentEndTime)
+    _finishSegment();
+    
+    // Потом сохраняем данные (используя _getSegmentTime(), который теперь знает время окончания)
     _saveCurrentSegmentData();
 
     switch (_currentSegment) {
       case 0:
         _shopAddress = 'ул. Ленина, 25, г. Москва';
-        _finishSegment();
         setState(() {
           _currentSegment = 1;
         });
@@ -1164,14 +1164,12 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
         if (weight <= 0) return;
         _weight = weight;
         _clientAddress = 'ул. Пушкина, 10, г. Москва';
-        _finishSegment();
         setState(() {
           _currentSegment = 2;
         });
         _startSegment();
         break;
       case 2:
-        _finishSegment();
         setState(() {
           _currentSegment = 3;
         });
@@ -1187,9 +1185,9 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     final apartment = _apartmentController.text.trim();
     if (apartment.isEmpty) return;
 
-    // Сохраняем данные последнего сегмента (Выдача)
-    _saveCurrentSegmentData();
+    // Завершаем последний сегмент и сохраняем данные
     _finishSegment();
+    _saveCurrentSegmentData();
 
     final delivery = Delivery(
       number: _deliveryNumber,
@@ -1278,11 +1276,9 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
   double _calculateTotalCost(PricingConfig pricing) {
     if (_completedDeliveries.isEmpty) return 0.0;
 
-    // Стоимость магазина (из первой доставки) с учётом коэффициента
     final first = _completedDeliveries.first;
     double total = (pricing.receivingFee + (first.weight * pricing.pricePerKg)) * _coefficient;
 
-    // Стоимость каждой доставки с учётом коэффициента
     for (final d in _completedDeliveries) {
       total += (pricing.deliveryFee + (d.distanceToClient * pricing.pricePerKm)) * _coefficient;
     }
