@@ -95,13 +95,11 @@ class GpsService {
           position.longitude,
         );
 
-        // Игнорируем шум меньше 2 метров
         if (distance < 2.0) {
           print('📏 GPS: distance too small (${distance.toStringAsFixed(2)}m), ignoring');
           return;
         }
 
-        // Игнорируем явные выбросы (> 200 метров)
         if (distance > 200) {
           print('⚠️ GPS: extreme jump (${distance.toStringAsFixed(2)}m > 200m), ignoring');
           return;
@@ -117,19 +115,16 @@ class GpsService {
     });
   }
 
-  // ---- НОВЫЙ МЕТОД: принудительное обновление GPS ----
+  // ---- forceRefresh() - исправленная версия для geolocator 8.2.1 ----
   Future<void> forceRefresh() async {
     print('🔄 GPS: forceRefresh() called');
     try {
-      // Запрашиваем текущую позицию
+      // Для geolocator 8.2.1 используем параметры напрямую
       final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.bestForNavigation,
-        ),
+        desiredAccuracy: LocationAccuracy.bestForNavigation,
       );
       
       if (position != null && _lastPosition != null) {
-        // Вычисляем расстояние между последней известной позицией и новой
         final distance = Geolocator.distanceBetween(
           _lastPosition!.latitude,
           _lastPosition!.longitude,
@@ -139,7 +134,6 @@ class GpsService {
         
         print('📏 GPS: forceRefresh - distance since last: ${distance.toStringAsFixed(2)}m');
         
-        // Если расстояние больше 2 метров — засчитываем
         if (distance > 2.0 && distance < 200) {
           _totalDistance += distance / 1000;
           print('📏 GPS: forceRefresh - added ${distance.toStringAsFixed(2)}m, total: ${_totalDistance.toStringAsFixed(4)}km');
@@ -147,10 +141,8 @@ class GpsService {
         }
       }
       
-      // Обновляем последнюю позицию
       _lastPosition = position;
       
-      // Проверяем, не отвалился ли стрим, и если отвалился — перезапускаем
       if (_isTracking && _positionStream == null) {
         print('🔄 GPS: stream is null, restarting...');
         _resumeTracking();
@@ -161,7 +153,6 @@ class GpsService {
     }
   }
 
-  // ---- Вспомогательный метод для перезапуска стрима ----
   void _resumeTracking() {
     print('🔄 GPS: _resumeTracking() called');
     if (!_isTracking || _positionStream != null) return;
@@ -229,7 +220,9 @@ class GpsService {
 
   Future<void> _getCurrentPosition() async {
     try {
-      final position = await Geolocator.getCurrentPosition();
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.bestForNavigation,
+      );
       _lastPosition = position;
     } catch (e) {
       print('⚠️ GPS: error getting current position: $e');
