@@ -1,124 +1,171 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:delivery_app/features/delivery/services/gps_service.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:share_plus/share_plus.dart';
 
-class MoreTab extends StatelessWidget {
+class MoreTab extends ConsumerStatefulWidget {
   const MoreTab({super.key});
 
   @override
+  ConsumerState<MoreTab> createState() => _MoreTabState();
+}
+
+class _MoreTabState extends ConsumerState<MoreTab> {
+  bool _isLogging = false;
+  String _logStatus = 'Логирование выключено';
+
+  @override
   Widget build(BuildContext context) {
-    return ListView(
+    final gpsService = ref.read(gpsServiceProvider);
+
+    return Padding(
       padding: const EdgeInsets.all(16),
-      children: [
-        ListTile(
-          leading: const Icon(Icons.file_download),
-          title: const Text('Выгрузить логи GPS'),
-          subtitle: const Text('Сохранить логи в файл и поделиться'),
-          onTap: _exportLogs,
-        ),
-        const Divider(),
-        ListTile(
-          leading: const Icon(Icons.settings),
-          title: const Text('Настройки'),
-          onTap: () {},
-        ),
-        ListTile(
-          leading: const Icon(Icons.info_outline),
-          title: const Text('О приложении'),
-          onTap: () {},
-        ),
-      ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Настройки',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          Card(
+            color: const Color(0xFF1E1E1E),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'GPS логирование',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _logStatus,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: _isLogging ? Colors.green : Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _isLogging ? null : () => _startLogging(gpsService),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _isLogging
+                                ? Colors.grey.shade700
+                                : Colors.green,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('Начать логирование'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _isLogging ? () => _stopLogging(gpsService) : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _isLogging
+                                ? Colors.red
+                                : Colors.grey.shade700,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('Остановить'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () => _shareLog(gpsService),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF6C63FF),
+                        side: const BorderSide(color: Color(0xFF6C63FF)),
+                      ),
+                      child: const Text('📤 Экспорт лога'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Future<void> _exportLogs(BuildContext context) async {
-    try {
-      // Проверяем разрешение на запись
-      final status = await Permission.storage.request();
-      if (!status.isGranted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Необходимо разрешение на запись'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      // Получаем логи
-      final gpsService = GpsService();
-      final logPath = await gpsService.getLogPath();
-      final logContent = await gpsService.getLog();
-
-      if (logContent == null || logContent.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Логов пока нет'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-        return;
-      }
-
-      // Показываем диалог с содержимым и кнопкой поделиться
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          backgroundColor: const Color(0xFF1E1E1E),
-          title: const Text(
-            'Логи GPS',
-            style: TextStyle(color: Colors.white),
-          ),
-          content: Container(
-            width: double.maxFinite,
-            height: 300,
-            child: SingleChildScrollView(
-              child: Text(
-                logContent,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontFamily: 'monospace',
-                ),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Закрыть',
-                style: TextStyle(color: Color(0xFF888888)),
-              ),
-            ),
-            ElevatedButton.icon(
-              onPressed: () async {
-                final path = await gpsService.getLogPath();
-                if (path != null) {
-                  await Share.shareXFiles(
-                    [XFile(path)],
-                    text: 'GPS логи приложения',
-                  );
-                }
-                Navigator.pop(context);
-              },
-              icon: const Icon(Icons.share),
-              label: const Text('Поделиться'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6C63FF),
-              ),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
+  Future<void> _startLogging(GpsService gpsService) async {
+    setState(() {
+      _isLogging = true;
+      _logStatus = 'Логирование активно...';
+    });
+    await gpsService.startLogging();
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Ошибка: $e'),
-          backgroundColor: Colors.red,
+        const SnackBar(
+          content: Text('Логирование запущено'),
+          backgroundColor: Colors.green,
         ),
       );
     }
+  }
+
+  Future<void> _stopLogging(GpsService gpsService) async {
+    await gpsService.stopLogging();
+    setState(() {
+      _isLogging = false;
+      _logStatus = 'Логирование остановлено';
+    });
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Логирование остановлено. Файл сохранён.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+  }
+
+  Future<void> _shareLog(GpsService gpsService) async {
+    final path = await gpsService.getLogFilePath();
+    if (path == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Лог-файл не найден. Сначала запустите логирование.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Лог сохранён: $path'),
+        backgroundColor: const Color(0xFF6C63FF),
+        duration: const Duration(seconds: 5),
+      ),
+    );
+
+    // TODO: Добавить share пакет для отправки файла
+    // Или просто скопировать путь в буфер обмена
+    await Clipboard.setData(ClipboardData(text: path));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Путь к логу скопирован в буфер обмена'),
+        backgroundColor: Colors.green,
+      ),
+    );
   }
 }

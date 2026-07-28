@@ -4,7 +4,9 @@ import 'package:geolocator/geolocator.dart';
 
 class PermissionService {
   static Future<bool> requestLocationPermission(BuildContext context) async {
-    var status = await Permission.location.status;
+      print('🔵 PermissionService: requestLocationPermission called');
+        var status = await Permission.location.status;
+        print('🔵 PermissionService: current status = $status');
 
     if (status.isGranted) {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();

@@ -64,7 +64,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
   bool _isPaused = false;
 
   // GPS
-  final GpsService _gpsService = GpsService();
+  final GpsService _gpsService = ref.watch(gpsServiceProvider);
   bool _useGps = true;
   double _distance = 0.0;
   final TextEditingController _distanceController = TextEditingController(text: '');
@@ -172,22 +172,26 @@ Future<void> _initGps() async {
   }
 
   void _startSegment() {
-    _segmentStartTime = DateTime.now();
-    _segmentEndTime = null;
-    _totalPauseDuration = Duration.zero;
-    _isPaused = false;
-    _pauseStartTime = null;
+  print('🔵 _startSegment() called for segment $_currentSegment');
+  _segmentStartTime = DateTime.now();
+  _segmentEndTime = null;
+  _totalPauseDuration = Duration.zero;
+  _isPaused = false;
+  _pauseStartTime = null;
 
-    _gpsService.resetDistance();
-    _distance = 0.0;
-    _distanceController.text = '';
+  _gpsService.resetDistance();
+  _distance = 0.0;
+  _distanceController.text = '';
 
-    if (_useGps && _currentSegment != 1 && _currentSegment != 3) {
-      _gpsService.startTracking();
-    }
-
-    setState(() {});
+  if (_useGps && _currentSegment != 1 && _currentSegment != 3) {
+    print('🟢 Starting GPS tracking for segment $_currentSegment');
+    _gpsService.startTracking();
+  } else {
+    print('🟡 GPS not started: useGps=$_useGps, segment=$_currentSegment');
   }
+
+  setState(() {});
+}
 
   void _togglePause() {
     setState(() {
@@ -227,41 +231,43 @@ Future<void> _initGps() async {
   }
 
   void _finishSegment() {
-    _segmentEndTime = DateTime.now();
-    if (_isPaused) {
-      if (_pauseStartTime != null) {
-        _totalPauseDuration += DateTime.now().difference(_pauseStartTime!);
-        _pauseStartTime = null;
-      }
-      _isPaused = false;
+  print('🔵 _finishSegment() called for segment $_currentSegment');
+  _segmentEndTime = DateTime.now();
+  if (_isPaused) {
+    if (_pauseStartTime != null) {
+      _totalPauseDuration += DateTime.now().difference(_pauseStartTime!);
+      _pauseStartTime = null;
     }
-    if (_useGps) {
-      _gpsService.stopTracking();
-    }
+    _isPaused = false;
   }
+  if (_useGps) {
+    print('🛑 Stopping GPS tracking for segment $_currentSegment');
+    _gpsService.stopTracking();
+  }
+}
 
   // ---- Сохранение данных текущего сегмента ----
   void _saveCurrentSegmentData() {
-    final time = _getSegmentTime();
-    final distance = _getDistance();
-    print('📊 Saving segment $_currentSegment: time=$time, distance=$distance');
-    switch (_currentSegment) {
-      case 0: // В магазин
-        _timeToShop = time;
-        _distanceToShop = distance;
-        break;
-      case 1: // Получение
-        _timeReceiving = time;
-        break;
-      case 2: // К клиенту
-        _timeToClient = time;
-        _distanceToClient = distance;
-        break;
-      case 3: // Выдача
-        _timeDelivery = time;
-        break;
-    }
+  final time = _getSegmentTime();
+  final distance = _getDistance();
+  print('📊 Saving segment $_currentSegment: time=$time, distance=$distance');
+  switch (_currentSegment) {
+    case 0:
+      _timeToShop = time;
+      _distanceToShop = distance;
+      break;
+    case 1:
+      _timeReceiving = time;
+      break;
+    case 2:
+      _timeToClient = time;
+      _distanceToClient = distance;
+      break;
+    case 3:
+      _timeDelivery = time;
+      break;
   }
+}
 
   @override
   Widget build(BuildContext context) {

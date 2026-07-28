@@ -1,44 +1,93 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:geolocator/geolocator.dart';
-import 'logger_service.dart';
+import 'package:path_provider/path_provider.dart';
 
 class GpsService {
   static final GpsService _instance = GpsService._internal();
   factory GpsService() => _instance;
   GpsService._internal();
 
+  Timer? _pollingTimer;
   bool _isTracking = false;
   double _totalDistance = 0.0;
   Position? _lastPosition;
   bool _isPaused = false;
-  bool _isInitialized = false;
 
   static const int _pollInterval = 1;
+
+  // Логирование
+  bool _isLoggingEnabled = false;
+  String _logBuffer = '';
+  final int _maxLogSize = 500 * 1024; // 500 KB
+  File? _logFile;
 
   double get currentDistance => _totalDistance;
 
   final _distanceStreamController = StreamController<double>.broadcast();
   Stream<double> get distanceStream => _distanceStreamController.stream;
 
-  Future<void> initLogger() async {
-    if (!_isInitialized) {
-      await LoggerService().init();
-      _isInitialized = true;
-      await LoggerService().logEvent('GPS_SERVICE_INIT');
+  // ---- Управление логированием ----
+
+  Future<void> startLogging() async {
+    if (_isLoggingEnabled) return;
+    _isLoggingEnabled = true;
+    _logBuffer = '';
+    _logBuffer += '=== GPS LOG STARTED ===\n';
+    _logBuffer += 'Timestamp: ${DateTime.now()}\n';
+    _logBuffer += 'Poll interval: ${_pollInterval}s\n';
+    _logBuffer += '========================\n\n';
+    _log('📁 GPS logging started');
+    await _saveLogToFile();
+  }
+
+  Future<void> stopLogging() async {
+    if (!_isLoggingEnabled) return;
+    _isLoggingEnabled = false;
+    _log('📁 GPS logging stopped');
+    await _saveLogToFile();
+  }
+
+  void _log(String message) {
+    if (!_isLoggingEnabled) return;
+    final timestamp = DateTime.now().toIso8601String();
+    _logBuffer += '[$timestamp] $message\n';
+    print(message);
+  }
+
+  Future<void> _saveLogToFile() async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/gps_log.txt');
+      _logFile = file;
+      await file.writeAsString(_logBuffer);
+      _log('📁 Log saved to: ${file.path}');
+    } catch (e) {
+      print('❌ Failed to save log: $e');
     }
   }
 
-  void startTracking() {
-    LoggerService().logEvent('START_TRACKING', data: {
-      'isTracking': _isTracking,
-      'isPaused': _isPaused,
-      'totalDistance': _totalDistance,
-    });
+  Future<String?> getLogFilePath() async {
+    if (_logFile == null) return null;
+    return _logFile!.path;
+  }
 
+  Future<String> readLogFile() async {
+    if (_logFile == null) return 'Log file not found';
+    try {
+      return await _logFile!.readAsString();
+    } catch (e) {
+      return 'Error reading log: $e';
+    }
+  }
+
+  // ---- Основные методы ----
+
+  void startTracking() {
+    _log('🟢 GPS: startTracking() called (POLLING 1s)');
     if (_isTracking) {
-      LoggerService().log('🟡 GPS: already tracking, ignoring');
+      _log('🟡 GPS: already tracking, ignoring');
       return;
     }
 
@@ -47,165 +96,118 @@ class GpsService {
     _totalDistance = 0.0;
     _lastPosition = null;
 
-    LoggerService().log('🟢 GPS: tracking started');
-
-    // Запускаем Foreground Service
-    _startForegroundService();
-  }
-
-  void _startForegroundService() {
-    FlutterForegroundTask.startService(
-      notificationTitle: 'FinFlow Доставка',
-      notificationText: 'Отслеживание маршрута...',
-      callback: _foregroundCallback,
+    _pollingTimer = Timer.periodic(
+      Duration(seconds: _pollInterval),
+      _pollGps,
     );
-    LoggerService().log('🟢 Foreground Service started');
+    _log('🟢 GPS: polling started every $_pollInterval second(s)');
   }
 
-  @pragma('vm:entry-point')
-  static void _foregroundCallback() {
-    FlutterForegroundTask.setTaskHandler(_GpsForegroundHandler());
+  Future<void> _pollGps(Timer timer) async {
+    if (!_isTracking || _isPaused) {
+      _log('⏸️ GPS: polling skipped (tracking=$_isTracking, paused=$_isPaused)');
+      return;
+    }
+
+    _log('📍 GPS: polling...');
+    try {
+      final stopwatch = Stopwatch()..start();
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.bestForNavigation,
+      );
+      stopwatch.stop();
+      _log('📍 GPS: getCurrentPosition took ${stopwatch.elapsedMilliseconds}ms');
+
+      _log('📍 GPS: position received:');
+      _log('   - lat: ${position.latitude}');
+      _log('   - lon: ${position.longitude}');
+      _log('   - accuracy: ${position.accuracy}m');
+      _log('   - speed: ${position.speed?.toStringAsFixed(2) ?? "N/A"} m/s');
+      _log('   - timestamp: ${position.timestamp}');
+
+      if (position.accuracy > 50) {
+        _log('⚠️ GPS: poor accuracy (${position.accuracy}m > 50m), but still using for test');
+      }
+
+      if (_lastPosition != null) {
+        final distance = Geolocator.distanceBetween(
+          _lastPosition!.latitude,
+          _lastPosition!.longitude,
+          position.latitude,
+          position.longitude,
+        );
+        _log('📏 GPS: raw distance since last update: ${distance.toStringAsFixed(2)} meters');
+
+        if (distance > 1000) {
+          _log('⚠️ GPS: extreme jump > 1000m (${distance.toStringAsFixed(2)}m), ignoring');
+          return;
+        }
+
+        if (distance < 0.5) {
+          _log('📏 GPS: distance too small (${distance.toStringAsFixed(2)}m < 0.5m), ignoring');
+          return;
+        }
+
+        _log('✅ GPS: ACCEPTING distance: ${distance.toStringAsFixed(2)}m');
+        _totalDistance += distance / 1000;
+        _log('📏 GPS: total distance now: ${_totalDistance.toStringAsFixed(4)} km');
+        _distanceStreamController.add(_totalDistance);
+      } else {
+        _log('🟢 GPS: first position, initializing');
+      }
+      _lastPosition = position;
+
+    } catch (e, stack) {
+      _log('🔴 GPS: poll error - $e');
+      _log('🔴 GPS: stack trace: $stack');
+    }
+
+    // Сохраняем лог каждые 10 секунд
+    if (_isLoggingEnabled && _logBuffer.length > _maxLogSize) {
+      await _saveLogToFile();
+      _logBuffer = _logBuffer.substring(_logBuffer.length ~/ 2);
+    }
   }
 
   void pauseTracking() {
-    LoggerService().logEvent('PAUSE_TRACKING', data: {
-      'totalDistance': _totalDistance,
-    });
+    _log('⏸️ GPS: pauseTracking()');
     _isPaused = true;
   }
 
   void resumeTracking() {
-    LoggerService().logEvent('RESUME_TRACKING', data: {
-      'totalDistance': _totalDistance,
-    });
+    _log('▶️ GPS: resumeTracking()');
     _isPaused = false;
   }
 
   void stopTracking() {
-    LoggerService().logEvent('STOP_TRACKING', data: {
-      'totalDistance': _totalDistance,
-      'lastPosition': _lastPosition?.latitude.toString() ?? 'null',
-    });
+    _log('🛑 GPS: stopTracking()');
     _isTracking = false;
     _isPaused = false;
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
     _lastPosition = null;
     _distanceStreamController.add(0.0);
-    LoggerService().close();
-
-    // Останавливаем Foreground Service
-    FlutterForegroundTask.stopService();
-    LoggerService().log('🛑 Foreground Service stopped');
+    if (_isLoggingEnabled) {
+      _saveLogToFile();
+    }
   }
 
   void forceRefresh() {
-    LoggerService().logEvent('FORCE_REFRESH', data: {
-      'isTracking': _isTracking,
-      'isPaused': _isPaused,
-    });
+    _log('🔄 GPS: forceRefresh() called');
+    if (_isTracking && !_isPaused) {
+      _log('🔄 GPS: executing immediate poll');
+      _pollGps(Timer.periodic(Duration(seconds: 1), (timer) {}));
+    } else {
+      _log('🔄 GPS: forceRefresh skipped (tracking=$_isTracking, paused=$_isPaused)');
+    }
   }
 
   double getTotalDistance() => _totalDistance;
 
   void resetDistance() {
-    LoggerService().logEvent('RESET_DISTANCE', data: {
-      'oldDistance': _totalDistance,
-    });
+    _log('🔄 GPS: resetDistance()');
     _totalDistance = 0.0;
     _lastPosition = null;
     _distanceStreamController.add(0.0);
-  }
-
-  Future<String?> getLog() async {
-    return await LoggerService().readLog();
-  }
-
-  Future<String?> getLogPath() async {
-    return await LoggerService().getLogFilePath();
-  }
-
-  // Метод для обновления расстояния из фонового сервиса
-  void updateDistance(double distance) {
-    _totalDistance = distance;
-    _distanceStreamController.add(_totalDistance);
-  }
-}
-
-// ---- Foreground Handler ----
-class _GpsForegroundHandler extends TaskHandler {
-  double _totalDistance = 0.0;
-  Position? _lastPosition;
-  bool _isPaused = false;
-  Timer? _pollingTimer;
-
-  @override
-  Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
-    print('🟢 Foreground: onStart');
-    _startPolling();
-    FlutterForegroundTask.updateService(
-      notificationTitle: 'FinFlow Доставка',
-      notificationText: 'Отслеживание маршрута...',
-    );
-  }
-
-  @override
-  Future<void> onEvent(DateTime timestamp, TaskStarter starter) async {
-    // Обновляем уведомление каждые 5 секунд
-    if (_pollingTimer == null || !_pollingTimer!.isActive) {
-      _startPolling();
-    }
-  }
-
-  @override
-  Future<void> onDestroy(DateTime timestamp, TaskStarter starter) async {
-    print('🛑 Foreground: onDestroy');
-    _pollingTimer?.cancel();
-    _pollingTimer = null;
-  }
-
-  @override
-  void onButtonPressed(String id) {
-    // Обработка нажатия на кнопку в уведомлении
-    print('🔘 Foreground: button pressed - $id');
-  }
-
-  void _startPolling() {
-    _pollingTimer?.cancel();
-    _pollingTimer = Timer.periodic(Duration(seconds: 1), (timer) async {
-      if (_isPaused) return;
-
-      try {
-        final position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.bestForNavigation,
-        );
-
-        if (_lastPosition != null) {
-          final distance = Geolocator.distanceBetween(
-            _lastPosition!.latitude,
-            _lastPosition!.longitude,
-            position.latitude,
-            position.longitude,
-          );
-
-          if (distance > 1.0 && distance < 500) {
-            _totalDistance += distance / 1000;
-            LoggerService().log('📏 Foreground: +${distance.toStringAsFixed(2)}m, total: ${_totalDistance.toStringAsFixed(4)}km');
-
-            // Обновляем уведомление с текущим расстоянием
-            FlutterForegroundTask.updateService(
-              notificationTitle: 'FinFlow Доставка',
-              notificationText: '${_totalDistance.toStringAsFixed(2)} км',
-            );
-
-            // Передаём расстояние в основное приложение
-            final gpsService = GpsService();
-            gpsService.updateDistance(_totalDistance);
-          }
-        }
-        _lastPosition = position;
-
-      } catch (e) {
-        print('⚠️ Foreground GPS error: $e');
-      }
-    });
   }
 }
