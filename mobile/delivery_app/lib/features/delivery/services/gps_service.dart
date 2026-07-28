@@ -79,7 +79,7 @@ class GpsService {
 
     const locationSettings = LocationSettings(
       accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 3, // игнорируем перемещения < 3 метров
+      distanceFilter: 3,
     );
 
     _positionStream = Geolocator.getPositionStream(
@@ -106,6 +106,86 @@ class GpsService {
           print('⚠️ GPS: extreme jump (${distance.toStringAsFixed(2)}m > 200m), ignoring');
           return;
         }
+
+        print('📏 GPS: distance: ${distance.toStringAsFixed(2)}m, total: ${_totalDistance.toStringAsFixed(4)}km');
+        _totalDistance += distance / 1000;
+      }
+      _lastPosition = position;
+      _distanceStreamController.add(_totalDistance);
+    }, onError: (error) {
+      print('🔴 GPS error: $error');
+    });
+  }
+
+  // ---- НОВЫЙ МЕТОД: принудительное обновление GPS ----
+  Future<void> forceRefresh() async {
+    print('🔄 GPS: forceRefresh() called');
+    try {
+      // Запрашиваем текущую позицию
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.bestForNavigation,
+        ),
+      );
+      
+      if (position != null && _lastPosition != null) {
+        // Вычисляем расстояние между последней известной позицией и новой
+        final distance = Geolocator.distanceBetween(
+          _lastPosition!.latitude,
+          _lastPosition!.longitude,
+          position.latitude,
+          position.longitude,
+        );
+        
+        print('📏 GPS: forceRefresh - distance since last: ${distance.toStringAsFixed(2)}m');
+        
+        // Если расстояние больше 2 метров — засчитываем
+        if (distance > 2.0 && distance < 200) {
+          _totalDistance += distance / 1000;
+          print('📏 GPS: forceRefresh - added ${distance.toStringAsFixed(2)}m, total: ${_totalDistance.toStringAsFixed(4)}km');
+          _distanceStreamController.add(_totalDistance);
+        }
+      }
+      
+      // Обновляем последнюю позицию
+      _lastPosition = position;
+      
+      // Проверяем, не отвалился ли стрим, и если отвалился — перезапускаем
+      if (_isTracking && _positionStream == null) {
+        print('🔄 GPS: stream is null, restarting...');
+        _resumeTracking();
+      }
+      
+    } catch (e) {
+      print('⚠️ GPS: forceRefresh error: $e');
+    }
+  }
+
+  // ---- Вспомогательный метод для перезапуска стрима ----
+  void _resumeTracking() {
+    print('🔄 GPS: _resumeTracking() called');
+    if (!_isTracking || _positionStream != null) return;
+    
+    const locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.bestForNavigation,
+      distanceFilter: 3,
+    );
+
+    _positionStream = Geolocator.getPositionStream(
+      locationSettings: locationSettings,
+    ).listen((Position position) {
+      if (_isPaused) return;
+
+      if (_lastPosition != null) {
+        final distance = Geolocator.distanceBetween(
+          _lastPosition!.latitude,
+          _lastPosition!.longitude,
+          position.latitude,
+          position.longitude,
+        );
+
+        if (distance < 2.0) return;
+        if (distance > 200) return;
 
         print('📏 GPS: distance: ${distance.toStringAsFixed(2)}m, total: ${_totalDistance.toStringAsFixed(4)}km');
         _totalDistance += distance / 1000;

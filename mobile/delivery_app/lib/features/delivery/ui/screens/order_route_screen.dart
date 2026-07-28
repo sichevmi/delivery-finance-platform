@@ -139,9 +139,18 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
-      // Ничего не делаем
+      print('🔵 App went to background');
     } else if (state == AppLifecycleState.resumed) {
+      print('🔵 App resumed from background');
+      
+      // Обновляем UI
       setState(() {});
+      
+      // Если GPS включён и не на паузе — принудительно обновляем
+      if (_useGps && !_isPaused) {
+        print('🔄 Force refreshing GPS on resume');
+        _gpsService.forceRefresh();
+      }
     }
   }
 
