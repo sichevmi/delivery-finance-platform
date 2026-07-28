@@ -138,8 +138,9 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     super.dispose();
   }
 
-  Future<void> _initGps() async {
-  final hasPermission = await PermissionService.requestLocationPermission(context);
+  // В _initGps используем метод с диалогами
+Future<void> _initGps() async {
+  final hasPermission = await _gpsService.requestPermissions(context);
   if (hasPermission) {
     _gpsSubscription = _gpsService.distanceStream.listen((distance) {
       if (mounted) {
