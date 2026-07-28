@@ -8,11 +8,14 @@ class GpsService {
   factory GpsService() => _instance;
   GpsService._internal();
 
-  StreamSubscription<Position>? _positionStream;
+  Timer? _pollingTimer;
   bool _isTracking = false;
   double _totalDistance = 0.0;
   Position? _lastPosition;
   bool _isPaused = false;
+
+  // Интервал опроса (секунды)
+  static const int _pollInterval = 2;
 
   double get currentDistance => _totalDistance;
 
@@ -66,7 +69,7 @@ class GpsService {
   }
 
   void startTracking() {
-    print('🟢 GPS: startTracking() called (MINIMAL FILTERS)');
+    print('🟢 GPS: startTracking() called (POLLING mode)');
     if (_isTracking) {
       print('🟡 GPS: already tracking, ignoring');
       return;
@@ -77,15 +80,32 @@ class GpsService {
     _totalDistance = 0.0;
     _lastPosition = null;
 
-    const locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 3,
+    // Запускаем таймер для опроса GPS
+    _pollingTimer = Timer.periodic(
+      Duration(seconds: _pollInterval),
+      _pollGps,
     );
+    print('🟢 GPS: polling started every $_pollInterval seconds');
+  }
 
-    _positionStream = Geolocator.getPositionStream(
-      locationSettings: locationSettings,
-    ).listen((Position position) {
-      if (_isPaused) return;
+  Future<void> _pollGps(Timer timer) async {
+    if (!_isTracking || _isPaused) {
+      print('⏸️ GPS: polling skipped (paused or stopped)');
+      return;
+    }
+
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.bestForNavigation,
+      );
+
+      print('📍 GPS: poll - lat: ${position.latitude}, lon: ${position.longitude}, acc: ${position.accuracy}m');
+
+      // Игнорируем плохой сигнал
+      if (position.accuracy > 15) {
+        print('⚠️ GPS: poor accuracy (${position.accuracy}m), ignoring');
+        return;
+      }
 
       if (_lastPosition != null) {
         final distance = Geolocator.distanceBetween(
@@ -95,11 +115,13 @@ class GpsService {
           position.longitude,
         );
 
+        // Игнорируем шум (< 2 метров)
         if (distance < 2.0) {
           print('📏 GPS: distance too small (${distance.toStringAsFixed(2)}m), ignoring');
           return;
         }
 
+        // Игнорируем выбросы (> 200 метров)
         if (distance > 200) {
           print('⚠️ GPS: extreme jump (${distance.toStringAsFixed(2)}m > 200m), ignoring');
           return;
@@ -107,85 +129,15 @@ class GpsService {
 
         print('📏 GPS: distance: ${distance.toStringAsFixed(2)}m, total: ${_totalDistance.toStringAsFixed(4)}km');
         _totalDistance += distance / 1000;
+        _distanceStreamController.add(_totalDistance);
+      } else {
+        print('🟢 GPS: first position, initializing');
       }
       _lastPosition = position;
-      _distanceStreamController.add(_totalDistance);
-    }, onError: (error) {
-      print('🔴 GPS error: $error');
-    });
-  }
 
-  // ---- forceRefresh() - исправленная версия для geolocator 8.2.1 ----
-  Future<void> forceRefresh() async {
-    print('🔄 GPS: forceRefresh() called');
-    try {
-      // Для geolocator 8.2.1 используем параметры напрямую
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.bestForNavigation,
-      );
-      
-      if (position != null && _lastPosition != null) {
-        final distance = Geolocator.distanceBetween(
-          _lastPosition!.latitude,
-          _lastPosition!.longitude,
-          position.latitude,
-          position.longitude,
-        );
-        
-        print('📏 GPS: forceRefresh - distance since last: ${distance.toStringAsFixed(2)}m');
-        
-        if (distance > 2.0 && distance < 200) {
-          _totalDistance += distance / 1000;
-          print('📏 GPS: forceRefresh - added ${distance.toStringAsFixed(2)}m, total: ${_totalDistance.toStringAsFixed(4)}km');
-          _distanceStreamController.add(_totalDistance);
-        }
-      }
-      
-      _lastPosition = position;
-      
-      if (_isTracking && _positionStream == null) {
-        print('🔄 GPS: stream is null, restarting...');
-        _resumeTracking();
-      }
-      
     } catch (e) {
-      print('⚠️ GPS: forceRefresh error: $e');
+      print('⚠️ GPS: poll error - $e');
     }
-  }
-
-  void _resumeTracking() {
-    print('🔄 GPS: _resumeTracking() called');
-    if (!_isTracking || _positionStream != null) return;
-    
-    const locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 3,
-    );
-
-    _positionStream = Geolocator.getPositionStream(
-      locationSettings: locationSettings,
-    ).listen((Position position) {
-      if (_isPaused) return;
-
-      if (_lastPosition != null) {
-        final distance = Geolocator.distanceBetween(
-          _lastPosition!.latitude,
-          _lastPosition!.longitude,
-          position.latitude,
-          position.longitude,
-        );
-
-        if (distance < 2.0) return;
-        if (distance > 200) return;
-
-        print('📏 GPS: distance: ${distance.toStringAsFixed(2)}m, total: ${_totalDistance.toStringAsFixed(4)}km');
-        _totalDistance += distance / 1000;
-      }
-      _lastPosition = position;
-      _distanceStreamController.add(_totalDistance);
-    }, onError: (error) {
-      print('🔴 GPS error: $error');
-    });
   }
 
   void pauseTracking() {
@@ -196,17 +148,23 @@ class GpsService {
   void resumeTracking() {
     print('▶️ GPS: resumeTracking()');
     _isPaused = false;
-    _getCurrentPosition();
   }
 
   void stopTracking() {
     print('🛑 GPS: stopTracking()');
     _isTracking = false;
     _isPaused = false;
-    _positionStream?.cancel();
-    _positionStream = null;
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
     _lastPosition = null;
     _distanceStreamController.add(0.0);
+  }
+
+  void forceRefresh() {
+    print('🔄 GPS: forceRefresh() called');
+    if (_isTracking && !_isPaused) {
+      _pollGps(Timer.periodic(Duration(seconds: 1), (timer) {}));
+    }
   }
 
   double getTotalDistance() => _totalDistance;
@@ -216,16 +174,5 @@ class GpsService {
     _totalDistance = 0.0;
     _lastPosition = null;
     _distanceStreamController.add(0.0);
-  }
-
-  Future<void> _getCurrentPosition() async {
-    try {
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.bestForNavigation,
-      );
-      _lastPosition = position;
-    } catch (e) {
-      print('⚠️ GPS: error getting current position: $e');
-    }
   }
 }
