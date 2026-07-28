@@ -5,6 +5,7 @@ import 'package:delivery_app/features/delivery/providers/tab_provider.dart';
 import 'package:delivery_app/features/delivery/providers/pricing_provider.dart';
 import 'package:delivery_app/features/delivery/services/gps_service.dart';
 import 'order_summary_screen.dart';
+import 'package:delivery_app/features/delivery/services/permission_service.dart';
 
 class Delivery {
   final int number;
@@ -138,22 +139,22 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
   }
 
   Future<void> _initGps() async {
-    final hasPermission = await _gpsService.requestPermissions(context);
-    if (hasPermission) {
-      _gpsSubscription = _gpsService.distanceStream.listen((distance) {
-        if (mounted) {
-          setState(() {
-            _distance = distance;
-          });
-        }
-      });
-      _isGpsInitialized = true;
-    } else {
-      setState(() {
-        _useGps = false;
-      });
-    }
+  final hasPermission = await PermissionService.requestLocationPermission(context);
+  if (hasPermission) {
+    _gpsSubscription = _gpsService.distanceStream.listen((distance) {
+      if (mounted) {
+        setState(() {
+          _distance = distance;
+        });
+      }
+    });
+    _isGpsInitialized = true;
+  } else {
+    setState(() {
+      _useGps = false;
+    });
   }
+}
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {

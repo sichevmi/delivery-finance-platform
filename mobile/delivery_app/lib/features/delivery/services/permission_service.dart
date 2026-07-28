@@ -3,34 +3,10 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
 
 class PermissionService {
-  /// Проверка и запрос разрешений с объяснением
   static Future<bool> requestLocationPermission(BuildContext context) async {
-    // Проверяем текущий статус
     var status = await Permission.location.status;
 
-    // Если разрешение уже есть — возвращаем true
     if (status.isGranted) {
-      return true;
-    }
-
-    // Если разрешение отклонено навсегда — открываем настройки
-    if (status.isPermanentlyDenied) {
-      await _showSettingsDialog(context);
-      return false;
-    }
-
-    // Если разрешение отклонено, но не навсегда — показываем объяснение
-    if (status.isDenied) {
-      final shouldRequest = await _showExplanationDialog(context);
-      if (!shouldRequest) {
-        return false;
-      }
-      status = await Permission.location.request();
-    }
-
-    // Повторно проверяем статус после запроса
-    if (status.isGranted) {
-      // Проверяем, включена ли служба геолокации
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         await _showEnableGpsDialog(context);
@@ -39,7 +15,28 @@ class PermissionService {
       return true;
     }
 
-    // Если разрешение всё ещё отклонено — редирект в настройки
+    if (status.isPermanentlyDenied) {
+      await _showSettingsDialog(context);
+      return false;
+    }
+
+    if (status.isDenied) {
+      final shouldRequest = await _showExplanationDialog(context);
+      if (!shouldRequest) {
+        return false;
+      }
+      status = await Permission.location.request();
+    }
+
+    if (status.isGranted) {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        await _showEnableGpsDialog(context);
+        return false;
+      }
+      return true;
+    }
+
     if (status.isPermanentlyDenied) {
       await _showSettingsDialog(context);
       return false;
@@ -48,7 +45,6 @@ class PermissionService {
     return false;
   }
 
-  /// Диалог-объяснение перед запросом разрешения
   static Future<bool> _showExplanationDialog(BuildContext context) async {
     return await showDialog<bool>(
       context: context,
@@ -85,7 +81,6 @@ class PermissionService {
     ) ?? false;
   }
 
-  /// Диалог для включения GPS
   static Future<void> _showEnableGpsDialog(BuildContext context) async {
     final result = await showDialog<bool>(
       context: context,
@@ -125,7 +120,6 @@ class PermissionService {
     }
   }
 
-  /// Диалог для перехода в настройки приложения
   static Future<void> _showSettingsDialog(BuildContext context) async {
     final result = await showDialog<bool>(
       context: context,

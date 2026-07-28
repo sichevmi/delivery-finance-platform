@@ -33,8 +33,6 @@ class GpsService {
     const locationSettings = LocationSettings(
       accuracy: LocationAccuracy.bestForNavigation,
       distanceFilter: 3,
-      // Для фоновой работы используем интервал 2 секунды
-      intervalDuration: const Duration(seconds: 2),
     );
 
     _positionStream = Geolocator.getPositionStream(
