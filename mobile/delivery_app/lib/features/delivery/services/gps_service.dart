@@ -15,7 +15,7 @@ class GpsService {
   Position? _lastPosition;
   bool _isPaused = false;
 
-  static const int _pollInterval = 2; // 2 секунды для экономии батареи
+  static const int _pollInterval = 2;
 
   bool _isLoggingEnabled = false;
   String _logBuffer = '';
@@ -75,7 +75,7 @@ class GpsService {
   // ---- Основные методы ----
 
   void startTracking() {
-    _log('🟢 GPS: startTracking() called (POLLING 2s)');
+    _log('🟢 GPS: startTracking() called (STREAM mode)');
     if (_isTracking) {
       _log('🟡 GPS: already tracking, ignoring');
       return;
@@ -86,8 +86,6 @@ class GpsService {
     _totalDistance = 0.0;
     _lastPosition = null;
 
-    // Используем getPositionStream вместо Timer для фоновой работы
-    // Он работает через Foreground Service, если он настроен
     _startPositionStream();
 
     _log('🟢 GPS: position stream started');
@@ -97,8 +95,6 @@ class GpsService {
     const locationSettings = LocationSettings(
       accuracy: LocationAccuracy.bestForNavigation,
       distanceFilter: 3,
-      // Для Android 8+ используем интервал обновления
-      intervalDuration: Duration(seconds: 2),
     );
 
     Geolocator.getPositionStream(
