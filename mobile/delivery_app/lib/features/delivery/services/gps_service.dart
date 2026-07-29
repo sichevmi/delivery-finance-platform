@@ -20,13 +20,12 @@ class GpsService {
   static const double _minDistance = 1.0;
   static const int _pollInterval = 2;
 
-  // НОВОЕ: Детектор залипания
+  // Детектор залипания
   Position? _lastAcceptedPosition;
   int _stuckCounter = 0;
-  static const int _stuckThreshold = 4; // 4 раза подряд без движения (8 секунд)
+  static const int _stuckThreshold = 4;
   DateTime? _lastUpdateTime;
   
-  // Для расчёта скорости между обновлениями
   double _lastSpeed = 0.0;
 
   bool _isLoggingEnabled = false;
@@ -124,14 +123,12 @@ class GpsService {
       _log('📍 GPS: lat: ${position.latitude}, lon: ${position.longitude}, '
           'acc: ${position.accuracy.toStringAsFixed(1)}m, speed: ${position.speed?.toStringAsFixed(2) ?? "N/A"} m/s');
 
-      // Фильтр точности
       if (position.accuracy > _maxAccuracy) {
         _log('⚠️ GPS: poor accuracy (${position.accuracy.toStringAsFixed(1)}m > ${_maxAccuracy}m), ignoring');
-        // Не сбрасываем stuckCounter при плохой точности
         return;
       }
 
-      // НОВОЕ: Проверка на залипание
+      // Проверка на залипание
       if (_lastAcceptedPosition != null) {
         final distFromLast = Geolocator.distanceBetween(
           _lastAcceptedPosition!.latitude,
@@ -148,13 +145,11 @@ class GpsService {
             _log('🔄 GPS: DETECTED STUCK! Forcing location refresh...');
             _stuckCounter = 0;
             
-            // Принудительно обновляем GPS
             await Geolocator.getCurrentPosition(
               desiredAccuracy: LocationAccuracy.bestForNavigation,
               forceAndroidLocationManager: true,
             );
             
-            // Сбрасываем последнюю позицию, чтобы следующий опрос был "первым"
             _lastPosition = null;
             return;
           }
@@ -173,18 +168,20 @@ class GpsService {
         
         _log('📏 GPS: raw distance: ${distance.toStringAsFixed(2)}m');
 
-        // НОВОЕ: Если расстояние большое (скачок), проверяем на реалистичность
+        // Проверка на реалистичность скачков
         if (distance > 100.0 && _lastUpdateTime != null) {
-          double timeDelta = DateTime.now().difference(_lastUpdateTime!).inSeconds;
+          // Исправлено: приводим int к double
+          double timeDelta = DateTime.now()
+              .difference(_lastUpdateTime!)
+              .inSeconds
+              .toDouble();
           double speed = distance / timeDelta;
           
-          // Если скорость > 50 м/с (180 км/ч) — явный выброс
           if (speed > 50.0) {
-            _log('⚠️ GPS: unrealistic jump! ${distance.toStringAsFixed(0)}m in ${timeDelta}s = ${speed.toStringAsFixed(1)} m/s, IGNORING');
+            _log('⚠️ GPS: unrealistic jump! ${distance.toStringAsFixed(0)}m in ${timeDelta.toStringAsFixed(0)}s = ${speed.toStringAsFixed(1)} m/s, IGNORING');
             return;
           }
           
-          // Если скорость > 30 м/с (108 км/ч) — подозрительно, берём только 70%
           if (speed > 30.0) {
             double adjustedDistance = distance * 0.7;
             _log('⚠️ GPS: high speed ${speed.toStringAsFixed(1)} m/s, using 70% = ${adjustedDistance.toStringAsFixed(0)}m');
@@ -200,7 +197,6 @@ class GpsService {
           }
         }
 
-        // Принимаем любое расстояние >= минимального
         if (distance >= _minDistance) {
           _totalDistance += distance / 1000;
           _log('✅ GPS: ACCEPTING ${distance.toStringAsFixed(2)}m, total: ${_totalDistance.toStringAsFixed(4)} km');
