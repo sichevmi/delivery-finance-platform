@@ -15,12 +15,22 @@ class GpsService {
   Position? _lastPosition;
   bool _isPaused = false;
 
-  // --- МИНИМАЛЬНЫЕ НАСТРОЙКИ ---
-  // Только точность — самое важное
-  static const double _maxAccuracy = 50.0; // Увеличил до 50м
-  static const double _minDistance = 1.0; // Минимальное расстояние для засчёта
+  // --- НАСТРОЙКИ (возврат к утренним, которые давали 80м погрешности) ---
+  static const double _minSpeedMps = 0.5; // Восстановлен фильтр скорости
+  static const double _maxAccuracy = 30.0; // 30м как было утром
+  static const double _minDistance = 1.5; // 1.5м как было утром
+  static const double _maxJump = 100.0; // 100м как было утром
   
-  static const int _pollInterval = 2; // Опрос каждые 2 секунды
+  // Детектор "стояния"
+  Position? _stationaryPosition;
+  DateTime? _stationaryStartTime;
+
+  // --- НОВОЕ: Детектор "залипания" GPS ---
+  Position? _lastAcceptedPosition;
+  int _stuckCounter = 0;
+  static const int _stuckThreshold = 3; // 3 раза подряд одинаковые координаты
+
+  static const int _pollInterval = 2;
 
   // --- Логирование ---
   bool _isLoggingEnabled = false;
@@ -90,7 +100,7 @@ class GpsService {
   // ---- Основные методы ----
 
   void startTracking() {
-    _log('🟢 GPS: startTracking() called (MINIMAL FILTER VERSION)');
+    _log('🟢 GPS: startTracking() called (STUCK DETECTOR VERSION)');
     if (_isTracking) {
       _log('🟡 GPS: already tracking, ignoring');
       return;
@@ -100,6 +110,10 @@ class GpsService {
     _isPaused = false;
     _totalDistance = 0.0;
     _lastPosition = null;
+    _stationaryPosition = null;
+    _stationaryStartTime = null;
+    _lastAcceptedPosition = null;
+    _stuckCounter = 0;
 
     _pollingTimer = Timer.periodic(
       Duration(seconds: _pollInterval),
@@ -121,9 +135,18 @@ class GpsService {
       _log('📍 GPS: lat: ${position.latitude}, lon: ${position.longitude}, '
           'acc: ${position.accuracy.toStringAsFixed(1)}m, speed: ${position.speed?.toStringAsFixed(2) ?? "N/A"} m/s');
 
-      // ЕДИНСТВЕННЫЙ ФИЛЬТР — только точность
+      // ---- ФИЛЬТР 1: Точность ----
       if (position.accuracy > _maxAccuracy) {
         _log('⚠️ GPS: poor accuracy (${position.accuracy.toStringAsFixed(1)}m > ${_maxAccuracy}m), ignoring');
+        // Сбрасываем счетчик залипания при плохой точности
+        _stuckCounter = 0;
+        return;
+      }
+
+      // ---- ФИЛЬТР 2: Скорость ----
+      if (position.speed != null && position.speed! < _minSpeedMps) {
+        _log('⏸️ GPS: speed too low (${position.speed!.toStringAsFixed(2)} m/s), ignoring');
+        _stuckCounter = 0;
         return;
       }
 
@@ -134,25 +157,94 @@ class GpsService {
           position.latitude,
           position.longitude,
         );
-        
         _log('📏 GPS: raw distance: ${distance.toStringAsFixed(2)}m');
 
-        // Минимальное расстояние — чтобы не считать шум на месте
-        if (distance >= _minDistance) {
-          _totalDistance += distance / 1000;
-          _log('✅ GPS: ACCEPTING ${distance.toStringAsFixed(2)}m, total: ${_totalDistance.toStringAsFixed(4)} km');
-          _distanceStreamController.add(_totalDistance);
-        } else {
-          _log('📏 GPS: distance too small (${distance.toStringAsFixed(2)}m < ${_minDistance}m), ignoring');
+        // ---- НОВОЕ: Детектор залипания ----
+        // Проверяем, не залипли ли мы на одной точке
+        if (_lastAcceptedPosition != null) {
+          final distFromLastAccepted = Geolocator.distanceBetween(
+            _lastAcceptedPosition!.latitude,
+            _lastAcceptedPosition!.longitude,
+            position.latitude,
+            position.longitude,
+          );
+          
+          if (distFromLastAccepted < 0.5) {
+            _stuckCounter++;
+            _log('⚠️ GPS: stuck counter = $_stuckCounter/${_stuckThreshold}');
+            
+            if (_stuckCounter >= _stuckThreshold) {
+              _log('🔄 GPS: DETECTED STUCK! Forcing refresh...');
+              _stuckCounter = 0;
+              // Принудительно обновляем позицию сбросом кеша
+              await Geolocator.getCurrentPosition(
+                desiredAccuracy: LocationAccuracy.bestForNavigation,
+                forceAndroidLocationManager: true,
+              );
+              return;
+            }
+          } else {
+            _stuckCounter = 0;
+          }
         }
+
+        // ---- ФИЛЬТР 3: Минимальное расстояние ----
+        if (distance < _minDistance) {
+          _log('📏 GPS: distance too small (${distance.toStringAsFixed(2)}m < ${_minDistance}m), ignoring');
+          return;
+        }
+
+        // ---- ФИЛЬТР 4: Максимальный скачок ----
+        if (distance > _maxJump) {
+          _log('⚠️ GPS: extreme jump > ${_maxJump}m (${distance.toStringAsFixed(2)}m), ignoring');
+          _stuckCounter = 0;
+          return;
+        }
+
+        // ---- ФИЛЬТР 5: Детектор "стояния" ----
+        if (distance < 3.0) {
+          if (_stationaryPosition == null) {
+            _stationaryPosition = position;
+            _stationaryStartTime = DateTime.now();
+          } else {
+            final stationaryDist = Geolocator.distanceBetween(
+              _stationaryPosition!.latitude,
+              _stationaryPosition!.longitude,
+              position.latitude,
+              position.longitude,
+            );
+            if (stationaryDist < 3.0 &&
+                _stationaryStartTime != null &&
+                DateTime.now().difference(_stationaryStartTime!).inSeconds > 30) {
+              _log('⏸️ GPS: stationary for >30s, ignoring small movement');
+              return;
+            }
+          }
+        } else {
+          _stationaryPosition = null;
+          _stationaryStartTime = null;
+        }
+
+        _log('✅ GPS: ACCEPTING ${distance.toStringAsFixed(2)}m');
+        _totalDistance += distance / 1000;
+        _log('📏 GPS: total: ${_totalDistance.toStringAsFixed(4)} km');
+        _distanceStreamController.add(_totalDistance);
+        
+        // Запоминаем последнюю принятую позицию
+        _lastAcceptedPosition = position;
+        _stuckCounter = 0;
+        
       } else {
         _log('🟢 GPS: first position, initializing');
+        _lastAcceptedPosition = position;
+        _stuckCounter = 0;
       }
       
       _lastPosition = position;
 
     } catch (e) {
       _log('🔴 GPS: poll error - $e');
+      _stuckCounter = 0;
     }
 
     if (_isLoggingEnabled && _logBuffer.length > _maxLogSize) {
@@ -178,6 +270,10 @@ class GpsService {
     _pollingTimer?.cancel();
     _pollingTimer = null;
     _lastPosition = null;
+    _stationaryPosition = null;
+    _stationaryStartTime = null;
+    _lastAcceptedPosition = null;
+    _stuckCounter = 0;
     _distanceStreamController.add(0.0);
     if (_isLoggingEnabled) {
       _saveLogToFile();
@@ -186,6 +282,7 @@ class GpsService {
 
   void forceRefresh() {
     _log('🔄 GPS: forceRefresh() called');
+    _stuckCounter = 0;
     if (_isTracking && !_isPaused) {
       _pollGps(Timer.periodic(Duration(seconds: 1), (timer) {}));
     }
@@ -197,6 +294,10 @@ class GpsService {
     _log('🔄 GPS: resetDistance()');
     _totalDistance = 0.0;
     _lastPosition = null;
+    _stationaryPosition = null;
+    _stationaryStartTime = null;
+    _lastAcceptedPosition = null;
+    _stuckCounter = 0;
     _distanceStreamController.add(0.0);
   }
 }
