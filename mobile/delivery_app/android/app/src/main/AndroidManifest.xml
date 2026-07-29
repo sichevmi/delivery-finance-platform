@@ -18,10 +18,8 @@
         
         <!-- Сервис для фоновой GPS -->
         <service
-            android:name="com.pravera.flutter_foreground_task.ForegroundService"
-            android:foregroundServiceType="location"
-            android:exported="false"
-            android:stopWithTask="false" />
+            android:name="com.baseflow.geolocator.GeolocatorBackgroundService"
+            android:foregroundServiceType="location" />
         
         <activity
             android:name=".MainActivity"

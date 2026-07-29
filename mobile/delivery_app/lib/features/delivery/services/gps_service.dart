@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 class GpsService {
   static final GpsService _instance = GpsService._internal();
@@ -27,36 +26,6 @@ class GpsService {
 
   final _distanceStreamController = StreamController<double>.broadcast();
   Stream<double> get distanceStream => _distanceStreamController.stream;
-
-  // ---- Foreground Service ----
-
-  Future<void> startForegroundService() async {
-    if (!await FlutterForegroundTask.isRunning) {
-      await FlutterForegroundTask.startService(
-        notificationTitle: 'FinFlow Доставка',
-        notificationText: 'Отслеживание маршрута...',
-        notificationButtons: [
-          const NotificationButton(id: 'stop', text: 'Остановить'),
-        ],
-        callback: _startCallback,
-      );
-      print('🟢 Foreground service started');
-    } else {
-      print('🟡 Foreground service already running');
-    }
-  }
-
-  Future<void> stopForegroundService() async {
-    if (await FlutterForegroundTask.isRunning) {
-      await FlutterForegroundTask.stopService();
-      print('🛑 Foreground service stopped');
-    }
-  }
-
-  @pragma('vm:entry-point')
-  static void _startCallback() {
-    FlutterForegroundTask.setTaskHandler(_GpsForegroundHandler());
-  }
 
   // ---- Управление логированием ----
 
@@ -114,15 +83,12 @@ class GpsService {
 
   // ---- Основные методы ----
 
-  void startTracking() async {
+  void startTracking() {
     _log('🟢 GPS: startTracking() called (POLLING 1s)');
     if (_isTracking) {
       _log('🟡 GPS: already tracking, ignoring');
       return;
     }
-
-    // Запускаем Foreground Service
-    await startForegroundService();
 
     _isTracking = true;
     _isPaused = false;
@@ -211,7 +177,7 @@ class GpsService {
     _isPaused = false;
   }
 
-  void stopTracking() async {
+  void stopTracking() {
     _log('🛑 GPS: stopTracking()');
     _isTracking = false;
     _isPaused = false;
@@ -222,7 +188,6 @@ class GpsService {
     if (_isLoggingEnabled) {
       _saveLogToFile();
     }
-    await stopForegroundService();
   }
 
   void forceRefresh() {
@@ -242,26 +207,5 @@ class GpsService {
     _totalDistance = 0.0;
     _lastPosition = null;
     _distanceStreamController.add(0.0);
-  }
-}
-
-// ---- Foreground Service Handler ----
-
-class _GpsForegroundHandler extends TaskHandler {
-  @override
-  void onRepeatEvent(DateTime timestamp) {
-    // Ничего не делаем, опрос идёт через _pollGps
-  }
-
-  @override
-  Future<void> onDestroy(DateTime timestamp) async {
-    // Сервис остановлен
-  }
-
-  @override
-  void onNotificationButtonPressed(String id) {
-    if (id == 'stop') {
-      FlutterForegroundTask.stopService();
-    }
   }
 }
