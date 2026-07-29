@@ -137,12 +137,14 @@ class GpsService {
     return Position(
       latitude: avgLat,
       longitude: avgLon,
+      timestamp: last.timestamp,
       accuracy: avgAcc,
       altitude: last.altitude,
       heading: last.heading,
       speed: last.speed,
       speedAccuracy: last.speedAccuracy,
-      timestamp: last.timestamp,
+      altitudeAccuracy: last.altitudeAccuracy,  // <-- Добавлено
+      headingAccuracy: last.headingAccuracy,    // <-- Добавлено
     );
   }
 
