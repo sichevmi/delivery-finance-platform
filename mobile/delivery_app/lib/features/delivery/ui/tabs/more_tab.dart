@@ -1,8 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
-import 'package:delivery_app/features/delivery/services/gps_service.dart';  // <-- ДОБАВЛЕН ИМПОРТ
+import 'package:delivery_app/features/delivery/services/gps_service.dart';
 
 class MoreTab extends ConsumerStatefulWidget {
   const MoreTab({super.key});
@@ -96,7 +98,7 @@ class _MoreTabState extends ConsumerState<MoreTab> {
                         foregroundColor: const Color(0xFF6C63FF),
                         side: const BorderSide(color: Color(0xFF6C63FF)),
                       ),
-                      child: const Text('📤 Экспорт лога'),
+                      child: const Text('📤 Отправить лог'),
                     ),
                   ),
                 ],
@@ -141,25 +143,49 @@ class _MoreTabState extends ConsumerState<MoreTab> {
   }
 
   Future<void> _shareLog(GpsService gpsService) async {
-    final path = await gpsService.getLogFilePath();
-    if (path == null) {
+    try {
+      final path = await gpsService.getLogFilePath();
+      if (path == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Лог-файл не найден. Сначала запустите логирование.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      final file = File(path);
+      if (!await file.exists()) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Файл лога не существует.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Открываем системный диалог шаринга
+      await Share.shareXFiles(
+        [XFile(path)],
+        text: 'GPS лог от ${DateTime.now().toLocal().toString().substring(0, 19)}',
+        subject: 'GPS лог',
+      );
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Лог-файл не найден. Сначала запустите логирование.'),
+          content: Text('Файл отправлен!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ошибка отправки: $e'),
           backgroundColor: Colors.red,
         ),
       );
-      return;
     }
-
-    await Clipboard.setData(ClipboardData(text: path));
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Путь к логу скопирован:\n$path'),
-        backgroundColor: const Color(0xFF6C63FF),
-        duration: const Duration(seconds: 5),
-      ),
-    );
   }
 }
