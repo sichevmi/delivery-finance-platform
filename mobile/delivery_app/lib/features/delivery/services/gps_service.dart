@@ -15,7 +15,7 @@ class GpsService {
   Position? _lastPosition;
   bool _isPaused = false;
 
-  static const int _pollInterval = 1;
+  static const int _pollInterval = 2; // 2 секунды для экономии батареи
 
   bool _isLoggingEnabled = false;
   String _logBuffer = '';
@@ -72,19 +72,10 @@ class GpsService {
     return _logFile!.path;
   }
 
-  Future<String> readLogFile() async {
-    if (_logFile == null) return 'Log file not found';
-    try {
-      return await _logFile!.readAsString();
-    } catch (e) {
-      return 'Error reading log: $e';
-    }
-  }
-
   // ---- Основные методы ----
 
   void startTracking() {
-    _log('🟢 GPS: startTracking() called (POLLING 1s)');
+    _log('🟢 GPS: startTracking() called (POLLING 2s)');
     if (_isTracking) {
       _log('🟡 GPS: already tracking, ignoring');
       return;
@@ -95,74 +86,77 @@ class GpsService {
     _totalDistance = 0.0;
     _lastPosition = null;
 
-    _pollingTimer = Timer.periodic(
-      Duration(seconds: _pollInterval),
-      _pollGps,
-    );
-    _log('🟢 GPS: polling started every $_pollInterval second(s)');
+    // Используем getPositionStream вместо Timer для фоновой работы
+    // Он работает через Foreground Service, если он настроен
+    _startPositionStream();
+
+    _log('🟢 GPS: position stream started');
   }
 
-  Future<void> _pollGps(Timer timer) async {
+  void _startPositionStream() {
+    const locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.bestForNavigation,
+      distanceFilter: 3,
+      // Для Android 8+ используем интервал обновления
+      intervalDuration: Duration(seconds: 2),
+    );
+
+    Geolocator.getPositionStream(
+      locationSettings: locationSettings,
+    ).listen((Position position) {
+      _onPositionReceived(position);
+    }, onError: (error) {
+      _log('🔴 GPS stream error: $error');
+    });
+  }
+
+  void _onPositionReceived(Position position) {
     if (!_isTracking || _isPaused) {
-      _log('⏸️ GPS: polling skipped (tracking=$_isTracking, paused=$_isPaused)');
+      _log('⏸️ GPS: position ignored (tracking=$_isTracking, paused=$_isPaused)');
       return;
     }
 
-    _log('📍 GPS: polling...');
-    try {
-      final stopwatch = Stopwatch()..start();
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.bestForNavigation,
-      );
-      stopwatch.stop();
-      _log('📍 GPS: getCurrentPosition took ${stopwatch.elapsedMilliseconds}ms');
+    _log('📍 GPS: position received:');
+    _log('   - lat: ${position.latitude}');
+    _log('   - lon: ${position.longitude}');
+    _log('   - accuracy: ${position.accuracy}m');
+    _log('   - speed: ${position.speed?.toStringAsFixed(2) ?? "N/A"} m/s');
+    _log('   - timestamp: ${position.timestamp}');
 
-      _log('📍 GPS: position received:');
-      _log('   - lat: ${position.latitude}');
-      _log('   - lon: ${position.longitude}');
-      _log('   - accuracy: ${position.accuracy}m');
-      _log('   - speed: ${position.speed?.toStringAsFixed(2) ?? "N/A"} m/s');
-      _log('   - timestamp: ${position.timestamp}');
-
-      if (position.accuracy > 50) {
-        _log('⚠️ GPS: poor accuracy (${position.accuracy}m > 50m), but still using for test');
-      }
-
-      if (_lastPosition != null) {
-        final distance = Geolocator.distanceBetween(
-          _lastPosition!.latitude,
-          _lastPosition!.longitude,
-          position.latitude,
-          position.longitude,
-        );
-        _log('📏 GPS: raw distance since last update: ${distance.toStringAsFixed(2)} meters');
-
-        if (distance > 1000) {
-          _log('⚠️ GPS: extreme jump > 1000m (${distance.toStringAsFixed(2)}m), ignoring');
-          return;
-        }
-
-        if (distance < 0.5) {
-          _log('📏 GPS: distance too small (${distance.toStringAsFixed(2)}m < 0.5m), ignoring');
-          return;
-        }
-
-        _log('✅ GPS: ACCEPTING distance: ${distance.toStringAsFixed(2)}m');
-        _totalDistance += distance / 1000;
-        _log('📏 GPS: total distance now: ${_totalDistance.toStringAsFixed(4)} km');
-        _distanceStreamController.add(_totalDistance);
-      } else {
-        _log('🟢 GPS: first position, initializing');
-      }
-      _lastPosition = position;
-
-    } catch (e, stack) {
-      _log('🔴 GPS: poll error - $e');
-      _log('🔴 GPS: stack trace: $stack');
+    if (position.accuracy > 50) {
+      _log('⚠️ GPS: poor accuracy (${position.accuracy}m > 50m), but still using for test');
     }
 
+    if (_lastPosition != null) {
+      final distance = Geolocator.distanceBetween(
+        _lastPosition!.latitude,
+        _lastPosition!.longitude,
+        position.latitude,
+        position.longitude,
+      );
+      _log('📏 GPS: raw distance since last update: ${distance.toStringAsFixed(2)} meters');
+
+      if (distance > 1000) {
+        _log('⚠️ GPS: extreme jump > 1000m, ignoring');
+        return;
+      }
+
+      if (distance < 0.5) {
+        _log('📏 GPS: distance too small (< 0.5m), ignoring');
+        return;
+      }
+
+      _log('✅ GPS: ACCEPTING distance: ${distance.toStringAsFixed(2)}m');
+      _totalDistance += distance / 1000;
+      _log('📏 GPS: total distance now: ${_totalDistance.toStringAsFixed(4)} km');
+      _distanceStreamController.add(_totalDistance);
+    } else {
+      _log('🟢 GPS: first position, initializing');
+    }
+    _lastPosition = position;
+
     if (_isLoggingEnabled && _logBuffer.length > _maxLogSize) {
-      await _saveLogToFile();
+      _saveLogToFile();
       _logBuffer = _logBuffer.substring(_logBuffer.length ~/ 2);
     }
   }
@@ -193,8 +187,15 @@ class GpsService {
   void forceRefresh() {
     _log('🔄 GPS: forceRefresh() called');
     if (_isTracking && !_isPaused) {
-      _log('🔄 GPS: executing immediate poll');
-      _pollGps(Timer.periodic(Duration(seconds: 1), (timer) {}));
+      _log('🔄 GPS: forceRefresh - getting current position');
+      Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.bestForNavigation,
+      ).then((position) {
+        _onPositionReceived(position);
+        _log('🔄 GPS: forceRefresh completed');
+      }).catchError((e) {
+        _log('🔄 GPS: forceRefresh error: $e');
+      });
     } else {
       _log('🔄 GPS: forceRefresh skipped (tracking=$_isTracking, paused=$_isPaused)');
     }
