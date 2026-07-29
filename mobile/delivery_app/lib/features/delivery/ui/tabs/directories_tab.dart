@@ -12,6 +12,7 @@ class DirectoriesTab extends StatefulWidget {
 
 class _DirectoriesTabState extends State<DirectoriesTab> {
   int _selectedIndex = 0;
+  bool _isLoading = true;
 
   final List<String> _tabs = ['Расходы', 'X5', 'Иное'];
   final List<Widget> _pages = const [
@@ -19,6 +20,21 @@ class _DirectoriesTabState extends State<DirectoriesTab> {
     X5Directory(),
     OtherDirectory(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _simulateLoading();
+  }
+
+  Future<void> _simulateLoading() async {
+    await Future.delayed(const Duration(milliseconds: 800));
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,11 +58,13 @@ class _DirectoriesTabState extends State<DirectoriesTab> {
                 _tabs.length,
                 (index) => Expanded(
                   child: GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedIndex = index;
-                      });
-                    },
+                    onTap: _isLoading
+                        ? null
+                        : () {
+                            setState(() {
+                              _selectedIndex = index;
+                            });
+                          },
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       decoration: BoxDecoration(
@@ -77,7 +95,9 @@ class _DirectoriesTabState extends State<DirectoriesTab> {
         ),
         // Страница выбранного справочника
         Expanded(
-          child: _pages[_selectedIndex],
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _pages[_selectedIndex],
         ),
       ],
     );
