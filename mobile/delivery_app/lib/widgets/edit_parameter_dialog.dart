@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/parameter_model.dart';
+import 'package:delivery_app/models/parameter_model.dart';
 
 class EditParameterDialog extends StatefulWidget {
   final Parameter parameter;
@@ -93,7 +93,6 @@ class _EditParameterDialogState extends State<EditParameterDialog> {
   }
 
   Future<void> _save() async {
-    // Валидация
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -101,22 +100,16 @@ class _EditParameterDialogState extends State<EditParameterDialog> {
       _errorText = null;
     });
 
-    // Имитация сохранения (задержка 1.5 сек)
     try {
       await Future.delayed(const Duration(milliseconds: 1500));
-
-      // Для демонстрации ошибки раскомментируйте строку ниже:
+      // Для теста ошибки раскомментируйте:
       // if (DateTime.now().millisecond % 3 == 0) throw Exception('Ошибка сервера');
-
-      // Успешно
       widget.onSave(_controller.text.trim());
     } catch (e) {
-      // Ошибка сохранения
       setState(() {
         _isSaving = false;
         _errorText = 'Не удалось сохранить. Попробуйте позже.';
       });
-      // Можно также показать SnackBar, но ошибка отображается в поле
     }
   }
 }

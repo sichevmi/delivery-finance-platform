@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../../models/parameter_model.dart';
-import '../../../../widgets/editable_parameter_card.dart';
+import 'package:delivery_app/models/parameter_model.dart';
+import 'package:delivery_app/widgets/editable_parameter_card.dart';
 
 class X5Directory extends StatefulWidget {
   const X5Directory({super.key});

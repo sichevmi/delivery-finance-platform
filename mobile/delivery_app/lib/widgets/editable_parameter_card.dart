@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../models/parameter_model.dart';
-import 'edit_parameter_dialog.dart';
+import 'package:delivery_app/models/parameter_model.dart';
+import 'package:delivery_app/widgets/edit_parameter_dialog.dart';
 
 class EditableParameterCard extends StatelessWidget {
   final Parameter parameter;
@@ -69,12 +69,12 @@ class EditableParameterCard extends StatelessWidget {
   void _showEditDialog(BuildContext context) {
     showDialog(
       context: context,
-      barrierDismissible: false, // запрещаем закрытие тапом вне диалога
+      barrierDismissible: false,
       builder: (context) => EditParameterDialog(
         parameter: parameter,
         onSave: (newValue) {
           onValueUpdated(newValue);
-          Navigator.of(context).pop(); // закрываем диалог после успеха
+          Navigator.of(context).pop();
         },
         onCancel: () {
           Navigator.of(context).pop();

@@ -40,17 +40,13 @@ class _DirectoriesTabState extends State<DirectoriesTab> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Переключатель разделов справочников
         Padding(
           padding: const EdgeInsets.all(16),
           child: Container(
             decoration: BoxDecoration(
               color: const Color(0xFF1E1E1E),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: const Color(0xFF2C2C2C),
-                width: 1,
-              ),
+              border: Border.all(color: const Color(0xFF2C2C2C), width: 1),
             ),
             padding: const EdgeInsets.all(4),
             child: Row(
@@ -93,7 +89,6 @@ class _DirectoriesTabState extends State<DirectoriesTab> {
             ),
           ),
         ),
-        // Страница выбранного справочника
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
