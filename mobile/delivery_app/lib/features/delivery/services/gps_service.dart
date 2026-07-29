@@ -15,9 +15,14 @@ class GpsService {
   Position? _lastPosition;
   bool _isPaused = false;
 
-  // МИНИМАЛЬНЫЕ НАСТРОЙКИ
-  static const double _maxAccuracy = 100.0; // Только очень плохие отсекаем
-  static const double _minDistance = 1.0;
+  // Kalman filter parameters
+  double _q = 0.01; // Process noise (движение)
+  double _r = 10.0; // Measurement noise (шум GPS)
+  double _p = 1.0;  // Estimation error
+  double _k = 0.0;  // Kalman gain
+  double _x = 0.0;  // Filtered value (расстояние)
+
+  static const double _maxAccuracy = 50.0;
   static const int _pollInterval = 2;
 
   bool _isLoggingEnabled = false;
@@ -34,7 +39,7 @@ class GpsService {
     if (_isLoggingEnabled) return;
     _isLoggingEnabled = true;
     _logBuffer = '';
-    _logBuffer += '=== GPS LOG STARTED (VERSION 1 - MINIMAL) ===\n';
+    _logBuffer += '=== GPS LOG STARTED (VERSION 2 - KALMAN LIGHT) ===\n';
     _logBuffer += 'Timestamp: ${DateTime.now()}\n';
     _logBuffer += '========================\n\n';
     _log('📁 GPS logging started');
@@ -81,8 +86,21 @@ class GpsService {
     }
   }
 
+  // Kalman filter для расстояния
+  double _kalmanFilter(double measurement) {
+    // Prediction
+    _p = _p + _q;
+    
+    // Update
+    _k = _p / (_p + _r);
+    _x = _x + _k * (measurement - _x);
+    _p = (1 - _k) * _p;
+    
+    return _x;
+  }
+
   void startTracking() {
-    _log('🟢 GPS: startTracking() V1 - MINIMAL');
+    _log('🟢 GPS: startTracking() V2 - KALMAN LIGHT');
     if (_isTracking) {
       _log('🟡 GPS: already tracking, ignoring');
       return;
@@ -92,6 +110,8 @@ class GpsService {
     _isPaused = false;
     _totalDistance = 0.0;
     _lastPosition = null;
+    _x = 0.0;
+    _p = 1.0;
 
     _pollingTimer = Timer.periodic(
       Duration(seconds: _pollInterval),
@@ -111,7 +131,6 @@ class GpsService {
       _log('📍 GPS: lat: ${position.latitude}, lon: ${position.longitude}, '
           'acc: ${position.accuracy.toStringAsFixed(1)}m, speed: ${position.speed?.toStringAsFixed(2) ?? "N/A"} m/s');
 
-      // ТОЛЬКО ОДИН ФИЛЬТР — очень плохая точность
       if (position.accuracy > _maxAccuracy) {
         _log('⚠️ GPS: poor accuracy (${position.accuracy.toStringAsFixed(1)}m > ${_maxAccuracy}m), ignoring');
         return;
@@ -127,13 +146,17 @@ class GpsService {
         
         _log('📏 GPS: raw distance: ${distance.toStringAsFixed(2)}m');
 
-        // ТОЛЬКО МИНИМАЛЬНОЕ РАССТОЯНИЕ
-        if (distance >= _minDistance) {
-          _totalDistance += distance / 1000;
-          _log('✅ GPS: ACCEPTING ${distance.toStringAsFixed(2)}m, total: ${_totalDistance.toStringAsFixed(4)} km');
+        // Используем Kalman filter для сглаживания
+        double filteredDistance = _kalmanFilter(distance);
+        _log('📏 GPS: filtered distance: ${filteredDistance.toStringAsFixed(2)}m');
+
+        // Добавляем только если фильтрованное расстояние > 0.5м
+        if (filteredDistance > 0.5) {
+          _totalDistance += filteredDistance / 1000;
+          _log('✅ GPS: ACCEPTING ${filteredDistance.toStringAsFixed(2)}m, total: ${_totalDistance.toStringAsFixed(4)} km');
           _distanceStreamController.add(_totalDistance);
         } else {
-          _log('📏 GPS: distance too small (${distance.toStringAsFixed(2)}m < ${_minDistance}m), ignoring');
+          _log('📏 GPS: filtered distance too small (${filteredDistance.toStringAsFixed(2)}m), ignoring');
         }
       } else {
         _log('🟢 GPS: first position, initializing');
@@ -187,6 +210,8 @@ class GpsService {
     _log('🔄 GPS: resetDistance()');
     _totalDistance = 0.0;
     _lastPosition = null;
+    _x = 0.0;
+    _p = 1.0;
     _distanceStreamController.add(0.0);
   }
 }
