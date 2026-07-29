@@ -15,14 +15,15 @@ class GpsService {
   Position? _lastPosition;
   bool _isPaused = false;
 
-  // АДАПТИВНЫЕ НАСТРОЙКИ
-  static const double _maxAccuracy = 40.0;
-  static const double _minDistance = 1.5;
+  // Kalman filter parameters - БЫСТРАЯ АДАПТАЦИЯ
+  double _q = 0.5;   // Увеличено! Доверяем движению больше
+  double _r = 5.0;   // Уменьшено! Меньше шума
+  double _p = 1.0;
+  double _k = 0.0;
+  double _x = 0.0;
+
+  static const double _maxAccuracy = 50.0;
   static const int _pollInterval = 2;
-  
-  // Буфер последних позиций для анализа
-  List<Position> _recentPositions = [];
-  static const int _bufferSize = 5;
 
   bool _isLoggingEnabled = false;
   String _logBuffer = '';
@@ -38,8 +39,9 @@ class GpsService {
     if (_isLoggingEnabled) return;
     _isLoggingEnabled = true;
     _logBuffer = '';
-    _logBuffer += '=== GPS LOG STARTED (VERSION 3 - SMART) ===\n';
+    _logBuffer += '=== GPS LOG STARTED (VERSION 2.1 - FAST KALMAN) ===\n';
     _logBuffer += 'Timestamp: ${DateTime.now()}\n';
+    _logBuffer += 'q=$_q, r=$_r\n';
     _logBuffer += '========================\n\n';
     _log('📁 GPS logging started');
     await _saveLogToFile();
@@ -85,71 +87,20 @@ class GpsService {
     }
   }
 
-  // Проверка на "реалистичность" перемещения
-  bool _isRealisticMovement(Position current, Position previous) {
-    double distance = Geolocator.distanceBetween(
-      previous.latitude, previous.longitude,
-      current.latitude, current.longitude,
-    );
+  double _kalmanFilter(double measurement) {
+    // Prediction
+    _p = _p + _q;
     
-    double timeDelta = (current.timestamp.millisecondsSinceEpoch - 
-                       previous.timestamp.millisecondsSinceEpoch) / 1000.0;
+    // Update
+    _k = _p / (_p + _r);
+    _x = _x + _k * (measurement - _x);
+    _p = (1 - _k) * _p;
     
-    if (timeDelta == 0) return false;
-    
-    double speed = distance / timeDelta;
-    
-    // Слишком быстро (>30 м/с) — явный выброс
-    if (speed > 30.0) {
-      _log('⚠️ GPS: unrealistic speed ${speed.toStringAsFixed(1)} m/s, ignoring');
-      return false;
-    }
-    
-    // Если расстояние меньше чем точность * 1.5 — скорее всего шум
-    if (current.accuracy > 0 && distance < current.accuracy * 1.5) {
-      _log('⚠️ GPS: distance ($distance) < accuracy * 1.5, likely noise');
-      return false;
-    }
-    
-    return true;
-  }
-
-  // Получение "усреднённой" позиции из буфера
-  Position? _getSmoothedPosition() {
-    if (_recentPositions.length < 3) return null;
-    
-    double avgLat = 0.0;
-    double avgLon = 0.0;
-    double avgAcc = 0.0;
-    
-    for (var pos in _recentPositions) {
-      avgLat += pos.latitude;
-      avgLon += pos.longitude;
-      avgAcc += pos.accuracy;
-    }
-    
-    avgLat /= _recentPositions.length;
-    avgLon /= _recentPositions.length;
-    avgAcc /= _recentPositions.length;
-    
-    // Используем последнюю позицию как основу
-    Position last = _recentPositions.last;
-    return Position(
-      latitude: avgLat,
-      longitude: avgLon,
-      timestamp: last.timestamp,
-      accuracy: avgAcc,
-      altitude: last.altitude,
-      heading: last.heading,
-      speed: last.speed,
-      speedAccuracy: last.speedAccuracy,
-      altitudeAccuracy: last.altitudeAccuracy,  // <-- Добавлено
-      headingAccuracy: last.headingAccuracy,    // <-- Добавлено
-    );
+    return _x;
   }
 
   void startTracking() {
-    _log('🟢 GPS: startTracking() V3 - SMART');
+    _log('🟢 GPS: startTracking() V2.1 - FAST KALMAN');
     if (_isTracking) {
       _log('🟡 GPS: already tracking, ignoring');
       return;
@@ -159,7 +110,8 @@ class GpsService {
     _isPaused = false;
     _totalDistance = 0.0;
     _lastPosition = null;
-    _recentPositions.clear();
+    _x = 0.0;
+    _p = 1.0;
 
     _pollingTimer = Timer.periodic(
       Duration(seconds: _pollInterval),
@@ -179,55 +131,38 @@ class GpsService {
       _log('📍 GPS: lat: ${position.latitude}, lon: ${position.longitude}, '
           'acc: ${position.accuracy.toStringAsFixed(1)}m, speed: ${position.speed?.toStringAsFixed(2) ?? "N/A"} m/s');
 
-      // Фильтр точности
       if (position.accuracy > _maxAccuracy) {
         _log('⚠️ GPS: poor accuracy (${position.accuracy.toStringAsFixed(1)}m > ${_maxAccuracy}m), ignoring');
         return;
       }
 
-      // Добавляем в буфер
-      _recentPositions.add(position);
-      if (_recentPositions.length > _bufferSize) {
-        _recentPositions.removeAt(0);
-      }
-
-      // Получаем сглаженную позицию
-      Position? smoothed = _getSmoothedPosition();
-      if (smoothed == null) {
-        _log('🟡 GPS: waiting for more data...');
-        return;
-      }
-
       if (_lastPosition != null) {
-        // Проверяем на реалистичность
-        if (!_isRealisticMovement(smoothed, _lastPosition!)) {
-          _log('⚠️ GPS: unrealistic movement, ignoring');
-          return;
-        }
-
         final distance = Geolocator.distanceBetween(
           _lastPosition!.latitude,
           _lastPosition!.longitude,
-          smoothed.latitude,
-          smoothed.longitude,
+          position.latitude,
+          position.longitude,
         );
         
-        _log('📏 GPS: smoothed distance: ${distance.toStringAsFixed(2)}m');
+        _log('📏 GPS: raw distance: ${distance.toStringAsFixed(2)}m');
 
-        if (distance >= _minDistance) {
-          _totalDistance += distance / 1000;
-          _log('✅ GPS: ACCEPTING ${distance.toStringAsFixed(2)}m, total: ${_totalDistance.toStringAsFixed(4)} km');
+        // Kalman filter с быстрой адаптацией
+        double filteredDistance = _kalmanFilter(distance);
+        _log('📏 GPS: filtered distance: ${filteredDistance.toStringAsFixed(2)}m (k=${_k.toStringAsFixed(3)})');
+
+        // Убираем слишком маленький порог
+        if (filteredDistance > 0.3) {
+          _totalDistance += filteredDistance / 1000;
+          _log('✅ GPS: ACCEPTING ${filteredDistance.toStringAsFixed(2)}m, total: ${_totalDistance.toStringAsFixed(4)} km');
           _distanceStreamController.add(_totalDistance);
-          
-          // Обновляем последнюю позицию
-          _lastPosition = smoothed;
         } else {
-          _log('📏 GPS: distance too small (${distance.toStringAsFixed(2)}m < ${_minDistance}m), ignoring');
+          _log('📏 GPS: filtered distance too small (${filteredDistance.toStringAsFixed(2)}m), ignoring');
         }
       } else {
         _log('🟢 GPS: first position, initializing');
-        _lastPosition = smoothed;
       }
+      
+      _lastPosition = position;
 
     } catch (e) {
       _log('🔴 GPS: poll error - $e');
@@ -256,7 +191,6 @@ class GpsService {
     _pollingTimer?.cancel();
     _pollingTimer = null;
     _lastPosition = null;
-    _recentPositions.clear();
     _distanceStreamController.add(0.0);
     if (_isLoggingEnabled) {
       _saveLogToFile();
@@ -265,6 +199,9 @@ class GpsService {
 
   void forceRefresh() {
     _log('🔄 GPS: forceRefresh() called');
+    // Сбрасываем Kalman при принудительном обновлении
+    _x = 0.0;
+    _p = 1.0;
     if (_isTracking && !_isPaused) {
       _pollGps(Timer.periodic(Duration(seconds: 1), (timer) {}));
     }
@@ -276,7 +213,8 @@ class GpsService {
     _log('🔄 GPS: resetDistance()');
     _totalDistance = 0.0;
     _lastPosition = null;
-    _recentPositions.clear();
+    _x = 0.0;
+    _p = 1.0;
     _distanceStreamController.add(0.0);
   }
 }
