@@ -15,19 +15,19 @@ class GpsService {
   Position? _lastPosition;
   bool _isPaused = false;
 
-  // Kalman filter parameters - АДАПТИВНЫЕ
-  double _q = 0.1;   // Базовый шум процесса
-  double _r = 2.0;   // Базовый шум измерения (уменьшен!)
-  double _p = 1.0;
-  double _k = 0.0;
-  double _x = 0.0;
-
-  // Для адаптации
-  double _lastRawDistance = 0.0;
-  bool _wasMoving = false;
-
-  static const double _maxAccuracy = 50.0;
+  // НАСТРОЙКИ V1
+  static const double _maxAccuracy = 100.0;
+  static const double _minDistance = 1.0;
   static const int _pollInterval = 2;
+
+  // НОВОЕ: Детектор залипания
+  Position? _lastAcceptedPosition;
+  int _stuckCounter = 0;
+  static const int _stuckThreshold = 4; // 4 раза подряд без движения (8 секунд)
+  DateTime? _lastUpdateTime;
+  
+  // Для расчёта скорости между обновлениями
+  double _lastSpeed = 0.0;
 
   bool _isLoggingEnabled = false;
   String _logBuffer = '';
@@ -43,7 +43,7 @@ class GpsService {
     if (_isLoggingEnabled) return;
     _isLoggingEnabled = true;
     _logBuffer = '';
-    _logBuffer += '=== GPS LOG STARTED (VERSION 2.2 - ADAPTIVE KALMAN) ===\n';
+    _logBuffer += '=== GPS LOG STARTED (VERSION 1.1 - STUCK DETECTOR) ===\n';
     _logBuffer += 'Timestamp: ${DateTime.now()}\n';
     _logBuffer += '========================\n\n';
     _log('📁 GPS logging started');
@@ -90,49 +90,8 @@ class GpsService {
     }
   }
 
-  // Адаптивный Kalman фильтр
-  double _adaptiveKalmanFilter(double measurement) {
-    // Адаптируем параметры на основе данных
-    if (measurement > 5.0) {
-      // Большое движение — увеличиваем доверие
-      _q = 0.5;
-      _r = 1.0;
-      _wasMoving = true;
-    } else if (measurement > 1.0 && _wasMoving) {
-      // Продолжаем движение
-      _q = 0.3;
-      _r = 1.5;
-    } else {
-      // Стоим или медленно движемся
-      _q = 0.1;
-      _r = 3.0;
-      _wasMoving = false;
-    }
-
-    // Если произошёл резкий скачок (>20м), сбрасываем фильтр
-    if (measurement > 20.0 && _lastRawDistance > 0) {
-      _log('🔄 GPS: large jump detected, resetting Kalman');
-      _x = 0.0;
-      _p = 1.0;
-      _lastRawDistance = measurement;
-      return measurement * 0.5; // Берём 50% от скачка
-    }
-
-    _lastRawDistance = measurement;
-
-    // Prediction
-    _p = _p + _q;
-    
-    // Update
-    _k = _p / (_p + _r);
-    _x = _x + _k * (measurement - _x);
-    _p = (1 - _k) * _p;
-    
-    return _x;
-  }
-
   void startTracking() {
-    _log('🟢 GPS: startTracking() V2.2 - ADAPTIVE KALMAN');
+    _log('🟢 GPS: startTracking() V1.1 - STUCK DETECTOR');
     if (_isTracking) {
       _log('🟡 GPS: already tracking, ignoring');
       return;
@@ -142,10 +101,10 @@ class GpsService {
     _isPaused = false;
     _totalDistance = 0.0;
     _lastPosition = null;
-    _x = 0.0;
-    _p = 1.0;
-    _lastRawDistance = 0.0;
-    _wasMoving = false;
+    _lastAcceptedPosition = null;
+    _stuckCounter = 0;
+    _lastUpdateTime = null;
+    _lastSpeed = 0.0;
 
     _pollingTimer = Timer.periodic(
       Duration(seconds: _pollInterval),
@@ -165,9 +124,43 @@ class GpsService {
       _log('📍 GPS: lat: ${position.latitude}, lon: ${position.longitude}, '
           'acc: ${position.accuracy.toStringAsFixed(1)}m, speed: ${position.speed?.toStringAsFixed(2) ?? "N/A"} m/s');
 
+      // Фильтр точности
       if (position.accuracy > _maxAccuracy) {
         _log('⚠️ GPS: poor accuracy (${position.accuracy.toStringAsFixed(1)}m > ${_maxAccuracy}m), ignoring');
+        // Не сбрасываем stuckCounter при плохой точности
         return;
+      }
+
+      // НОВОЕ: Проверка на залипание
+      if (_lastAcceptedPosition != null) {
+        final distFromLast = Geolocator.distanceBetween(
+          _lastAcceptedPosition!.latitude,
+          _lastAcceptedPosition!.longitude,
+          position.latitude,
+          position.longitude,
+        );
+        
+        if (distFromLast < 0.5) {
+          _stuckCounter++;
+          _log('⚠️ GPS: stuck counter = $_stuckCounter/${_stuckThreshold}');
+          
+          if (_stuckCounter >= _stuckThreshold) {
+            _log('🔄 GPS: DETECTED STUCK! Forcing location refresh...');
+            _stuckCounter = 0;
+            
+            // Принудительно обновляем GPS
+            await Geolocator.getCurrentPosition(
+              desiredAccuracy: LocationAccuracy.bestForNavigation,
+              forceAndroidLocationManager: true,
+            );
+            
+            // Сбрасываем последнюю позицию, чтобы следующий опрос был "первым"
+            _lastPosition = null;
+            return;
+          }
+        } else {
+          _stuckCounter = 0;
+        }
       }
 
       if (_lastPosition != null) {
@@ -180,20 +173,50 @@ class GpsService {
         
         _log('📏 GPS: raw distance: ${distance.toStringAsFixed(2)}m');
 
-        // Адаптивный Kalman
-        double filteredDistance = _adaptiveKalmanFilter(distance);
-        _log('📏 GPS: filtered: ${filteredDistance.toStringAsFixed(2)}m (q=$_q, r=$_r, k=${_k.toStringAsFixed(3)})');
+        // НОВОЕ: Если расстояние большое (скачок), проверяем на реалистичность
+        if (distance > 100.0 && _lastUpdateTime != null) {
+          double timeDelta = DateTime.now().difference(_lastUpdateTime!).inSeconds;
+          double speed = distance / timeDelta;
+          
+          // Если скорость > 50 м/с (180 км/ч) — явный выброс
+          if (speed > 50.0) {
+            _log('⚠️ GPS: unrealistic jump! ${distance.toStringAsFixed(0)}m in ${timeDelta}s = ${speed.toStringAsFixed(1)} m/s, IGNORING');
+            return;
+          }
+          
+          // Если скорость > 30 м/с (108 км/ч) — подозрительно, берём только 70%
+          if (speed > 30.0) {
+            double adjustedDistance = distance * 0.7;
+            _log('⚠️ GPS: high speed ${speed.toStringAsFixed(1)} m/s, using 70% = ${adjustedDistance.toStringAsFixed(0)}m');
+            _totalDistance += adjustedDistance / 1000;
+            _log('📏 GPS: total: ${_totalDistance.toStringAsFixed(4)} km');
+            _distanceStreamController.add(_totalDistance);
+            
+            _lastPosition = position;
+            _lastAcceptedPosition = position;
+            _lastUpdateTime = DateTime.now();
+            _stuckCounter = 0;
+            return;
+          }
+        }
 
-        // Принимаем даже маленькие значения, если двигались
-        if (filteredDistance > 0.3 || _wasMoving) {
-          _totalDistance += filteredDistance / 1000;
-          _log('✅ GPS: ACCEPTING ${filteredDistance.toStringAsFixed(2)}m, total: ${_totalDistance.toStringAsFixed(4)} km');
+        // Принимаем любое расстояние >= минимального
+        if (distance >= _minDistance) {
+          _totalDistance += distance / 1000;
+          _log('✅ GPS: ACCEPTING ${distance.toStringAsFixed(2)}m, total: ${_totalDistance.toStringAsFixed(4)} km');
           _distanceStreamController.add(_totalDistance);
+          
+          _lastAcceptedPosition = position;
+          _lastUpdateTime = DateTime.now();
+          _stuckCounter = 0;
         } else {
-          _log('📏 GPS: filtered distance too small (${filteredDistance.toStringAsFixed(2)}m), ignoring');
+          _log('📏 GPS: distance too small (${distance.toStringAsFixed(2)}m < ${_minDistance}m), ignoring');
         }
       } else {
         _log('🟢 GPS: first position, initializing');
+        _lastAcceptedPosition = position;
+        _lastUpdateTime = DateTime.now();
+        _stuckCounter = 0;
       }
       
       _lastPosition = position;
@@ -225,10 +248,9 @@ class GpsService {
     _pollingTimer?.cancel();
     _pollingTimer = null;
     _lastPosition = null;
-    _x = 0.0;
-    _p = 1.0;
-    _lastRawDistance = 0.0;
-    _wasMoving = false;
+    _lastAcceptedPosition = null;
+    _stuckCounter = 0;
+    _lastUpdateTime = null;
     _distanceStreamController.add(0.0);
     if (_isLoggingEnabled) {
       _saveLogToFile();
@@ -237,11 +259,8 @@ class GpsService {
 
   void forceRefresh() {
     _log('🔄 GPS: forceRefresh() called');
-    // Сбрасываем Kalman при принудительном обновлении
-    _x = 0.0;
-    _p = 1.0;
-    _lastRawDistance = 0.0;
-    _wasMoving = false;
+    _stuckCounter = 0;
+    _lastPosition = null;
     if (_isTracking && !_isPaused) {
       _pollGps(Timer.periodic(Duration(seconds: 1), (timer) {}));
     }
@@ -253,10 +272,9 @@ class GpsService {
     _log('🔄 GPS: resetDistance()');
     _totalDistance = 0.0;
     _lastPosition = null;
-    _x = 0.0;
-    _p = 1.0;
-    _lastRawDistance = 0.0;
-    _wasMoving = false;
+    _lastAcceptedPosition = null;
+    _stuckCounter = 0;
+    _lastUpdateTime = null;
     _distanceStreamController.add(0.0);
   }
 }
