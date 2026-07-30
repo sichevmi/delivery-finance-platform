@@ -3,10 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:delivery_app/features/delivery/providers/tab_provider.dart';
 import 'package:delivery_app/features/delivery/providers/pricing_provider.dart';
-import 'package:delivery_app/features/delivery/services/gps_foreground_service.dart'; // <-- новый импорт
+import 'package:delivery_app/features/delivery/services/gps_foreground_service.dart';
 import 'order_summary_screen.dart';
 import 'package:delivery_app/features/delivery/services/permission_service.dart';
-import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 
 class Delivery {
   final int number;
@@ -56,23 +55,18 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
   final List<String> _segments = ['В магазин', 'Получение', 'К клиенту', 'Выдача'];
   late int _currentSegment;
 
-  // ---- Данные сегмента (время, пробег, паузы) ----
-
   DateTime? _segmentStartTime;
   DateTime? _segmentEndTime;
   Duration _totalPauseDuration = Duration.zero;
   DateTime? _pauseStartTime;
   bool _isPaused = false;
 
-  // GPS
-  late final GpsService _gpsService;
   bool _useGps = true;
   double _distance = 0.0;
   final TextEditingController _distanceController = TextEditingController(text: '');
   StreamSubscription<double>? _gpsSubscription;
   bool _isGpsInitialized = false;
 
-  // ---- Сохранённые данные по сегментам ----
   int _timeToShop = 0;
   double _distanceToShop = 0.0;
   int _timeReceiving = 0;
@@ -80,7 +74,6 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
   double _distanceToClient = 0.0;
   int _timeDelivery = 0;
 
-  // Общие данные
   late double _coefficient;
   double? _weight;
   double? _baseCost;
@@ -97,7 +90,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
   String? _clientAddress;
   String? _shopAddress;
 
- @override
+  @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
@@ -109,29 +102,10 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     _startSegment();
   }
 
-  Future<void> _checkPermissionsAndInit() async {
-  final hasPermission = await PermissionService.requestLocationPermission(context);
-  if (hasPermission) {
-    _gpsSubscription = _gpsService.distanceStream.listen((distance) {
-      if (mounted) {
-        setState(() {
-          _distance = distance;
-        });
-      }
-    });
-    _isGpsInitialized = true;
-  } else {
-    setState(() {
-      _useGps = false;
-    });
-  }
-}
-
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _gpsSubscription?.cancel();
-    // Останавливаем foreground-сервис, если он был запущен
     GpsForegroundService.stop();
     _distanceController.dispose();
     _weightController.dispose();
@@ -139,11 +113,9 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     super.dispose();
   }
 
-  // В _initGps используем метод с диалогами
-Future<void> _initGps() async {
+  Future<void> _initGps() async {
     final hasPermission = await PermissionService.requestLocationPermission(context);
     if (hasPermission) {
-      // Подписываемся на стрим расстояния от foreground-сервиса
       _gpsSubscription = GpsForegroundService.distanceStream.listen((distance) {
         if (mounted) {
           setState(() {
@@ -185,7 +157,6 @@ Future<void> _initGps() async {
     _distance = 0.0;
     _distanceController.text = '';
 
-    // Запускаем foreground-сервис только для сегментов с пробегом (0 и 2)
     if (_useGps && _currentSegment != 1 && _currentSegment != 3) {
       print('🟢 Starting GPS tracking (foreground) for segment $_currentSegment');
       GpsForegroundService.start(
@@ -246,7 +217,6 @@ Future<void> _initGps() async {
       }
       _isPaused = false;
     }
-    // Останавливаем foreground-сервис, если он был запущен для этого сегмента
     if (_useGps && _currentSegment != 1 && _currentSegment != 3) {
       print('🛑 Stopping GPS tracking (foreground) for segment $_currentSegment');
       GpsForegroundService.stop();
@@ -485,7 +455,7 @@ Future<void> _initGps() async {
             _buildToggleButton('Вручную', !_useGps, () {
               setState(() {
                 _useGps = false;
-                _gpsService.stopTracking();
+                GpsForegroundService.stop();
                 _distance = 0.0;
                 _distanceController.text = '';
               });
@@ -494,7 +464,11 @@ Future<void> _initGps() async {
             _buildToggleButton('GPS', _useGps, () {
               setState(() {
                 _useGps = true;
-                _gpsService.startTracking();
+                // Запускаем сервис заново
+                GpsForegroundService.start(
+                  notificationTitle: 'Отслеживание маршрута',
+                  notificationText: 'Сегмент ${_segments[_currentSegment]}',
+                );
                 _distance = 0.0;
                 _distanceController.text = '';
               });
@@ -752,7 +726,7 @@ Future<void> _initGps() async {
             _buildToggleButton('Вручную', !_useGps, () {
               setState(() {
                 _useGps = false;
-                _gpsService.stopTracking();
+                GpsForegroundService.stop();
                 _distance = 0.0;
                 _distanceController.text = '';
               });
@@ -761,7 +735,10 @@ Future<void> _initGps() async {
             _buildToggleButton('GPS', _useGps, () {
               setState(() {
                 _useGps = true;
-                _gpsService.startTracking();
+                GpsForegroundService.start(
+                  notificationTitle: 'Отслеживание маршрута',
+                  notificationText: 'Сегмент ${_segments[_currentSegment]}',
+                );
                 _distance = 0.0;
                 _distanceController.text = '';
               });
@@ -1178,10 +1155,7 @@ Future<void> _initGps() async {
   }
 
   void _handleMainAction() {
-    // Сначала завершаем текущий сегмент (устанавливаем _segmentEndTime)
     _finishSegment();
-    
-    // Потом сохраняем данные (используя _getSegmentTime(), который теперь знает время окончания)
     _saveCurrentSegmentData();
 
     switch (_currentSegment) {
@@ -1218,7 +1192,6 @@ Future<void> _initGps() async {
     final apartment = _apartmentController.text.trim();
     if (apartment.isEmpty) return;
 
-    // Завершаем последний сегмент и сохраняем данные
     _finishSegment();
     _saveCurrentSegmentData();
 

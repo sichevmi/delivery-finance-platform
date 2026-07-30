@@ -1,129 +1,89 @@
-// lib/features/delivery/services/GpsForegroundService.dart
+// gps_foreground_service.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class GpsForegroundService {
-  static final GpsForegroundService _instance = GpsForegroundService._internal();
-  factory GpsForegroundService() => _instance;
-  GpsForegroundService._internal();
+  static bool _isRunning = false;
+  static final StreamController<double> _distanceController = StreamController<double>.broadcast();
+  static Stream<double> get distanceStream => _distanceController.stream;
 
-  bool _isRunning = false;
-  StreamSubscription<Position>? _positionSubscription;
-  double _totalDistance = 0.0;
-  Position? _lastPosition;
+  static double _totalDistance = 0.0;
+  static Position? _lastPosition;
+  static bool _isPaused = false;
 
-  // Параметры фильтрации (те же, что в GpsService)
   static const double _maxAccuracy = 30.0;
   static const double _minDistance = 0.5;
   static const double _maxJump = 100.0;
 
-  // Стрим для отправки обновлений в UI
-  final _distanceStreamController = StreamController<double>.broadcast();
-  Stream<double> get distanceStream => _distanceStreamController.stream;
+  static bool get isRunning => _isRunning;
 
-  Future<void> startTracking() async {
+  static void start({
+    required String notificationTitle,
+    required String notificationText,
+  }) async {
     if (_isRunning) return;
 
-    // Запрашиваем разрешения для фоновой работы
-    final locationPermission = await Geolocator.checkPermission();
-    if (locationPermission != LocationPermission.always) {
-      // Если нет "always", запрашиваем
-      final newPermission = await Geolocator.requestPermission();
-      if (newPermission != LocationPermission.always) {
-        throw Exception('Разрешение "Всегда" не получено');
-      }
+    // Запрашиваем разрешения, если ещё нет
+    final status = await Permission.locationAlways.status;
+    if (!status.isGranted) {
+      await Permission.locationAlways.request();
     }
 
-    // Проверяем, включена ли геолокация
-    if (!await Geolocator.isLocationServiceEnabled()) {
-      throw Exception('GPS выключен');
-    }
+    // Настройки уведомления
+    final notification = NotificationDetails(
+      id: 888,
+      title: notificationTitle,
+      text: notificationText,
+      iconData: NotificationIcon.fromIconData(Icons.directions_car), // исправлено
+      sound: null,
+    );
 
-    // Запускаем foreground service через flutter_foreground_task
-    // (библиотека flutter_foreground_task упрощает эту задачу)
-    // Но можно и через MethodChannel, но я покажу простой вариант через плагин.
-
-    // Для простоты я предлагаю использовать готовый плагин flutter_foreground_task.
-    // Добавьте в pubspec.yaml: flutter_foreground_task: ^8.0.0
-
-    // Запускаем сервис
+    // Запускаем foreground-сервис
     await FlutterForegroundTask.startService(
-      notificationTitle: 'Отслеживание поездки',
-      notificationText: 'Идёт подсчёт пробега...',
-      notificationIcon: Icons.directions_car,
-      callback: _startForegroundTask,
+      notification: notification,
+      callback: _startCallback,
     );
 
     _isRunning = true;
+    _resetDistance();
+    _isPaused = false;
   }
 
-  // Эта функция будет выполняться в фоновом изоляте
-  @pragma('vm:entry-point')
-  static void _startForegroundTask() {
-    FlutterForegroundTask.setTaskHandler(_GpsTaskHandler());
-  }
-
-  Future<void> stopTracking() async {
+  static void stop() {
     if (!_isRunning) return;
-    await FlutterForegroundTask.stopService();
-    _positionSubscription?.cancel();
-    _positionSubscription = null;
+    FlutterForegroundTask.stopService();
     _isRunning = false;
+    _distanceController.add(0.0);
+  }
+
+  static void pauseTracking() {
+    _isPaused = true;
+    // В TaskHandler мы обрабатываем паузу через флаг
+  }
+
+  static void resumeTracking() {
+    _isPaused = false;
+  }
+
+  static void resetDistance() {
     _totalDistance = 0.0;
     _lastPosition = null;
-    _distanceStreamController.add(0.0);
+    _distanceController.add(0.0);
   }
 
-  double getTotalDistance() => _totalDistance;
-
-  void resetDistance() {
-    _totalDistance = 0.0;
-    _lastPosition = null;
-    _distanceStreamController.add(0.0);
-  }
-}
-
-// Обработчик фоновой задачи
-class _GpsTaskHandler extends TaskHandler {
-  StreamSubscription<Position>? _positionSubscription;
-  double _totalDistance = 0.0;
-  Position? _lastPosition;
-
-  @override
-  void onStart(DateTime timestamp, TaskStarter starter) {
-    super.onStart(timestamp, starter);
-
-    // Запускаем подписку на GPS
-    const settings = LocationSettings(
-      accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 0,
-    );
-
-    _positionSubscription = Geolocator.getPositionStream(
-      locationSettings: settings,
-    ).listen(
-      (Position position) {
-        _onPositionUpdate(position);
-      },
-      onError: (error) {
-        print('GPS error in foreground: $error');
-      },
-    );
-
-    // Обновляем уведомление каждые 5 секунд
-    Timer.periodic(Duration(seconds: 5), (timer) {
-      FlutterForegroundTask.updateService(
-        notificationTitle: 'Пробег: ${_totalDistance.toStringAsFixed(2)} км',
-        notificationText: 'Отслеживание продолжается...',
-      );
-    });
+  static void forceRefresh() {
+    // Можно отправить сигнал TaskHandler, но для простоты ничего не делаем
   }
 
-  void _onPositionUpdate(Position position) {
-    // Те же фильтры, что и в GpsService
-    if (position.accuracy > 30.0) return;
+  // ---- Внутренние методы для TaskHandler ----
+  static void _onPositionUpdate(Position position) {
+    if (_isPaused) return;
+
+    // Фильтр точности
+    if (position.accuracy > _maxAccuracy) return;
 
     if (_lastPosition == null) {
       _lastPosition = position;
@@ -137,23 +97,66 @@ class _GpsTaskHandler extends TaskHandler {
       position.longitude,
     );
 
-    if (distance < 0.5 || distance > 100.0) return;
+    if (distance < _minDistance) return;
+    if (distance > _maxJump) return;
 
     _totalDistance += distance / 1000;
+    _distanceController.add(_totalDistance);
     _lastPosition = position;
+  }
+}
 
-    // Можно сохранять в SharedPreferences для восстановления после перезапуска
+// ---- TaskHandler (полноценная реализация) ----
+@pragma('vm:entry-point')
+void _startCallback() {
+  FlutterForegroundTask.setTaskHandler(_GpsTaskHandler());
+}
+
+class _GpsTaskHandler extends TaskHandler {
+  StreamSubscription<Position>? _gpsSubscription;
+  bool _isPaused = false;
+
+  @override
+  Future<void> onStart(DateTime timestamp) async {
+    // Подписываемся на GPS
+    const settings = LocationSettings(
+      accuracy: LocationAccuracy.bestForNavigation,
+      distanceFilter: 0,
+    );
+
+    _gpsSubscription = Geolocator.getPositionStream(
+      locationSettings: settings,
+    ).listen((position) {
+      // Передаём данные в статический метод
+      GpsForegroundService._onPositionUpdate(position);
+    }, onError: (error) {
+      // Логируем ошибку
+    });
   }
 
   @override
-  void onDestroy(DateTime timestamp, TaskStarter starter) {
-    _positionSubscription?.cancel();
-    _positionSubscription = null;
-    super.onDestroy(timestamp, starter);
+  void onRepeatEvent(DateTime timestamp) {
+    // Можно обновлять уведомление, если нужно
+    // Например, показать текущую дистанцию
+    // final distance = GpsForegroundService._totalDistance;
+    // FlutterForegroundTask.updateService(
+    //   notification: NotificationDetails(
+    //     id: 888,
+    //     title: 'Отслеживание маршрута',
+    //     text: 'Пробег: ${distance.toStringAsFixed(2)} км',
+    //     iconData: NotificationIcon.fromIconData(Icons.directions_car),
+    //   ),
+    // );
   }
 
   @override
-  void onEvent(DateTime timestamp, TaskStarter starter, dynamic event) {
-    // Обработка событий из UI
+  Future<void> onDestroy(DateTime timestamp) async {
+    await _gpsSubscription?.cancel();
+    _gpsSubscription = null;
+  }
+
+  @override
+  void onNotificationPressed() {
+    // Можно открыть приложение при нажатии на уведомление
   }
 }
