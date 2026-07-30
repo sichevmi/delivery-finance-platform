@@ -55,5 +55,6 @@ flutter {
     source = "../.."
 }
 
-// УБРАЛИ СТРОКУ:
-// implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22"
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22"
+}
