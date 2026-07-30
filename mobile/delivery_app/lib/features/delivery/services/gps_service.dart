@@ -1,127 +1,180 @@
-// gps_service.dart – Версия B: Speed Integration V1.0
+// gps_service.dart – Версия A: Adaptive Kalman V3.0
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 import 'package:location/location.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class GpsService {
-  static const String VERSION = '1.0 - SPEED INTEGRATION';
-  
-  // Состояние трекера
+  static const String VERSION = '3.0 - ADAPTIVE KALMAN (IMPROVED)';
+
+  // ---- Основные параметры трекера ----
   bool _isTracking = false;
+  bool _isPaused = false;
   bool _isFirstFix = true;
   LocationData? _lastLocation;
   DateTime? _lastTimestamp;
   double _totalDistance = 0.0;
-  
-  // Константы фильтрации
-  static const double MIN_SPEED = 0.2;        // м/с – игнорируем медленное движение (шум)
-  static const double MAX_SPEED = 40.0;       // м/с – ограничение (144 км/ч)
-  static const double MIN_DISTANCE_INCREMENT = 0.5;  // минимальное приращение для учёта
-  static const double MAX_DISTANCE_INCREMENT = 100.0; // максимальное приращение за один шаг
-  
-  // Логирование
+
+  // ---- Параметры фильтра Калмана ----
+  double _filteredDistance = 0.0;
+  double _k = 0.268;        // коэффициент Калмана (адаптивный)
+  double _q = 0.1;          // шум процесса
+  double _r = 3.0;          // шум измерения
+
+  // ---- Константы фильтра ----
+  static const double MIN_GAIN = 0.12;
+  static const double MAX_GAIN = 0.8;
+  static const double STATIONARY_SPEED_THRESHOLD = 0.3; // м/с
+
+  // ---- Логирование ----
   final List<String> _log = [];
   bool _logEnabled = false;
-  
-  // Геттеры
-  double get totalDistance => _totalDistance;
-  String get version => VERSION;
-  bool get isTracking => _isTracking;
-  
-  // Инициализация
+  String _logFilePath = '';
+  final _logFileLock = Object();
+
+  // ---- Стрим для дистанции ----
+  final _distanceController = StreamController<double>.broadcast();
+  Stream<double> get distanceStream => _distanceController.stream;
+
+  // ---- Инициализация ----
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     _totalDistance = prefs.getDouble('totalDistance') ?? 0.0;
+    _logFilePath = (await _getLogDirectoryPath()) + '/gps_log.txt';
   }
-  
-  // Старт трекинга
+
+  // ---- Управление трекингом ----
   void startTracking() {
     _isTracking = true;
+    _isPaused = false;
     _isFirstFix = true;
     _lastLocation = null;
-    _lastTimestamp = null;
+    _filteredDistance = 0.0;
     _log.clear();
     _addLog('🟢 GPS: startTracking() V$VERSION');
   }
-  
-  // Стоп трекинга
+
   void stopTracking() {
     _isTracking = false;
+    _isPaused = false;
     _addLog('🛑 GPS: stopTracking()');
     _saveDistance();
+    _distanceController.close();
   }
-  
-  // Сброс дистанции
+
+  void pauseTracking() {
+    if (_isTracking && !_isPaused) {
+      _isPaused = true;
+      _addLog('⏸️ GPS: pauseTracking()');
+    }
+  }
+
+  void resumeTracking() {
+    if (_isTracking && _isPaused) {
+      _isPaused = false;
+      _isFirstFix = true; // сбросим, чтобы переинициализировать позицию
+      _addLog('▶️ GPS: resumeTracking()');
+    }
+  }
+
   void resetDistance() {
     _totalDistance = 0.0;
+    _filteredDistance = 0.0;
     _lastLocation = null;
-    _lastTimestamp = null;
     _isFirstFix = true;
     _addLog('🔄 GPS: resetDistance()');
+    _distanceController.add(_totalDistance);
   }
-  
-  // Основной обработчик новых GPS-данных
+
+  void forceRefresh() {
+    // Запрос принудительного обновления (можно реализовать через Location().requestLocationUpdate())
+    _addLog('🔄 GPS: forceRefresh() called');
+    // В реальном коде можно вызвать Location().getLocation() и обработать
+  }
+
+  // ---- Обработка новых GPS-данных ----
   void onLocationChanged(LocationData location) {
-    if (!_isTracking) return;
-    
-    // Проверяем наличие скорости
-    if (location.speed == null) return;
-    final speed = location.speed!;
-    final timestamp = DateTime.now();
-    
+    if (!_isTracking || _isPaused) return;
+    if (location.latitude == null || location.longitude == null) return;
+
     if (_isFirstFix) {
       _lastLocation = location;
-      _lastTimestamp = timestamp;
+      _lastTimestamp = DateTime.now();
       _isFirstFix = false;
       _addLog('📍 GPS: first position, initializing');
       return;
     }
-    
-    // Вычисляем временной интервал (секунды)
-    final dt = timestamp.difference(_lastTimestamp!).inSeconds.toDouble();
-    if (dt <= 0.0) {
-      _lastTimestamp = timestamp;
-      return;
-    }
-    
-    // Ограничиваем dt, чтобы избежать больших скачков (например, при паузе)
-    final effectiveDt = dt.clamp(0.5, 5.0);
-    
-    // Фильтруем скорость
-    double effectiveSpeed = speed;
-    if (effectiveSpeed < MIN_SPEED) {
-      // Если скорость меньше порога – считаем, что стоим
-      effectiveSpeed = 0.0;
-    } else if (effectiveSpeed > MAX_SPEED) {
-      effectiveSpeed = MAX_SPEED;
-    }
-    
-    // Расстояние = скорость * время
-    double distance = effectiveSpeed * effectiveDt;
-    
-    // Проверка минимального приращения
-    if (distance < MIN_DISTANCE_INCREMENT) {
-      _lastTimestamp = timestamp;
+
+    final rawDistance = _calculateDistance(_lastLocation!, location);
+    final speed = location.speed ?? 0.0;
+    final accuracy = location.accuracy ?? 0.0;
+
+    if (rawDistance < 0.5) {
       _lastLocation = location;
       return;
     }
-    
-    // Ограничиваем максимальное приращение (защита от выбросов)
-    if (distance > MAX_DISTANCE_INCREMENT) {
-      distance = MAX_DISTANCE_INCREMENT;
+
+    // Адаптация параметров фильтра
+    _adaptParameters(speed, accuracy);
+
+    // Динамический порог для скачков
+    final dynamicThreshold = _calculateDynamicThreshold(speed);
+    double clampedRaw = rawDistance;
+    if (rawDistance > dynamicThreshold && speed > 1.0) {
+      clampedRaw = rawDistance.clamp(0.0, dynamicThreshold);
+      _addLog('⚠️ GPS: large jump limited to ${clampedRaw.toStringAsFixed(1)}m');
     }
-    
-    // Добавляем к общей дистанции
-    _totalDistance += distance;
-    _addLog('📏 GPS: accepted ${distance.toStringAsFixed(2)}m, total: ${(_totalDistance/1000).toStringAsFixed(4)} km');
-    
-    // Обновляем время и позицию
-    _lastTimestamp = timestamp;
+
+    // Применение фильтра Калмана
+    _applyKalman(clampedRaw, speed);
+
     _lastLocation = location;
+    _lastTimestamp = DateTime.now();
   }
-  
-  // Расчёт расстояния (не используется, но оставлен для совместимости)
+
+  // ---- Вспомогательные методы фильтра ----
+  void _adaptParameters(double speed, double accuracy) {
+    double newK;
+    if (accuracy > 30.0) {
+      newK = 0.1;
+    } else if (accuracy > 15.0) {
+      newK = 0.2;
+    } else if (speed > 10.0) {
+      newK = 0.8;
+    } else if (speed > 5.0) {
+      newK = 0.6;
+    } else if (speed > 2.0) {
+      newK = 0.4;
+    } else if (speed > 0.5) {
+      newK = 0.25;
+    } else {
+      newK = 0.12;
+    }
+    _k = _k * 0.7 + newK * 0.3;
+    _q = (0.1 + speed * 0.05).clamp(0.05, 0.8);
+    _r = (1.0 + accuracy * 0.3).clamp(1.0, 10.0);
+  }
+
+  double _calculateDynamicThreshold(double speed) {
+    final expected = speed * 2.0 * 1.5 + 10.0;
+    return expected.clamp(10.0, 80.0);
+  }
+
+  void _applyKalman(double rawDistance, double speed) {
+    final predicted = _filteredDistance;
+    final innovation = rawDistance - predicted;
+    _filteredDistance = predicted + _k * innovation;
+
+    if (_filteredDistance > 0.01) {
+      _totalDistance += _filteredDistance;
+      _distanceController.add(_totalDistance);
+      _addLog('📏 GPS: accepted ${_filteredDistance.toStringAsFixed(2)}m, total: ${(_totalDistance/1000).toStringAsFixed(4)} km');
+    }
+    _filteredDistance = 0.0;
+  }
+
+  // ---- Расчёт расстояния по гаверсинусам ----
   double _calculateDistance(LocationData from, LocationData to) {
     const R = 6371000;
     final dLat = _toRadians(to.latitude! - from.latitude!);
@@ -132,27 +185,75 @@ class GpsService {
     final c = 2 * atan2(sqrt(a), sqrt(1 - a));
     return R * c;
   }
-  
+
   double _toRadians(double degrees) => degrees * pi / 180.0;
-  
-  // Логирование
-  void _addLog(String message) {
-    if (_logEnabled) {
-      final timestamp = DateTime.now().toIso8601String();
-      _log.add('[$timestamp] $message');
-    }
-  }
-  
+
+  // ---- Сохранение состояния ----
   Future<void> _saveDistance() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('totalDistance', _totalDistance);
   }
-  
-  // Получение лога
-  List<String> getLog() => _log;
-  
-  // Включение/выключение логов
-  void setLoggingEnabled(bool enabled) {
-    _logEnabled = enabled;
+
+  // ---- Логирование в файл ----
+  Future<void> startLogging() async {
+    _logEnabled = true;
+    _log.clear();
+    // Добавляем заголовок лога
+    _addLog('=== GPS LOG STARTED (V$VERSION) ===');
+    _addLog('Timestamp: ${DateTime.now().toIso8601String()}');
+    _addLog('========================');
+    // Перезаписываем файл
+    try {
+      final file = File(_logFilePath);
+      if (await file.exists()) await file.delete();
+      // Создаём новый файл
+      await file.create(recursive: true);
+      await file.writeAsString(''); // очищаем
+    } catch (e) {
+      print('Ошибка создания лог-файла: $e');
+    }
   }
+
+  Future<void> stopLogging() async {
+    _logEnabled = false;
+    // Сохраняем накопленный лог
+    await _flushLogToFile();
+    _addLog('📁 Log saved to: $_logFilePath');
+  }
+
+  Future<void> _flushLogToFile() async {
+    if (_log.isEmpty) return;
+    try {
+      final file = File(_logFilePath);
+      await file.writeAsString(_log.join('\n') + '\n', mode: FileMode.append);
+      _log.clear();
+    } catch (e) {
+      print('Ошибка записи лога: $e');
+    }
+  }
+
+  Future<String> getLogFilePath() async {
+    return _logFilePath;
+  }
+
+  Future<String> _getLogDirectoryPath() async {
+    final dir = await getApplicationDocumentsDirectory();
+    return dir.path;
+  }
+
+  void _addLog(String message) {
+    if (_logEnabled) {
+      final timestamp = DateTime.now().toIso8601String();
+      _log.add('[$timestamp] $message');
+      // Автоматически сбрасываем в файл, если лог слишком большой
+      if (_log.length > 100) {
+        _flushLogToFile();
+      }
+    }
+  }
+
+  // ---- Методы для совместимости (если нужны) ----
+  double get totalDistance => _totalDistance;
+  bool get isTracking => _isTracking;
+  String get version => VERSION;
 }
