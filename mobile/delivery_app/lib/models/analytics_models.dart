@@ -1,3 +1,5 @@
+import 'analytics_enums.dart';
+
 // Сводка по периоду
 class AnalyticsSummary {
   final int totalOrders;

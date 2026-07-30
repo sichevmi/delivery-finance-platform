@@ -1,0 +1,1 @@
+enum AnalyticsPeriod { year, month, day }

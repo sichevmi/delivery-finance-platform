@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:delivery_app/models/analytics_models.dart';
+import 'package:delivery_app/models/analytics_enums.dart';
 import 'package:delivery_app/services/mock_analytics_repository.dart';
 import 'package:delivery_app/widgets/kpi_card.dart';
 import 'package:delivery_app/widgets/analytics_chart.dart';
@@ -16,13 +17,11 @@ class AnalyticsTab extends StatefulWidget {
 class _AnalyticsTabState extends State<AnalyticsTab> {
   final _repository = MockAnalyticsRepository();
 
-  // Текущий выбранный период
   AnalyticsPeriod _selectedPeriod = AnalyticsPeriod.year;
   int _selectedYear = DateTime.now().year;
   int? _selectedMonth;
   int? _selectedDay;
 
-  // Данные для отображения
   AnalyticsData? _data;
   bool _isLoading = false;
 
@@ -34,7 +33,7 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 500)); // имитация загрузки
+    await Future.delayed(const Duration(milliseconds: 500));
     final data = _repository.getData(
       year: _selectedYear,
       month: _selectedMonth,
@@ -48,22 +47,15 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
   }
 
   void _onPeriodChanged(AnalyticsPeriod period) {
-    // При смене периода сбрасываем детализацию
     if (period == AnalyticsPeriod.year) {
       _selectedMonth = null;
       _selectedDay = null;
     } else if (period == AnalyticsPeriod.month) {
-      if (_selectedMonth == null) {
-        _selectedMonth = DateTime.now().month;
-      }
+      if (_selectedMonth == null) _selectedMonth = DateTime.now().month;
       _selectedDay = null;
     } else if (period == AnalyticsPeriod.day) {
-      if (_selectedMonth == null) {
-        _selectedMonth = DateTime.now().month;
-      }
-      if (_selectedDay == null) {
-        _selectedDay = DateTime.now().day;
-      }
+      if (_selectedMonth == null) _selectedMonth = DateTime.now().month;
+      if (_selectedDay == null) _selectedDay = DateTime.now().day;
     }
     setState(() {
       _selectedPeriod = period;
@@ -72,9 +64,7 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
   }
 
   void _onTileTap(AnalyticsPeriodTile tile) {
-    // Переход на следующий уровень детализации
     if (_selectedPeriod == AnalyticsPeriod.year && tile.startDate != null) {
-      // Выбран месяц
       setState(() {
         _selectedPeriod = AnalyticsPeriod.month;
         _selectedMonth = tile.startDate!.month;
@@ -82,20 +72,17 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
       });
       _loadData();
     } else if (_selectedPeriod == AnalyticsPeriod.month && tile.startDate != null) {
-      // Выбран день
       setState(() {
         _selectedPeriod = AnalyticsPeriod.day;
         _selectedDay = tile.startDate!.day;
       });
       _loadData();
     } else if (_selectedPeriod == AnalyticsPeriod.day) {
-      // Переход на детали заказа (заглушка)
       _showOrderDetails(tile);
     }
   }
 
   void _showOrderDetails(AnalyticsPeriodTile tile) {
-    // Заглушка — показываем диалог с информацией о заказе
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -128,7 +115,6 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
         backgroundColor: const Color(0xFF121212),
         elevation: 0,
         actions: [
-          // Можно добавить кнопку обновления
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadData,
@@ -145,28 +131,23 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Сводка (KPI)
                         _buildSummary(_data!.summary),
                         const SizedBox(height: 16),
-                        // Селектор периода
                         AnalyticsPeriodSelector(
                           selectedPeriod: _selectedPeriod,
                           onPeriodChanged: _onPeriodChanged,
                         ),
                         const SizedBox(height: 16),
-                        // График (кроме режима "День")
                         if (_selectedPeriod != AnalyticsPeriod.day)
                           AnalyticsChart(
                             points: _data!.chartPoints,
                             onBarTapped: (index) {
-                              // По клику на столбец переключаем период аналогично тапу по плашке
                               if (index < _data!.periodTiles.length) {
                                 _onTileTap(_data!.periodTiles[index]);
                               }
                             },
                           ),
                         const SizedBox(height: 16),
-                        // Список плашек (или заказов)
                         ..._data!.periodTiles.map((tile) => AnalyticsTile(
                               title: tile.title,
                               profit: tile.profit,

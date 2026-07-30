@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-
-enum AnalyticsPeriod { year, month, day }
+import 'package:delivery_app/models/analytics_enums.dart';
 
 class AnalyticsPeriodSelector extends StatelessWidget {
   final AnalyticsPeriod selectedPeriod;

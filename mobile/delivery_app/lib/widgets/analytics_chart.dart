@@ -4,7 +4,7 @@ import 'package:delivery_app/models/analytics_models.dart';
 
 class AnalyticsChart extends StatelessWidget {
   final List<AnalyticsChartPoint> points;
-  final void Function(int index)? onBarTapped; // индекс точки
+  final void Function(int index)? onBarTapped;
 
   const AnalyticsChart({
     super.key,
@@ -22,7 +22,7 @@ class AnalyticsChart extends StatelessWidget {
     }
 
     final maxValue = points.map((p) => p.value).reduce((a, b) => a > b ? a : b);
-    final safeMax = maxValue > 0 ? maxValue * 1.2 : 100;
+    final safeMax = maxValue > 0 ? (maxValue * 1.2).toDouble() : 100.0;
 
     return SizedBox(
       height: 180,
@@ -94,11 +94,6 @@ class AnalyticsChart extends StatelessWidget {
               showingTooltipIndicators: [],
             );
           }).toList(),
-          extraLinesData: ExtraLinesData(
-            extraLines: [
-              // Можно добавить линию среднего значения, если нужно
-            ],
-          ),
         ),
         swapAnimationDuration: const Duration(milliseconds: 300),
       ),

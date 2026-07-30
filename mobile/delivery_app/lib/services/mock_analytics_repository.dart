@@ -1,4 +1,5 @@
 import 'package:delivery_app/models/analytics_models.dart';
+import 'package:delivery_app/models/analytics_enums.dart';
 import 'dart:math';
 
 class MockAnalyticsRepository {
@@ -11,7 +12,6 @@ class MockAnalyticsRepository {
     int? day,
     AnalyticsPeriod period = AnalyticsPeriod.year,
   }) {
-    // В зависимости от периода генерируем соответствующие точки и плитки
     if (period == AnalyticsPeriod.year) {
       return _getYearData(year);
     } else if (period == AnalyticsPeriod.month) {
@@ -109,8 +109,6 @@ class MockAnalyticsRepository {
 
   // Данные за день: список заказов (имитация)
   AnalyticsData _getDayData(int year, int month, int day) {
-    // Для дня нет графика, только список заказов
-    // Создаём фиктивные заказы
     final ordersCount = 3 + _random.nextInt(10);
     final chartPoints = List.generate(ordersCount, (i) {
       final profit = 100 + _random.nextDouble() * 300;
@@ -126,7 +124,6 @@ class MockAnalyticsRepository {
     final totalExpenses = totalProfit * 0.4;
     final totalDistance = 5 + _random.nextDouble() * 20;
 
-    // Плитки - заказы
     final tiles = chartPoints.asMap().entries.map((entry) {
       final idx = entry.key;
       final point = entry.value;
