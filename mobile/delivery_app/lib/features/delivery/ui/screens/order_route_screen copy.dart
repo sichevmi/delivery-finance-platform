@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:delivery_app/features/delivery/providers/tab_provider.dart';
 import 'package:delivery_app/features/delivery/providers/pricing_provider.dart';
 import 'package:delivery_app/features/delivery/services/gps_service.dart';
+import 'package:delivery_app/features/delivery/services/geocoder_service.dart';
 import 'order_summary_screen.dart';
 import 'package:delivery_app/features/delivery/services/permission_service.dart';
-import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 
 class Delivery {
   final int number;
@@ -56,23 +57,19 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
   final List<String> _segments = ['В магазин', 'Получение', 'К клиенту', 'Выдача'];
   late int _currentSegment;
 
-  // ---- Данные сегмента (время, пробег, паузы) ----
-
   DateTime? _segmentStartTime;
   DateTime? _segmentEndTime;
   Duration _totalPauseDuration = Duration.zero;
   DateTime? _pauseStartTime;
   bool _isPaused = false;
 
-  // GPS
-  late final GpsService _gpsService;
+  late final GpsService _gpsService = GpsService();
   bool _useGps = true;
   double _distance = 0.0;
   final TextEditingController _distanceController = TextEditingController(text: '');
   StreamSubscription<double>? _gpsSubscription;
   bool _isGpsInitialized = false;
 
-  // ---- Сохранённые данные по сегментам ----
   int _timeToShop = 0;
   double _distanceToShop = 0.0;
   int _timeReceiving = 0;
@@ -80,7 +77,6 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
   double _distanceToClient = 0.0;
   int _timeDelivery = 0;
 
-  // Общие данные
   late double _coefficient;
   double? _weight;
   double? _baseCost;
@@ -105,28 +101,9 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     _coefficient = widget.coefficient;
     _baseCost = 250.0;
 
-    _gpsService = ref.read(gpsServiceProvider);
     _initGps();
     _startSegment();
   }
-
-  Future<void> _checkPermissionsAndInit() async {
-  final hasPermission = await PermissionService.requestLocationPermission(context);
-  if (hasPermission) {
-    _gpsSubscription = _gpsService.distanceStream.listen((distance) {
-      if (mounted) {
-        setState(() {
-          _distance = distance;
-        });
-      }
-    });
-    _isGpsInitialized = true;
-  } else {
-    setState(() {
-      _useGps = false;
-    });
-  }
-}
 
   @override
   void dispose() {
@@ -139,25 +116,23 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     super.dispose();
   }
 
-  // В _initGps используем метод с диалогами
-Future<void> _initGps() async {
-  // В новой версии gps_service нет requestPermissions, используем PermissionService
-  final hasPermission = await PermissionService.requestLocationPermission(context);
-  if (hasPermission) {
-    _gpsSubscription = _gpsService.distanceStream.listen((distance) {
-      if (mounted) {
-        setState(() {
-          _distance = distance;
-        });
-      }
-    });
-    _isGpsInitialized = true;
-  } else {
-    setState(() {
-      _useGps = false;
-    });
+  Future<void> _initGps() async {
+    final hasPermission = await PermissionService.requestLocationPermission(context);
+    if (hasPermission) {
+      _gpsSubscription = _gpsService.distanceStream.listen((distance) {
+        if (mounted) {
+          setState(() {
+            _distance = distance;
+          });
+        }
+      });
+      _isGpsInitialized = true;
+    } else {
+      setState(() {
+        _useGps = false;
+      });
+    }
   }
-}
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -174,26 +149,26 @@ Future<void> _initGps() async {
   }
 
   void _startSegment() {
-  print('🔵 _startSegment() called for segment $_currentSegment');
-  _segmentStartTime = DateTime.now();
-  _segmentEndTime = null;
-  _totalPauseDuration = Duration.zero;
-  _isPaused = false;
-  _pauseStartTime = null;
+    print('🔵 _startSegment() called for segment $_currentSegment');
+    _segmentStartTime = DateTime.now();
+    _segmentEndTime = null;
+    _totalPauseDuration = Duration.zero;
+    _isPaused = false;
+    _pauseStartTime = null;
 
-  _gpsService.resetDistance();
-  _distance = 0.0;
-  _distanceController.text = '';
+    _gpsService.resetDistance();
+    _distance = 0.0;
+    _distanceController.text = '';
 
-  if (_useGps && _currentSegment != 1 && _currentSegment != 3) {
-    print('🟢 Starting GPS tracking for segment $_currentSegment');
-    _gpsService.startTracking();
-  } else {
-    print('🟡 GPS not started: useGps=$_useGps, segment=$_currentSegment');
+    if (_useGps && _currentSegment != 1 && _currentSegment != 3) {
+      print('🟢 Starting GPS tracking for segment $_currentSegment');
+      _gpsService.startTracking();
+    } else {
+      print('🟡 GPS not started: useGps=$_useGps, segment=$_currentSegment');
+    }
+
+    setState(() {});
   }
-
-  setState(() {});
-}
 
   void _togglePause() {
     setState(() {
@@ -233,43 +208,54 @@ Future<void> _initGps() async {
   }
 
   void _finishSegment() {
-  print('🔵 _finishSegment() called for segment $_currentSegment');
-  _segmentEndTime = DateTime.now();
-  if (_isPaused) {
-    if (_pauseStartTime != null) {
-      _totalPauseDuration += DateTime.now().difference(_pauseStartTime!);
-      _pauseStartTime = null;
+    print('🔵 _finishSegment() called for segment $_currentSegment');
+    _segmentEndTime = DateTime.now();
+    if (_isPaused) {
+      if (_pauseStartTime != null) {
+        _totalPauseDuration += DateTime.now().difference(_pauseStartTime!);
+        _pauseStartTime = null;
+      }
+      _isPaused = false;
     }
-    _isPaused = false;
+    if (_useGps) {
+      print('🛑 Stopping GPS tracking for segment $_currentSegment');
+      _gpsService.stopTracking();
+    }
   }
-  if (_useGps) {
-    print('🛑 Stopping GPS tracking for segment $_currentSegment');
-    _gpsService.stopTracking();
-  }
-}
 
-  // ---- Сохранение данных текущего сегмента ----
   void _saveCurrentSegmentData() {
-  final time = _getSegmentTime();
-  final distance = _getDistance();
-  print('📊 Saving segment $_currentSegment: time=$time, distance=$distance');
-  switch (_currentSegment) {
-    case 0:
-      _timeToShop = time;
-      _distanceToShop = distance;
-      break;
-    case 1:
-      _timeReceiving = time;
-      break;
-    case 2:
-      _timeToClient = time;
-      _distanceToClient = distance;
-      break;
-    case 3:
-      _timeDelivery = time;
-      break;
+    final time = _getSegmentTime();
+    final distance = _getDistance();
+    print('📊 Saving segment $_currentSegment: time=$time, distance=$distance');
+    switch (_currentSegment) {
+      case 0:
+        _timeToShop = time;
+        _distanceToShop = distance;
+        break;
+      case 1:
+        _timeReceiving = time;
+        break;
+      case 2:
+        _timeToClient = time;
+        _distanceToClient = distance;
+        break;
+      case 3:
+        _timeDelivery = time;
+        break;
+    }
   }
-}
+
+  // ---- Получение текущей позиции (для геокодера) ----
+  Future<Position?> _getCurrentPosition() async {
+    try {
+      return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.bestForNavigation,
+      );
+    } catch (e) {
+      print('Ошибка получения позиции: $e');
+      return null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -461,8 +447,6 @@ Future<void> _initGps() async {
     }
   }
 
-  // ---- Сегмент 1: В магазин ----
-
   Widget _buildShopSegment() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -590,8 +574,6 @@ Future<void> _initGps() async {
     );
   }
 
-  // ---- Сегмент 2: Получение ----
-
   Widget _buildReceivingSegment() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -691,8 +673,6 @@ Future<void> _initGps() async {
       ],
     );
   }
-
-  // ---- Сегмент 3: К клиенту ----
 
   Widget _buildClientSegment() {
     final deliveryLabel = _deliveryNumber > 1 ? ' (Доставка #$_deliveryNumber)' : '';
@@ -855,8 +835,6 @@ Future<void> _initGps() async {
     );
   }
 
-  // ---- Сегмент 4: Выдача ----
-
   Widget _buildDeliverySegment() {
     final deliveryLabel = _deliveryNumber > 1 ? ' (Доставка #$_deliveryNumber)' : '';
 
@@ -1000,8 +978,6 @@ Future<void> _initGps() async {
       ],
     );
   }
-
-  // ---- Вспомогательные виджеты ----
 
   Widget _buildInfoRow({
     required IconData icon,
@@ -1150,7 +1126,7 @@ Future<void> _initGps() async {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: isMainEnabled ? _handleMainAction : null,
+        onPressed: isMainEnabled ? () => _handleMainAction() : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: isMainEnabled
               ? const Color(0xFF6C63FF)
@@ -1173,37 +1149,67 @@ Future<void> _initGps() async {
     );
   }
 
-  void _handleMainAction() {
-    // Сначала завершаем текущий сегмент (устанавливаем _segmentEndTime)
+  void _handleMainAction() async {
     _finishSegment();
-    
-    // Потом сохраняем данные (используя _getSegmentTime(), который теперь знает время окончания)
     _saveCurrentSegmentData();
 
     switch (_currentSegment) {
       case 0:
-        _shopAddress = 'ул. Ленина, 25, г. Москва';
+        // Получаем адрес магазина по текущим координатам
+        final currentPos = await _getCurrentPosition();
+        if (currentPos != null) {
+          final address = await GeocoderService.reverseGeocode(
+            currentPos.latitude,
+            currentPos.longitude,
+          );
+          setState(() {
+            _shopAddress = address ?? 'Адрес не определён';
+          });
+        } else {
+          setState(() {
+            _shopAddress = 'Адрес не определён';
+          });
+        }
         setState(() {
           _currentSegment = 1;
         });
         _startSegment();
         break;
+
       case 1:
         final weight = double.tryParse(_weightController.text.replaceAll(',', '.')) ?? 0.0;
         if (weight <= 0) return;
         _weight = weight;
-        _clientAddress = 'ул. Пушкина, 10, г. Москва';
+        // Адрес клиента пока не определён, зададим позже
+        _clientAddress = 'Адрес будет определён при выезде';
         setState(() {
           _currentSegment = 2;
         });
         _startSegment();
         break;
+
       case 2:
+        // При выезде к клиенту, получаем адрес клиента
+        final currentPos = await _getCurrentPosition();
+        if (currentPos != null) {
+          final address = await GeocoderService.reverseGeocode(
+            currentPos.latitude,
+            currentPos.longitude,
+          );
+          setState(() {
+            _clientAddress = address ?? 'Адрес не определён';
+          });
+        } else {
+          setState(() {
+            _clientAddress = 'Адрес не определён';
+          });
+        }
         setState(() {
           _currentSegment = 3;
         });
         _startSegment();
         break;
+
       case 3:
         _completeDelivery();
         break;
@@ -1214,7 +1220,6 @@ Future<void> _initGps() async {
     final apartment = _apartmentController.text.trim();
     if (apartment.isEmpty) return;
 
-    // Завершаем последний сегмент и сохраняем данные
     _finishSegment();
     _saveCurrentSegmentData();
 
@@ -1264,7 +1269,7 @@ Future<void> _initGps() async {
     setState(() {
       _deliveryNumber++;
       _currentSegment = 2;
-      _clientAddress = 'ул. Новая, ${_deliveryNumber * 5}, г. Москва';
+      _clientAddress = 'Адрес будет определён при выезде';
       _apartmentController.clear();
       _isApartmentValid = false;
     });

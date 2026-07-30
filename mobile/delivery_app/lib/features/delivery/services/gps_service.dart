@@ -16,13 +16,10 @@ class GpsService {
   Position? _lastPosition;
   bool _isPaused = false;
 
-  // ---- Константы (оптимальные) ----
-  static const double _maxAccuracy = 30.0;   // максимальная точность (м)
-  static const double _minDistance = 0.5;    // минимальное перемещение для учёта (м)
-  static const double _maxJump = 100.0;      // защита от выбросов (м)
-  // Фильтр скорости полностью убран
+  static const double _maxAccuracy = 30.0;
+  static const double _minDistance = 0.5;
+  static const double _maxJump = 100.0;
 
-  // Логирование
   bool _isLoggingEnabled = false;
   String _logBuffer = '';
   final int _maxLogSize = 500 * 1024;
@@ -115,13 +112,11 @@ class GpsService {
 
     _log('📍 GPS: lat: ${position.latitude}, lon: ${position.longitude}, acc: ${position.accuracy}m');
 
-    // Фильтр точности
     if (position.accuracy > _maxAccuracy) {
       _log('⚠️ Accuracy too poor (${position.accuracy}m), ignoring');
       return;
     }
 
-    // Первая позиция
     if (_lastPosition == null) {
       _lastPosition = position;
       _log('🟢 First position stored');
@@ -136,19 +131,16 @@ class GpsService {
     );
     _log('📏 Raw distance: ${distance.toStringAsFixed(2)}m');
 
-    // Минимальное расстояние (0.5 м)
     if (distance < _minDistance) {
       _log('📏 Too small (< ${_minDistance}m), ignoring');
       return;
     }
 
-    // Защита от выбросов
     if (distance > _maxJump) {
       _log('⚠️ Jump > ${_maxJump}m (${distance.toStringAsFixed(2)}m), ignoring');
       return;
     }
 
-    // Принимаем
     _totalDistance += distance / 1000;
     _log('✅ ACCEPTED ${distance.toStringAsFixed(2)}m, total: ${_totalDistance.toStringAsFixed(4)} km');
     _distanceStreamController.add(_totalDistance);
