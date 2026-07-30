@@ -17,7 +17,7 @@ dependencies:
   logger: ^2.0.2
   cupertino_icons: ^1.0.6
   # GPS
-  geolocator: ^10.1.0
+  geolocator: ^8.0.1
   permission_handler: ^10.2.0
   share_plus: ^7.2.1
   flutter_foreground_task: ^8.17.0
