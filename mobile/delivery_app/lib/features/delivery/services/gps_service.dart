@@ -1,4 +1,4 @@
-// gps_service.dart – Упрощённая стрим-версия (только координаты, скорость НЕ используется)
+// gps_service.dart – Стрим-версия с настроенными порогами (minSpeed=0, minDistance=2)
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -16,10 +16,11 @@ class GpsService {
   Position? _lastPosition;
   bool _isPaused = false;
 
-  // ---- КОНСТАНТЫ ----
-  static const double _maxAccuracy = 30.0;   // максимальная допустимая точность (м)
-  static const double _minDistance = 2.0;    // минимальное перемещение для учёта (м)
-  static const double _maxJump = 100.0;      // защита от выбросов (м)
+  // ---- КОНСТАНТЫ (настроены) ----
+  static const double _maxAccuracy = 30.0;
+  static const double _minDistance = 2.0;
+  static const double _maxJump = 100.0;
+  static const double _minSpeed = 0.0;   // теперь 0 – не блокирует
 
   // Логирование (без изменений)
   bool _isLoggingEnabled = false;
@@ -35,18 +36,18 @@ class GpsService {
     if (_isLoggingEnabled) return;
     _isLoggingEnabled = true;
     _logBuffer = '';
-    _logBuffer += '=== GPS LOG STARTED (SIMPLE COORD ONLY) ===\n';
+    _logBuffer += '=== GPS LOG STARTED (TUNED STREAM) ===\n';
     _logBuffer += 'Timestamp: ${DateTime.now()}\n';
-    _logBuffer += 'Min distance: ${_minDistance}m\n';
+    _logBuffer += 'Min distance: ${_minDistance}m, Min speed: ${_minSpeed}\n';
     _logBuffer += '========================\n\n';
-    _log('📁 GPS logging started (SIMPLE)');
+    _log('📁 GPS logging started (TUNED)');
     await _saveLogToFile();
   }
 
   Future<void> stopLogging() async {
     if (!_isLoggingEnabled) return;
     _isLoggingEnabled = false;
-    _log('📁 GPS logging stopped (SIMPLE)');
+    _log('📁 GPS logging stopped (TUNED)');
     await _saveLogToFile();
   }
 
@@ -60,7 +61,7 @@ class GpsService {
   Future<void> _saveLogToFile() async {
     try {
       final directory = await getApplicationDocumentsDirectory();
-      final file = File('${directory.path}/gps_log_simple.txt');
+      final file = File('${directory.path}/gps_log_tuned.txt');
       _logFile = file;
       await file.writeAsString(_logBuffer);
       _log('📁 Log saved to: ${file.path}');
@@ -84,7 +85,7 @@ class GpsService {
   }
 
   void startTracking() {
-    _log('🟢 GPS: startTracking() SIMPLE');
+    _log('🟢 GPS: startTracking() TUNED');
     if (_isTracking) {
       _log('🟡 GPS: already tracking');
       return;
@@ -112,11 +113,19 @@ class GpsService {
   void _onPositionUpdate(Position position) {
     if (!_isTracking || _isPaused) return;
 
-    _log('📍 GPS: lat: ${position.latitude}, lon: ${position.longitude}, acc: ${position.accuracy}m');
+    _log('📍 GPS: lat: ${position.latitude}, lon: ${position.longitude}, '
+        'acc: ${position.accuracy}m, speed: ${position.speed?.toStringAsFixed(2) ?? "N/A"}');
 
     // Фильтр точности
     if (position.accuracy > _maxAccuracy) {
       _log('⚠️ Accuracy too poor (${position.accuracy}m), ignoring');
+      return;
+    }
+
+    // Фильтр скорости (теперь minSpeed=0, поэтому никогда не сработает)
+    final speed = position.speed ?? 0.0;
+    if (speed < _minSpeed) {
+      _log('⏸️ Speed too low (${speed.toStringAsFixed(2)} m/s), ignoring');
       return;
     }
 
@@ -135,19 +144,16 @@ class GpsService {
     );
     _log('📏 Raw distance: ${distance.toStringAsFixed(2)}m');
 
-    // Минимальное расстояние
     if (distance < _minDistance) {
       _log('📏 Too small (< ${_minDistance}m), ignoring');
       return;
     }
 
-    // Защита от выбросов
     if (distance > _maxJump) {
       _log('⚠️ Jump > ${_maxJump}m (${distance.toStringAsFixed(2)}m), ignoring');
       return;
     }
 
-    // Принимаем
     _totalDistance += distance / 1000;
     _log('✅ ACCEPTED ${distance.toStringAsFixed(2)}m, total: ${_totalDistance.toStringAsFixed(4)} km');
     _distanceStreamController.add(_totalDistance);
