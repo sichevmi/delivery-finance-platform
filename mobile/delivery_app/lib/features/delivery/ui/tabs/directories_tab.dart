@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'directories/expenses_directory.dart';
-import 'directories/x5_directory.dart';
-import 'directories/other_directory.dart';
+import 'package:delivery_app/features/delivery/ui/tabs/directories/expenses_directory.dart';
+import 'package:delivery_app/features/delivery/ui/tabs/directories/x5_directory.dart';
+import 'package:delivery_app/features/delivery/ui/tabs/directories/other_directory.dart';
 
 class DirectoriesTab extends StatefulWidget {
   const DirectoriesTab({super.key});
