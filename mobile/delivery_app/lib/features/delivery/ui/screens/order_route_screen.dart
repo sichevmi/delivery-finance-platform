@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:delivery_app/features/delivery/providers/tab_provider.dart';
 import 'package:delivery_app/features/delivery/providers/pricing_provider.dart';
 import 'package:delivery_app/features/delivery/services/gps_service.dart';
+import 'package:delivery_app/features/delivery/services/geocoder_service.dart';
 import 'order_summary_screen.dart';
 import 'package:delivery_app/features/delivery/services/permission_service.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
@@ -270,6 +272,18 @@ Future<void> _initGps() async {
       break;
   }
 }
+
+  // ---- Получение текущих координат (для геокодера) ----
+  Future<Position?> _getCurrentPosition() async {
+    try {
+      return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.bestForNavigation,
+      );
+    } catch (e) {
+      print('❌ Ошибка получения позиции: $e');
+      return null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1173,37 +1187,68 @@ Future<void> _initGps() async {
     );
   }
 
-  void _handleMainAction() {
-    // Сначала завершаем текущий сегмент (устанавливаем _segmentEndTime)
+  void _handleMainAction() async {
+    // Сначала завершаем текущий сегмент
     _finishSegment();
-    
-    // Потом сохраняем данные (используя _getSegmentTime(), который теперь знает время окончания)
     _saveCurrentSegmentData();
 
     switch (_currentSegment) {
       case 0:
-        _shopAddress = 'ул. Ленина, 25, г. Москва';
+        // Получаем адрес магазина по текущим координатам
+        final currentPos = await _getCurrentPosition();
+        if (currentPos != null) {
+          final address = await GeocoderService.reverseGeocode(
+            currentPos.latitude,
+            currentPos.longitude,
+          );
+          setState(() {
+            _shopAddress = address ?? 'Адрес не определён';
+          });
+        } else {
+          setState(() {
+            _shopAddress = 'Адрес не определён (нет GPS)';
+          });
+        }
         setState(() {
           _currentSegment = 1;
         });
         _startSegment();
         break;
+
       case 1:
         final weight = double.tryParse(_weightController.text.replaceAll(',', '.')) ?? 0.0;
         if (weight <= 0) return;
         _weight = weight;
-        _clientAddress = 'ул. Пушкина, 10, г. Москва';
+        // Адрес клиента пока не знаем, установим позже
+        _clientAddress = 'Адрес клиента будет определён позже';
         setState(() {
           _currentSegment = 2;
         });
         _startSegment();
         break;
+
       case 2:
+        // При выезде к клиенту получаем его адрес
+        final currentPos = await _getCurrentPosition();
+        if (currentPos != null) {
+          final address = await GeocoderService.reverseGeocode(
+            currentPos.latitude,
+            currentPos.longitude,
+          );
+          setState(() {
+            _clientAddress = address ?? 'Адрес не определён';
+          });
+        } else {
+          setState(() {
+            _clientAddress = 'Адрес не определён (нет GPS)';
+          });
+        }
         setState(() {
           _currentSegment = 3;
         });
         _startSegment();
         break;
+
       case 3:
         _completeDelivery();
         break;

@@ -17,23 +17,25 @@ class GeocoderService {
     );
 
     try {
+      print('🌍 Запрос геокодера: $lat, $lon');
       final response = await http.get(url);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         try {
           final geoObject = data['response']['GeoObjectCollection']['featureMember'][0]['GeoObject'];
           final address = geoObject['metaDataProperty']['GeocoderMetaData']['text'];
+          print('✅ Адрес получен: $address');
           return address;
         } catch (e) {
-          print('Ошибка парсинга адреса: $e');
+          print('❌ Ошибка парсинга адреса: $e');
           return null;
         }
       } else {
-        print('Ошибка геокодирования: ${response.statusCode}');
+        print('❌ Ошибка геокодирования: ${response.statusCode}');
         return null;
       }
     } catch (e) {
-      print('Ошибка запроса: $e');
+      print('❌ Ошибка запроса: $e');
       return null;
     }
   }
