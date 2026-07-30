@@ -1,4 +1,4 @@
-// gps_service_hybrid.dart – Координатный метод с EMA-сглаживанием
+// gps_service.dart – Стрим-версия (точный пробег по координатам)
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -10,20 +10,22 @@ class GpsService {
   factory GpsService() => _instance;
   GpsService._internal();
 
-  Timer? _pollingTimer;
+  StreamSubscription<Position>? _positionSubscription;
   bool _isTracking = false;
   double _totalDistance = 0.0;
-  Position? _lastRawPosition;          // последняя сырая позиция (для фильтров)
-  Position? _smoothedPosition;          // сглаженная позиция (EMA)
+  Position? _lastPosition;
   bool _isPaused = false;
 
-  // ---- Константы ----
-  static const int _pollInterval = 2;          // секунды
-  static const double _minSpeed = 0.3;         // м/с – минимальная скорость для движения
-  static const double _maxAccuracy = 30.0;     // метры – максимальная допустимая точность
-  static const double _minDistance = 0.5;      // метры – игнорируем очень маленькие перемещения
-  static const double _maxJump = 100.0;        // метры – защита от выбросов
-  static const double _emaAlpha = 0.6;         // коэффициент сглаживания (0..1), больше – быстрее реагируем
+  // ---- Константы фильтрации ----
+  static const double _maxAccuracy = 30.0;      // метры – максимальная допустимая точность
+  static const double _minDistance = 1.0;       // метры – минимальное перемещение для учёта
+  static const double _maxJump = 100.0;         // метры – защита от выбросов
+  static const double _minSpeed = 0.2;          // м/с – минимальная скорость (для отсечения стоячего шума)
+  static const bool _useSmoothing = false;      // можно включить EMA (пока отключено)
+
+  // ---- EMA (если включено) ----
+  double _emaAlpha = 0.5;
+  Position? _smoothedPosition;
 
   // ---- Логирование ----
   bool _isLoggingEnabled = false;
@@ -41,19 +43,19 @@ class GpsService {
     if (_isLoggingEnabled) return;
     _isLoggingEnabled = true;
     _logBuffer = '';
-    _logBuffer += '=== GPS LOG STARTED (HYBRID EMA COORD) ===\n';
+    _logBuffer += '=== GPS LOG STARTED (STREAM VERSION) ===\n';
     _logBuffer += 'Timestamp: ${DateTime.now()}\n';
-    _logBuffer += 'Poll interval: ${_pollInterval}s\n';
-    _logBuffer += 'EMA alpha: $_emaAlpha\n';
+    _logBuffer += 'Min distance: ${_minDistance}m\n';
+    _logBuffer += 'Max accuracy: ${_maxAccuracy}m\n';
     _logBuffer += '========================\n\n';
-    _log('📁 GPS logging started (HYBRID)');
+    _log('📁 GPS logging started (STREAM)');
     await _saveLogToFile();
   }
 
   Future<void> stopLogging() async {
     if (!_isLoggingEnabled) return;
     _isLoggingEnabled = false;
-    _log('📁 GPS logging stopped (HYBRID)');
+    _log('📁 GPS logging stopped (STREAM)');
     await _saveLogToFile();
   }
 
@@ -67,7 +69,7 @@ class GpsService {
   Future<void> _saveLogToFile() async {
     try {
       final directory = await getApplicationDocumentsDirectory();
-      final file = File('${directory.path}/gps_log_hybrid.txt');
+      final file = File('${directory.path}/gps_log_stream.txt');
       _logFile = file;
       await file.writeAsString(_logBuffer);
       _log('📁 Log saved to: ${file.path}');
@@ -92,7 +94,7 @@ class GpsService {
 
   // ---- Основные методы ----
   void startTracking() {
-    _log('🟢 GPS: startTracking() HYBRID EMA');
+    _log('🟢 GPS: startTracking() STREAM');
     if (_isTracking) {
       _log('🟡 GPS: already tracking, ignoring');
       return;
@@ -101,82 +103,88 @@ class GpsService {
     _isTracking = true;
     _isPaused = false;
     _totalDistance = 0.0;
-    _lastRawPosition = null;
+    _lastPosition = null;
     _smoothedPosition = null;
 
-    _pollingTimer = Timer.periodic(
-      Duration(seconds: _pollInterval),
-      _pollGps,
+    // Настройки геолокации
+    const settings = LocationSettings(
+      accuracy: LocationAccuracy.bestForNavigation,
+      distanceFilter: 0, // получаем все обновления
+      intervalDuration: Duration(seconds: 1),
     );
-    _log('🟢 GPS: polling started every $_pollInterval second(s)');
+
+    _positionSubscription = Geolocator.getPositionStream(
+      locationSettings: settings,
+    ).listen(
+      (Position position) {
+        _onPositionUpdate(position);
+      },
+      onError: (error) {
+        _log('🔴 GPS stream error: $error');
+      },
+      cancelOnError: false,
+    );
+
+    _log('🟢 GPS: stream started');
   }
 
-  Future<void> _pollGps(Timer timer) async {
+  void _onPositionUpdate(Position position) {
     if (!_isTracking || _isPaused) {
-      _log('⏸️ GPS: polling skipped');
+      _log('⏸️ GPS: update skipped (paused/stopped)');
       return;
     }
 
-    _log('📍 GPS: polling...');
-    try {
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.bestForNavigation,
-      );
+    _log('📍 GPS: position - lat: ${position.latitude}, lon: ${position.longitude}, '
+        'acc: ${position.accuracy}m, speed: ${position.speed?.toStringAsFixed(2) ?? "N/A"} m/s');
 
-      _log('📍 GPS: position - lat: ${position.latitude}, lon: ${position.longitude}, '
-          'acc: ${position.accuracy}m, speed: ${position.speed?.toStringAsFixed(2) ?? "N/A"} m/s');
+    // ---- ФИЛЬТР 1: Точность ----
+    if (position.accuracy > _maxAccuracy) {
+      _log('⚠️ GPS: poor accuracy (${position.accuracy}m > ${_maxAccuracy}m), ignoring');
+      return;
+    }
 
-      // ---- ФИЛЬТР 1: Точность ----
-      if (position.accuracy > _maxAccuracy) {
-        _log('⚠️ GPS: poor accuracy (${position.accuracy}m > ${_maxAccuracy}m), ignoring');
-        return;
-      }
+    // ---- ФИЛЬТР 2: Скорость (только для отсечения стоячего шума) ----
+    final speed = position.speed ?? 0.0;
+    if (speed < _minSpeed) {
+      _log('⏸️ GPS: speed too low (${speed.toStringAsFixed(2)} m/s), ignoring');
+      return;
+    }
 
-      // ---- ФИЛЬТР 2: Скорость ----
-      final speed = position.speed ?? 0.0;
-      if (speed < _minSpeed) {
-        _log('⏸️ GPS: speed too low (${speed.toStringAsFixed(2)} m/s), ignoring');
-        return;
-      }
+    // ---- Первая позиция ----
+    if (_lastPosition == null) {
+      _lastPosition = position;
+      if (_useSmoothing) _smoothedPosition = position;
+      _log('🟢 GPS: first position stored');
+      return;
+    }
 
-      // ---- Сохраняем сырую позицию для фильтров (выбросы) ----
-      _lastRawPosition = position;
+    // ---- Вычисляем расстояние между текущей и предыдущей позицией ----
+    double distance = Geolocator.distanceBetween(
+      _lastPosition!.latitude,
+      _lastPosition!.longitude,
+      position.latitude,
+      position.longitude,
+    );
+    _log('📏 GPS: raw distance: ${distance.toStringAsFixed(2)}m');
 
-      // ---- Обновляем сглаженную позицию (EMA) ----
-      if (_smoothedPosition == null) {
-        // Первая точка – просто берём её
-        _smoothedPosition = position;
-        _log('🟢 GPS: first smoothed position set');
-        return;
-      }
+    // ---- ФИЛЬТР 3: Минимальное расстояние ----
+    if (distance < _minDistance) {
+      _log('📏 GPS: distance too small (${distance.toStringAsFixed(2)}m < ${_minDistance}m), ignoring');
+      return;
+    }
 
-      // Вычисляем сырое расстояние между сырыми координатами (для проверки выбросов)
-      final rawDistance = Geolocator.distanceBetween(
-        _lastRawPosition!.latitude,
-        _lastRawPosition!.longitude,
-        position.latitude,
-        position.longitude,
-      );
-      _log('📏 GPS: raw distance between raw points: ${rawDistance.toStringAsFixed(2)}m');
+    // ---- ФИЛЬТР 4: Максимальный скачок ----
+    if (distance > _maxJump) {
+      _log('⚠️ GPS: extreme jump > ${_maxJump}m (${distance.toStringAsFixed(2)}m), ignoring');
+      return;
+    }
 
-      // ---- ФИЛЬТР 3: Минимальное расстояние (сырое) ----
-      if (rawDistance < _minDistance) {
-        _log('📏 GPS: raw distance too small (${rawDistance.toStringAsFixed(2)}m < ${_minDistance}m), ignoring');
-        return;
-      }
-
-      // ---- ФИЛЬТР 4: Максимальный скачок (защита от выбросов) ----
-      if (rawDistance > _maxJump) {
-        _log('⚠️ GPS: extreme jump > ${_maxJump}m (${rawDistance.toStringAsFixed(2)}m), ignoring');
-        return;
-      }
-
-      // ---- Применяем EMA к координатам ----
+    // ---- Опциональное EMA-сглаживание (по умолчанию выключено) ----
+    double finalDistance = distance;
+    if (_useSmoothing && _smoothedPosition != null) {
       final double smoothedLat = _emaAlpha * position.latitude + (1 - _emaAlpha) * _smoothedPosition!.latitude;
       final double smoothedLon = _emaAlpha * position.longitude + (1 - _emaAlpha) * _smoothedPosition!.longitude;
-
-      // Создаём новую сглаженную позицию (копируем остальные поля из сырой)
-      final newSmoothed = Position(
+      final smoothedPos = Position(
         latitude: smoothedLat,
         longitude: smoothedLon,
         timestamp: position.timestamp,
@@ -188,35 +196,49 @@ class GpsService {
         altitudeAccuracy: position.altitudeAccuracy,
         headingAccuracy: position.headingAccuracy,
       );
-
-      // ---- Считаем расстояние между сглаженными позициями ----
-      final smoothedDistance = Geolocator.distanceBetween(
+      final smoothedDist = Geolocator.distanceBetween(
         _smoothedPosition!.latitude,
         _smoothedPosition!.longitude,
-        newSmoothed.latitude,
-        newSmoothed.longitude,
+        smoothedPos.latitude,
+        smoothedPos.longitude,
       );
-      _log('📏 GPS: smoothed distance: ${smoothedDistance.toStringAsFixed(2)}m');
-
-      // ---- Принимаем это расстояние ----
-      if (smoothedDistance > 0.01) {
-        _totalDistance += smoothedDistance / 1000;
-        _log('✅ GPS: ACCEPTING ${smoothedDistance.toStringAsFixed(2)}m (smoothed)');
-        _log('📏 GPS: total: ${_totalDistance.toStringAsFixed(4)} km');
-        _distanceStreamController.add(_totalDistance);
+      if (smoothedDist > 0.01) {
+        finalDistance = smoothedDist;
+        _smoothedPosition = smoothedPos;
       } else {
-        _log('📏 GPS: smoothed distance too small (${smoothedDistance.toStringAsFixed(2)}m), ignoring');
+        _log('📏 GPS: smoothed distance too small (${smoothedDist.toStringAsFixed(2)}m), using raw');
       }
-
-      // Обновляем сглаженную позицию
-      _smoothedPosition = newSmoothed;
-
-    } catch (e, stack) {
-      _log('🔴 GPS: poll error - $e');
+    } else {
+      // Если сглаживание выключено, обновляем lastPosition
+      _lastPosition = position;
     }
 
+    // ---- Добавляем расстояние ----
+    if (finalDistance > 0.01) {
+      _totalDistance += finalDistance / 1000;
+      _log('✅ GPS: ACCEPTING ${finalDistance.toStringAsFixed(2)}m');
+      _log('📏 GPS: total: ${_totalDistance.toStringAsFixed(4)} km');
+      _distanceStreamController.add(_totalDistance);
+    } else {
+      _log('📏 GPS: final distance too small (${finalDistance.toStringAsFixed(2)}m), ignoring');
+    }
+
+    // ---- Обновляем lastPosition (если не использовали EMA) ----
+    if (!_useSmoothing) {
+      _lastPosition = position;
+    } else {
+      // При EMA мы уже обновили _smoothedPosition, но lastPosition оставляем исходным для следующих итераций?
+      // Лучше хранить lastPosition как сырую, а smoothed – отдельно.
+      // В этом коде мы не трогаем _lastPosition при EMA, но для простоты оставим как есть.
+      // Для корректности: при EMA _lastPosition должен оставаться сырым, а _smoothedPosition – сглаженным.
+      // В текущей реализации _lastPosition используется только для расчёта сырого расстояния, что нам и нужно.
+      // После расчёта мы обновляем _lastPosition на сырую позицию (чтобы следующий шаг считал сырое расстояние от новой сырой точки).
+      _lastPosition = position;
+    }
+
+    // ---- Ротация лога ----
     if (_isLoggingEnabled && _logBuffer.length > _maxLogSize) {
-      await _saveLogToFile();
+      _saveLogToFile();
       _logBuffer = _logBuffer.substring(_logBuffer.length ~/ 2);
     }
   }
@@ -236,9 +258,9 @@ class GpsService {
     _log('🛑 GPS: stopTracking()');
     _isTracking = false;
     _isPaused = false;
-    _pollingTimer?.cancel();
-    _pollingTimer = null;
-    _lastRawPosition = null;
+    _positionSubscription?.cancel();
+    _positionSubscription = null;
+    _lastPosition = null;
     _smoothedPosition = null;
     _distanceStreamController.add(0.0);
     if (_isLoggingEnabled) {
@@ -246,11 +268,9 @@ class GpsService {
     }
   }
 
+  // forceRefresh не нужен для стрима, но оставим как заглушку
   void forceRefresh() {
-    _log('🔄 GPS: forceRefresh() called');
-    if (_isTracking && !_isPaused) {
-      _pollGps(Timer.periodic(Duration(seconds: 1), (timer) {}));
-    }
+    _log('🔄 GPS: forceRefresh() called (no-op for stream)');
   }
 
   double getTotalDistance() => _totalDistance;
@@ -258,7 +278,7 @@ class GpsService {
   void resetDistance() {
     _log('🔄 GPS: resetDistance()');
     _totalDistance = 0.0;
-    _lastRawPosition = null;
+    _lastPosition = null;
     _smoothedPosition = null;
     _distanceStreamController.add(0.0);
   }
