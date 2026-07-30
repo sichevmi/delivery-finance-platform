@@ -9,6 +9,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     
     <application
         android:label="delivery_app"
@@ -18,8 +19,15 @@
         
         <!-- Сервис для фоновой GPS -->
         <service
-            android:name="com.baseflow.geolocator.GeolocatorBackgroundService"
-            android:foregroundServiceType="location" />
+            android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
+            android:foregroundServiceType="location"
+            android:exported="false"
+            android:stopWithTask="false" />
+
+        <service
+            android:name=".GpsForegroundService"
+            android:foregroundServiceType="location"
+            android:exported="false" />
         
         <activity
             android:name=".MainActivity"
