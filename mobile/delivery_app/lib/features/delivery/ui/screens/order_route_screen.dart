@@ -143,9 +143,10 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
 
   // В _initGps используем метод с диалогами
 Future<void> _initGps() async {
-  // В новой версии gps_service нет requestPermissions, используем PermissionService
   final hasPermission = await PermissionService.requestLocationPermission(context);
   if (hasPermission) {
+    // Включаем логирование (теперь все логи GPS и геокодера будут в одном файле)
+    await _gpsService.startLogging();
     _gpsSubscription = _gpsService.distanceStream.listen((distance) {
       if (mounted) {
         setState(() {
@@ -275,15 +276,15 @@ Future<void> _initGps() async {
 
   // ---- Получение текущих координат (для геокодера) ----
   Future<Position?> _getCurrentPosition() async {
-    try {
-      return await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.bestForNavigation,
-      );
-    } catch (e) {
-      print('❌ Ошибка получения позиции: $e');
-      return null;
-    }
+  try {
+    return await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.bestForNavigation,
+    );
+  } catch (e) {
+    _gpsService.addLog('❌ Ошибка получения позиции: $e');
+    return null;
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -1188,72 +1189,72 @@ Future<void> _initGps() async {
   }
 
   void _handleMainAction() async {
-    // Сначала завершаем текущий сегмент
-    _finishSegment();
-    _saveCurrentSegmentData();
+  _finishSegment();
+  _saveCurrentSegmentData();
 
-    switch (_currentSegment) {
-      case 0:
-        // Получаем адрес магазина по текущим координатам
-        final currentPos = await _getCurrentPosition();
-        if (currentPos != null) {
-          final address = await GeocoderService.reverseGeocode(
-            currentPos.latitude,
-            currentPos.longitude,
-          );
-          setState(() {
-            _shopAddress = address ?? 'Адрес не определён';
-          });
-        } else {
-          setState(() {
-            _shopAddress = 'Адрес не определён (нет GPS)';
-          });
-        }
+  switch (_currentSegment) {
+    case 0:
+      _gpsService.addLog('🔍 Получение адреса магазина...');
+      final currentPos = await _getCurrentPosition();
+      if (currentPos != null) {
+        final address = await GeocoderService.reverseGeocode(
+          currentPos.latitude,
+          currentPos.longitude,
+          onLog: _gpsService.addLog, // передаём колбэк
+        );
         setState(() {
-          _currentSegment = 1;
+          _shopAddress = address ?? 'Адрес не определён';
         });
-        _startSegment();
-        break;
-
-      case 1:
-        final weight = double.tryParse(_weightController.text.replaceAll(',', '.')) ?? 0.0;
-        if (weight <= 0) return;
-        _weight = weight;
-        // Адрес клиента пока не знаем, установим позже
-        _clientAddress = 'Адрес клиента будет определён позже';
+      } else {
         setState(() {
-          _currentSegment = 2;
+          _shopAddress = 'Адрес не определён (нет GPS)';
         });
-        _startSegment();
-        break;
+      }
+      setState(() {
+        _currentSegment = 1;
+      });
+      _startSegment();
+      break;
 
-      case 2:
-        // При выезде к клиенту получаем его адрес
-        final currentPos = await _getCurrentPosition();
-        if (currentPos != null) {
-          final address = await GeocoderService.reverseGeocode(
-            currentPos.latitude,
-            currentPos.longitude,
-          );
-          setState(() {
-            _clientAddress = address ?? 'Адрес не определён';
-          });
-        } else {
-          setState(() {
-            _clientAddress = 'Адрес не определён (нет GPS)';
-          });
-        }
+    case 1:
+      final weight = double.tryParse(_weightController.text.replaceAll(',', '.')) ?? 0.0;
+      if (weight <= 0) return;
+      _weight = weight;
+      _clientAddress = 'Адрес клиента будет определён позже';
+      setState(() {
+        _currentSegment = 2;
+      });
+      _startSegment();
+      break;
+
+    case 2:
+      _gpsService.addLog('🔍 Получение адреса клиента...');
+      final currentPos = await _getCurrentPosition();
+      if (currentPos != null) {
+        final address = await GeocoderService.reverseGeocode(
+          currentPos.latitude,
+          currentPos.longitude,
+          onLog: _gpsService.addLog,
+        );
         setState(() {
-          _currentSegment = 3;
+          _clientAddress = address ?? 'Адрес не определён';
         });
-        _startSegment();
-        break;
+      } else {
+        setState(() {
+          _clientAddress = 'Адрес не определён (нет GPS)';
+        });
+      }
+      setState(() {
+        _currentSegment = 3;
+      });
+      _startSegment();
+      break;
 
-      case 3:
-        _completeDelivery();
-        break;
-    }
+    case 3:
+      _completeDelivery();
+      break;
   }
+}
 
   void _completeDelivery() async {
     final apartment = _apartmentController.text.trim();

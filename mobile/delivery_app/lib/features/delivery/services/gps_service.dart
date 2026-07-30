@@ -1,4 +1,4 @@
-// gps_service.dart – финальная версия (стрим, без фильтра скорости, minDistance=0.5)
+// gps_service.dart – финальная версия с публичным логированием
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -20,6 +20,7 @@ class GpsService {
   static const double _minDistance = 0.5;
   static const double _maxJump = 100.0;
 
+  // Логирование
   bool _isLoggingEnabled = false;
   String _logBuffer = '';
   final int _maxLogSize = 500 * 1024;
@@ -29,6 +30,7 @@ class GpsService {
   final _distanceStreamController = StreamController<double>.broadcast();
   Stream<double> get distanceStream => _distanceStreamController.stream;
 
+  // ---- Публичные методы логирования ----
   Future<void> startLogging() async {
     if (_isLoggingEnabled) return;
     _isLoggingEnabled = true;
@@ -46,6 +48,12 @@ class GpsService {
     _isLoggingEnabled = false;
     _log('📁 GPS logging stopped (FINAL)');
     await _saveLogToFile();
+  }
+
+  /// Публичный метод для добавления внешних логов (например, от геокодера)
+  void addLog(String message) {
+    if (!_isLoggingEnabled) return;
+    _log(message);
   }
 
   void _log(String message) {
@@ -81,6 +89,7 @@ class GpsService {
     }
   }
 
+  // ---- Основные методы GPS (без изменений) ----
   void startTracking() {
     _log('🟢 GPS: startTracking() FINAL');
     if (_isTracking) {

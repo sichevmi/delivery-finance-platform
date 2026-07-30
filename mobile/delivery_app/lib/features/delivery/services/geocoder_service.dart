@@ -5,8 +5,14 @@ class GeocoderService {
   // Замените на свой API-ключ
   static const String _apiKey = '5ca7e701-237d-4fc0-9327-a1cdf7171dcd';
 
-  /// Обратное геокодирование: координаты → адрес
-  static Future<String?> reverseGeocode(double lat, double lon) async {
+  /// Обратное геокодирование с поддержкой логирования
+  static Future<String?> reverseGeocode(
+    double lat,
+    double lon, {
+    void Function(String)? onLog,
+  }) async {
+    onLog?.call('🌍 Запрос геокодера: lat=$lat, lon=$lon');
+
     final url = Uri.parse(
       'https://geocode-maps.yandex.ru/1.x/'
       '?apikey=$_apiKey'
@@ -17,25 +23,26 @@ class GeocoderService {
     );
 
     try {
-      print('🌍 Запрос геокодера: $lat, $lon');
       final response = await http.get(url);
+      onLog?.call('📡 Ответ геокодера: статус ${response.statusCode}');
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         try {
           final geoObject = data['response']['GeoObjectCollection']['featureMember'][0]['GeoObject'];
           final address = geoObject['metaDataProperty']['GeocoderMetaData']['text'];
-          print('✅ Адрес получен: $address');
+          onLog?.call('✅ Адрес получен: "$address"');
           return address;
         } catch (e) {
-          print('❌ Ошибка парсинга адреса: $e');
+          onLog?.call('❌ Ошибка парсинга ответа: $e');
           return null;
         }
       } else {
-        print('❌ Ошибка геокодирования: ${response.statusCode}');
+        onLog?.call('❌ HTTP ошибка: ${response.statusCode}');
         return null;
       }
     } catch (e) {
-      print('❌ Ошибка запроса: $e');
+      onLog?.call('❌ Исключение при запросе: $e');
       return null;
     }
   }
