@@ -1,20 +1,22 @@
-// gps_service.dart – универсальная версия (работает с location 4.4.0 и 5.x)
+// gps_service.dart – полная версия на geolocator
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
-import 'package:location/location.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class GpsService {
-  static const String VERSION = 'ADAPTIVE KALMAN v3.0 (for location 4.4.0)';
+  static const String VERSION = 'ADAPTIVE KALMAN v3.0 (geolocator)';
 
+  // ---- Состояние ----
   bool _isTracking = false;
   bool _isPaused = false;
   bool _isFirstFix = true;
-  LocationData? _lastLocation;
+  Position? _lastPosition;
   DateTime? _lastTimestamp;
   double _totalDistance = 0.0;
 
+  // ---- Фильтр Калмана ----
   double _filteredDistance = 0.0;
   double _k = 0.268;
   double _q = 0.1;
@@ -24,14 +26,20 @@ class GpsService {
   static const double MAX_GAIN = 0.8;
   static const double STATIONARY_SPEED_THRESHOLD = 0.3;
 
+  // ---- Логирование ----
   final List<String> _log = [];
   bool _logEnabled = false;
   String _logFilePath = '';
   final _logFileLock = Object();
 
+  // ---- Стрим для дистанции ----
   final _distanceController = StreamController<double>.broadcast();
   Stream<double> get distanceStream => _distanceController.stream;
 
+  // ---- Подписка на обновления геолокации ----
+  StreamSubscription<Position>? _positionSubscription;
+
+  // ---- Инициализация ----
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     _totalDistance = prefs.getDouble('totalDistance') ?? 0.0;
@@ -39,22 +47,40 @@ class GpsService {
     _logFilePath = '${dir.path}/gps_log.txt';
   }
 
+  // ---- Запуск и остановка GPS-подписки ----
   void startTracking() {
+    if (_isTracking) return;
     _isTracking = true;
     _isPaused = false;
     _isFirstFix = true;
-    _lastLocation = null;
+    _lastPosition = null;
     _filteredDistance = 0.0;
     _log.clear();
     _addLog('🟢 GPS: startTracking() V$VERSION');
+
+    // Создаём подписку на обновления геолокации
+    _positionSubscription = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.best,
+        distanceFilter: 1, // обновлять при изменении на 1 метр
+        timeLimit: Duration(seconds: 2),
+      ),
+    ).listen((Position position) {
+      _onLocationChanged(position);
+    }, onError: (error) {
+      _addLog('⚠️ GPS error: $error');
+    });
   }
 
   void stopTracking() {
     _isTracking = false;
     _isPaused = false;
+    _positionSubscription?.cancel();
+    _positionSubscription = null;
     _addLog('🛑 GPS: stopTracking()');
     _saveDistance();
-    _distanceController.close();
+    // Закрываем стрим, чтобы не было утечек (но он может быть пересоздан)
+    // _distanceController.close(); // лучше не закрывать, т.к. может быть перезапуск
   }
 
   void pauseTracking() {
@@ -75,7 +101,7 @@ class GpsService {
   void resetDistance() {
     _totalDistance = 0.0;
     _filteredDistance = 0.0;
-    _lastLocation = null;
+    _lastPosition = null;
     _isFirstFix = true;
     _addLog('🔄 GPS: resetDistance()');
     _distanceController.add(_totalDistance);
@@ -83,26 +109,27 @@ class GpsService {
 
   void forceRefresh() {
     _addLog('🔄 GPS: forceRefresh() called');
+    // Для geolocator можно вызвать getCurrentPosition, но это не обязательно
   }
 
-  void onLocationChanged(LocationData location) {
+  // ---- Обработка новых позиций ----
+  void _onLocationChanged(Position position) {
     if (!_isTracking || _isPaused) return;
-    if (location.latitude == null || location.longitude == null) return;
 
     if (_isFirstFix) {
-      _lastLocation = location;
+      _lastPosition = position;
       _lastTimestamp = DateTime.now();
       _isFirstFix = false;
       _addLog('📍 GPS: first position, initializing');
       return;
     }
 
-    final rawDistance = _calculateDistance(_lastLocation!, location);
-    final speed = location.speed ?? 0.0;
-    final accuracy = location.accuracy ?? 0.0;
+    final rawDistance = _calculateDistance(_lastPosition!, position);
+    final speed = position.speed; // в м/с
+    final accuracy = position.accuracy; // в метрах
 
     if (rawDistance < 0.5) {
-      _lastLocation = location;
+      _lastPosition = position;
       return;
     }
 
@@ -117,10 +144,11 @@ class GpsService {
 
     _applyKalman(clampedRaw, speed);
 
-    _lastLocation = location;
+    _lastPosition = position;
     _lastTimestamp = DateTime.now();
   }
 
+  // ---- Вспомогательные методы фильтра ----
   void _adaptParameters(double speed, double accuracy) {
     double newK;
     if (accuracy > 30.0) newK = 0.1;
@@ -153,12 +181,13 @@ class GpsService {
     _filteredDistance = 0.0;
   }
 
-  double _calculateDistance(LocationData from, LocationData to) {
+  // ---- Расчёт расстояния по гаверсинусам ----
+  double _calculateDistance(Position from, Position to) {
     const R = 6371000;
-    final dLat = _toRadians(to.latitude! - from.latitude!);
-    final dLon = _toRadians(to.longitude! - from.longitude!);
+    final dLat = _toRadians(to.latitude - from.latitude);
+    final dLon = _toRadians(to.longitude - from.longitude);
     final a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(_toRadians(from.latitude!)) * cos(_toRadians(to.latitude!)) *
+        cos(_toRadians(from.latitude)) * cos(_toRadians(to.latitude)) *
         sin(dLon / 2) * sin(dLon / 2);
     final c = 2 * atan2(sqrt(a), sqrt(1 - a));
     return R * c;
@@ -166,11 +195,13 @@ class GpsService {
 
   double _toRadians(double degrees) => degrees * pi / 180.0;
 
+  // ---- Сохранение состояния ----
   Future<void> _saveDistance() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('totalDistance', _totalDistance);
   }
 
+  // ---- Логирование в файл ----
   Future<void> startLogging() async {
     _logEnabled = true;
     _log.clear();
@@ -218,6 +249,7 @@ class GpsService {
     }
   }
 
+  // ---- Геттеры ----
   double get totalDistance => _totalDistance;
   bool get isTracking => _isTracking;
   String get version => VERSION;
