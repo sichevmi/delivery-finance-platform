@@ -22,7 +22,7 @@ dependencies:
   share_plus: ^7.2.1
   flutter_foreground_task: ^8.17.0
   fl_chart: ^0.68.0  
-  location: ^5.0.0
+  location: ^6.0.0
   shared_preferences: ^2.0.0
   #geolocator: ^8.0.1
   #location: ^5.0.3
