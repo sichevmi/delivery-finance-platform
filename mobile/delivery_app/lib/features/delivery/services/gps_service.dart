@@ -1,4 +1,4 @@
-// gps_service.dart – Стрим-версия (точный пробег по координатам)
+// gps_service.dart – Упрощённая стрим-версия (только координаты, скорость НЕ используется)
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -16,41 +16,37 @@ class GpsService {
   Position? _lastPosition;
   bool _isPaused = false;
 
-  // ---- Константы фильтрации ----
-  static const double _maxAccuracy = 30.0;      // метры – максимальная допустимая точность
-  static const double _minDistance = 1.0;       // метры – минимальное перемещение для учёта
-  static const double _maxJump = 100.0;         // метры – защита от выбросов
-  static const double _minSpeed = 0.2;          // м/с – минимальная скорость (для отсечения стоячего шума)
+  // ---- КОНСТАНТЫ ----
+  static const double _maxAccuracy = 30.0;   // максимальная допустимая точность (м)
+  static const double _minDistance = 2.0;    // минимальное перемещение для учёта (м)
+  static const double _maxJump = 100.0;      // защита от выбросов (м)
 
-  // ---- Логирование ----
+  // Логирование (без изменений)
   bool _isLoggingEnabled = false;
   String _logBuffer = '';
-  final int _maxLogSize = 500 * 1024; // 500 KB
+  final int _maxLogSize = 500 * 1024;
   File? _logFile;
 
   double get currentDistance => _totalDistance;
-
   final _distanceStreamController = StreamController<double>.broadcast();
   Stream<double> get distanceStream => _distanceStreamController.stream;
 
-  // ---- Управление логированием ----
   Future<void> startLogging() async {
     if (_isLoggingEnabled) return;
     _isLoggingEnabled = true;
     _logBuffer = '';
-    _logBuffer += '=== GPS LOG STARTED (STREAM VERSION) ===\n';
+    _logBuffer += '=== GPS LOG STARTED (SIMPLE COORD ONLY) ===\n';
     _logBuffer += 'Timestamp: ${DateTime.now()}\n';
     _logBuffer += 'Min distance: ${_minDistance}m\n';
-    _logBuffer += 'Max accuracy: ${_maxAccuracy}m\n';
     _logBuffer += '========================\n\n';
-    _log('📁 GPS logging started (STREAM)');
+    _log('📁 GPS logging started (SIMPLE)');
     await _saveLogToFile();
   }
 
   Future<void> stopLogging() async {
     if (!_isLoggingEnabled) return;
     _isLoggingEnabled = false;
-    _log('📁 GPS logging stopped (STREAM)');
+    _log('📁 GPS logging stopped (SIMPLE)');
     await _saveLogToFile();
   }
 
@@ -64,7 +60,7 @@ class GpsService {
   Future<void> _saveLogToFile() async {
     try {
       final directory = await getApplicationDocumentsDirectory();
-      final file = File('${directory.path}/gps_log_stream.txt');
+      final file = File('${directory.path}/gps_log_simple.txt');
       _logFile = file;
       await file.writeAsString(_logBuffer);
       _log('📁 Log saved to: ${file.path}');
@@ -87,138 +83,104 @@ class GpsService {
     }
   }
 
-  // ---- Основные методы ----
   void startTracking() {
-    _log('🟢 GPS: startTracking() STREAM');
+    _log('🟢 GPS: startTracking() SIMPLE');
     if (_isTracking) {
-      _log('🟡 GPS: already tracking, ignoring');
+      _log('🟡 GPS: already tracking');
       return;
     }
-
     _isTracking = true;
     _isPaused = false;
     _totalDistance = 0.0;
     _lastPosition = null;
 
-    // Настройки геолокации (без intervalDuration)
     const settings = LocationSettings(
       accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 0, // получаем все обновления
+      distanceFilter: 0,
     );
 
     _positionSubscription = Geolocator.getPositionStream(
       locationSettings: settings,
     ).listen(
-      (Position position) {
-        _onPositionUpdate(position);
-      },
-      onError: (error) {
-        _log('🔴 GPS stream error: $error');
-      },
+      (Position position) => _onPositionUpdate(position),
+      onError: (error) => _log('🔴 GPS error: $error'),
       cancelOnError: false,
     );
-
     _log('🟢 GPS: stream started');
   }
 
   void _onPositionUpdate(Position position) {
-    if (!_isTracking || _isPaused) {
-      _log('⏸️ GPS: update skipped (paused/stopped)');
-      return;
-    }
+    if (!_isTracking || _isPaused) return;
 
-    _log('📍 GPS: position - lat: ${position.latitude}, lon: ${position.longitude}, '
-        'acc: ${position.accuracy}m, speed: ${position.speed?.toStringAsFixed(2) ?? "N/A"} m/s');
+    _log('📍 GPS: lat: ${position.latitude}, lon: ${position.longitude}, acc: ${position.accuracy}m');
 
-    // ---- ФИЛЬТР 1: Точность ----
+    // Фильтр точности
     if (position.accuracy > _maxAccuracy) {
-      _log('⚠️ GPS: poor accuracy (${position.accuracy}m > ${_maxAccuracy}m), ignoring');
+      _log('⚠️ Accuracy too poor (${position.accuracy}m), ignoring');
       return;
     }
 
-    // ---- ФИЛЬТР 2: Скорость (только для отсечения стоячего шума) ----
-    final speed = position.speed ?? 0.0;
-    if (speed < _minSpeed) {
-      _log('⏸️ GPS: speed too low (${speed.toStringAsFixed(2)} m/s), ignoring');
-      return;
-    }
-
-    // ---- Первая позиция ----
+    // Первая позиция
     if (_lastPosition == null) {
       _lastPosition = position;
-      _log('🟢 GPS: first position stored');
+      _log('🟢 First position stored');
       return;
     }
 
-    // ---- Вычисляем расстояние между текущей и предыдущей позицией ----
     double distance = Geolocator.distanceBetween(
       _lastPosition!.latitude,
       _lastPosition!.longitude,
       position.latitude,
       position.longitude,
     );
-    _log('📏 GPS: raw distance: ${distance.toStringAsFixed(2)}m');
+    _log('📏 Raw distance: ${distance.toStringAsFixed(2)}m');
 
-    // ---- ФИЛЬТР 3: Минимальное расстояние ----
+    // Минимальное расстояние
     if (distance < _minDistance) {
-      _log('📏 GPS: distance too small (${distance.toStringAsFixed(2)}m < ${_minDistance}m), ignoring');
+      _log('📏 Too small (< ${_minDistance}m), ignoring');
       return;
     }
 
-    // ---- ФИЛЬТР 4: Максимальный скачок ----
+    // Защита от выбросов
     if (distance > _maxJump) {
-      _log('⚠️ GPS: extreme jump > ${_maxJump}m (${distance.toStringAsFixed(2)}m), ignoring');
+      _log('⚠️ Jump > ${_maxJump}m (${distance.toStringAsFixed(2)}m), ignoring');
       return;
     }
 
-    // ---- Добавляем расстояние ----
+    // Принимаем
     _totalDistance += distance / 1000;
-    _log('✅ GPS: ACCEPTING ${distance.toStringAsFixed(2)}m');
-    _log('📏 GPS: total: ${_totalDistance.toStringAsFixed(4)} km');
+    _log('✅ ACCEPTED ${distance.toStringAsFixed(2)}m, total: ${_totalDistance.toStringAsFixed(4)} km');
     _distanceStreamController.add(_totalDistance);
-
-    // ---- Обновляем последнюю позицию ----
     _lastPosition = position;
-
-    // ---- Ротация лога ----
-    if (_isLoggingEnabled && _logBuffer.length > _maxLogSize) {
-      _saveLogToFile();
-      _logBuffer = _logBuffer.substring(_logBuffer.length ~/ 2);
-    }
   }
 
-  // ---- Остальные методы ----
   void pauseTracking() {
-    _log('⏸️ GPS: pauseTracking()');
+    _log('⏸️ Pause');
     _isPaused = true;
   }
 
   void resumeTracking() {
-    _log('▶️ GPS: resumeTracking()');
+    _log('▶️ Resume');
     _isPaused = false;
   }
 
   void stopTracking() {
-    _log('🛑 GPS: stopTracking()');
+    _log('🛑 Stop');
     _isTracking = false;
     _isPaused = false;
     _positionSubscription?.cancel();
     _positionSubscription = null;
     _lastPosition = null;
     _distanceStreamController.add(0.0);
-    if (_isLoggingEnabled) {
-      _saveLogToFile();
-    }
+    if (_isLoggingEnabled) _saveLogToFile();
   }
 
-  void forceRefresh() {
-    _log('🔄 GPS: forceRefresh() called (no-op for stream)');
-  }
+  void forceRefresh() => _log('🔄 ForceRefresh (no-op)');
 
   double getTotalDistance() => _totalDistance;
 
   void resetDistance() {
-    _log('🔄 GPS: resetDistance()');
+    _log('🔄 Reset');
     _totalDistance = 0.0;
     _lastPosition = null;
     _distanceStreamController.add(0.0);
