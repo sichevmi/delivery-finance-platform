@@ -1,4 +1,4 @@
-// gps_service_kalman.dart – Версия с адаптивным фильтром Калмана
+// gps_service_speed.dart – Версия на основе скорости GPS
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -14,20 +14,15 @@ class GpsService {
   bool _isTracking = false;
   double _totalDistance = 0.0;
   Position? _lastPosition;
+  DateTime? _lastTimestamp;
   bool _isPaused = false;
-
-  // ---- Фильтр Калмана ----
-  double _filteredDistance = 0.0; // отфильтрованное расстояние за шаг
-  double _k = 0.268; // коэффициент Калмана (адаптивный)
-  double _q = 0.1;   // шум процесса
-  double _r = 3.0;   // шум измерения
 
   // ---- Константы ----
   static const int _pollInterval = 2; // секунды
-  static const double _minSpeed = 0.3;   // м/с – минимальная скорость для движения
-  static const double _maxAccuracy = 30.0; // метры – максимальная допустимая точность
-  static const double _minDistance = 0.5;   // метры – игнорируем очень маленькие перемещения
-  static const double _maxJump = 80.0;      // метры – защита от выбросов
+  static const double _minSpeed = 0.3;       // м/с – минимальная скорость для движения
+  static const double _maxAccuracy = 30.0;   // метры – максимальная допустимая точность
+  static const double _minDistanceIncrement = 0.5; // метры – минимальное приращение для учёта
+  static const double _maxSpeed = 40.0;      // м/с – ограничение скорости (144 км/ч)
 
   // ---- Логирование ----
   bool _isLoggingEnabled = false;
@@ -45,18 +40,18 @@ class GpsService {
     if (_isLoggingEnabled) return;
     _isLoggingEnabled = true;
     _logBuffer = '';
-    _logBuffer += '=== GPS LOG STARTED (KALMAN ADAPTIVE) ===\n';
+    _logBuffer += '=== GPS LOG STARTED (SPEED INTEGRATION) ===\n';
     _logBuffer += 'Timestamp: ${DateTime.now()}\n';
     _logBuffer += 'Poll interval: ${_pollInterval}s\n';
     _logBuffer += '========================\n\n';
-    _log('📁 GPS logging started (KALMAN)');
+    _log('📁 GPS logging started (SPEED)');
     await _saveLogToFile();
   }
 
   Future<void> stopLogging() async {
     if (!_isLoggingEnabled) return;
     _isLoggingEnabled = false;
-    _log('📁 GPS logging stopped (KALMAN)');
+    _log('📁 GPS logging stopped (SPEED)');
     await _saveLogToFile();
   }
 
@@ -70,7 +65,7 @@ class GpsService {
   Future<void> _saveLogToFile() async {
     try {
       final directory = await getApplicationDocumentsDirectory();
-      final file = File('${directory.path}/gps_log_kalman.txt');
+      final file = File('${directory.path}/gps_log_speed.txt');
       _logFile = file;
       await file.writeAsString(_logBuffer);
       _log('📁 Log saved to: ${file.path}');
@@ -95,7 +90,7 @@ class GpsService {
 
   // ---- Основные методы ----
   void startTracking() {
-    _log('🟢 GPS: startTracking() KALMAN ADAPTIVE');
+    _log('🟢 GPS: startTracking() SPEED INTEGRATION');
     if (_isTracking) {
       _log('🟡 GPS: already tracking, ignoring');
       return;
@@ -105,8 +100,7 @@ class GpsService {
     _isPaused = false;
     _totalDistance = 0.0;
     _lastPosition = null;
-    _filteredDistance = 0.0;
-    _k = 0.268;
+    _lastTimestamp = null;
 
     _pollingTimer = Timer.periodic(
       Duration(seconds: _pollInterval),
@@ -143,47 +137,43 @@ class GpsService {
         return;
       }
 
-      if (_lastPosition != null) {
-        final rawDistance = Geolocator.distanceBetween(
-          _lastPosition!.latitude,
-          _lastPosition!.longitude,
-          position.latitude,
-          position.longitude,
-        );
-        _log('📏 GPS: raw distance: ${rawDistance.toStringAsFixed(2)}m');
+      // ---- Ограничение скорости ----
+      final effectiveSpeed = speed.clamp(0.0, _maxSpeed);
 
-        // ---- ФИЛЬТР 3: Минимальное расстояние ----
-        if (rawDistance < _minDistance) {
-          _log('📏 GPS: distance too small (${rawDistance.toStringAsFixed(2)}m < ${_minDistance}m), ignoring');
-          return;
-        }
+      // ---- Вычисляем время с предыдущего опроса ----
+      final now = DateTime.now();
+      if (_lastTimestamp != null) {
+        final dt = now.difference(_lastTimestamp!).inSeconds.toDouble();
+        if (dt > 0.0 && dt < 10.0) {
+          // Расстояние = скорость * время
+          double distance = effectiveSpeed * dt;
 
-        // ---- ФИЛЬТР 4: Максимальный скачок ----
-        if (rawDistance > _maxJump) {
-          _log('⚠️ GPS: extreme jump > ${_maxJump}m (${rawDistance.toStringAsFixed(2)}m), ignoring');
-          return;
-        }
+          // ---- Минимальное приращение ----
+          if (distance < _minDistanceIncrement) {
+            _log('📏 GPS: distance too small (${distance.toStringAsFixed(2)}m < ${_minDistanceIncrement}m), ignoring');
+            _lastTimestamp = now;
+            return;
+          }
 
-        // ---- АДАПТИВНЫЙ КАЛМАН ----
-        // 1. Адаптация коэффициента K в зависимости от скорости и точности
-        _adaptKalman(speed, position.accuracy);
+          // ---- Ограничение максимального приращения ----
+          if (distance > 100.0) {
+            _log('⚠️ GPS: distance > 100m (${distance.toStringAsFixed(2)}m), limiting to 100m');
+            distance = 100.0;
+          }
 
-        // 2. Применение фильтра
-        final filtered = _applyKalman(rawDistance);
-
-        // 3. Добавляем отфильтрованное расстояние (если > 0.01 м)
-        if (filtered > 0.01) {
-          _totalDistance += filtered / 1000;
-          _log('✅ GPS: ACCEPTING ${filtered.toStringAsFixed(2)}m (filtered)');
+          _totalDistance += distance / 1000;
+          _log('✅ GPS: ACCEPTING ${distance.toStringAsFixed(2)}m (speed integration)');
           _log('📏 GPS: total: ${_totalDistance.toStringAsFixed(4)} km');
           _distanceStreamController.add(_totalDistance);
         } else {
-          _log('📏 GPS: filtered distance too small (${filtered.toStringAsFixed(2)}m), ignoring');
+          _log('⚠️ GPS: dt out of range (${dt}s), ignoring');
         }
       } else {
         _log('🟢 GPS: first position, initializing');
       }
+
       _lastPosition = position;
+      _lastTimestamp = now;
 
     } catch (e, stack) {
       _log('🔴 GPS: poll error - $e');
@@ -193,43 +183,6 @@ class GpsService {
       await _saveLogToFile();
       _logBuffer = _logBuffer.substring(_logBuffer.length ~/ 2);
     }
-  }
-
-  // ---- Адаптация коэффициента Калмана ----
-  void _adaptKalman(double speed, double accuracy) {
-    double newK;
-    if (accuracy > 30.0) {
-      newK = 0.1;  // очень плохая точность – почти не доверяем
-    } else if (accuracy > 15.0) {
-      newK = 0.2;
-    } else if (speed > 10.0) {
-      newK = 0.8;  // быстрая езда – доверяем данным
-    } else if (speed > 5.0) {
-      newK = 0.6;
-    } else if (speed > 2.0) {
-      newK = 0.4;
-    } else if (speed > 0.5) {
-      newK = 0.25;
-    } else {
-      newK = 0.12; // стоя – сильное сглаживание
-    }
-    // Плавное изменение
-    _k = _k * 0.7 + newK * 0.3;
-    _q = (0.1 + speed * 0.05).clamp(0.05, 0.8);
-    _r = (1.0 + accuracy * 0.3).clamp(1.0, 10.0);
-  }
-
-  // ---- Применение фильтра Калмана ----
-  double _applyKalman(double rawDistance) {
-    // Предсказание: используем предыдущее отфильтрованное значение
-    final predicted = _filteredDistance;
-    // Обновление по Калману
-    final innovation = rawDistance - predicted;
-    _filteredDistance = predicted + _k * innovation;
-    // Возвращаем отфильтрованное значение и сбрасываем для следующего шага
-    final result = _filteredDistance;
-    _filteredDistance = 0.0;
-    return result;
   }
 
   // ---- Остальные методы ----
@@ -250,7 +203,7 @@ class GpsService {
     _pollingTimer?.cancel();
     _pollingTimer = null;
     _lastPosition = null;
-    _filteredDistance = 0.0;
+    _lastTimestamp = null;
     _distanceStreamController.add(0.0);
     if (_isLoggingEnabled) {
       _saveLogToFile();
@@ -270,7 +223,7 @@ class GpsService {
     _log('🔄 GPS: resetDistance()');
     _totalDistance = 0.0;
     _lastPosition = null;
-    _filteredDistance = 0.0;
+    _lastTimestamp = null;
     _distanceStreamController.add(0.0);
   }
 }
