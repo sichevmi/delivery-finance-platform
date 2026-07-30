@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:delivery_app/features/delivery/providers/tab_provider.dart';
 import 'package:delivery_app/features/delivery/providers/pricing_provider.dart';
-import 'package:delivery_app/features/delivery/services/gps_foreground_service.dart';
+import 'package:delivery_app/features/delivery/services/gps_service.dart';
 import 'order_summary_screen.dart';
 import 'package:delivery_app/features/delivery/services/permission_service.dart';
+import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 
 class Delivery {
   final int number;
@@ -55,18 +56,23 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
   final List<String> _segments = ['В магазин', 'Получение', 'К клиенту', 'Выдача'];
   late int _currentSegment;
 
+  // ---- Данные сегмента (время, пробег, паузы) ----
+
   DateTime? _segmentStartTime;
   DateTime? _segmentEndTime;
   Duration _totalPauseDuration = Duration.zero;
   DateTime? _pauseStartTime;
   bool _isPaused = false;
 
+  // GPS
+  late final GpsService _gpsService;
   bool _useGps = true;
   double _distance = 0.0;
   final TextEditingController _distanceController = TextEditingController(text: '');
   StreamSubscription<double>? _gpsSubscription;
   bool _isGpsInitialized = false;
 
+  // ---- Сохранённые данные по сегментам ----
   int _timeToShop = 0;
   double _distanceToShop = 0.0;
   int _timeReceiving = 0;
@@ -74,6 +80,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
   double _distanceToClient = 0.0;
   int _timeDelivery = 0;
 
+  // Общие данные
   late double _coefficient;
   double? _weight;
   double? _baseCost;
@@ -98,38 +105,59 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     _coefficient = widget.coefficient;
     _baseCost = 250.0;
 
+    _gpsService = ref.read(gpsServiceProvider);
     _initGps();
     _startSegment();
   }
+
+  Future<void> _checkPermissionsAndInit() async {
+  final hasPermission = await PermissionService.requestLocationPermission(context);
+  if (hasPermission) {
+    _gpsSubscription = _gpsService.distanceStream.listen((distance) {
+      if (mounted) {
+        setState(() {
+          _distance = distance;
+        });
+      }
+    });
+    _isGpsInitialized = true;
+  } else {
+    setState(() {
+      _useGps = false;
+    });
+  }
+}
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _gpsSubscription?.cancel();
-    GpsForegroundService.stop();
+    _gpsService.stopTracking();
     _distanceController.dispose();
     _weightController.dispose();
     _apartmentController.dispose();
     super.dispose();
   }
 
-  Future<void> _initGps() async {
-    final hasPermission = await PermissionService.requestLocationPermission(context);
-    if (hasPermission) {
-      _gpsSubscription = GpsForegroundService.distanceStream.listen((distance) {
-        if (mounted) {
-          setState(() {
-            _distance = distance;
-          });
-        }
-      });
-      _isGpsInitialized = true;
-    } else {
-      setState(() {
-        _useGps = false;
-      });
-    }
+  // В _initGps используем метод с диалогами
+Future<void> _initGps() async {
+  // В новой версии gps_service нет requestPermissions, используем PermissionService
+  final hasPermission = await PermissionService.requestLocationPermission(context);
+  if (hasPermission) {
+    _gpsSubscription = _gpsService.distanceStream.listen((distance) {
+      if (mounted) {
+        setState(() {
+          _distance = distance;
+        });
+      }
+    });
+    _isGpsInitialized = true;
+  } else {
+    setState(() {
+      _useGps = false;
+    });
   }
+}
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -140,35 +168,32 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
       setState(() {});
       if (_useGps && !_isPaused) {
         print('🔄 Force refreshing GPS on resume');
-        GpsForegroundService.forceRefresh();
+        _gpsService.forceRefresh();
       }
     }
   }
 
   void _startSegment() {
-    print('🔵 _startSegment() called for segment $_currentSegment');
-    _segmentStartTime = DateTime.now();
-    _segmentEndTime = null;
-    _totalPauseDuration = Duration.zero;
-    _isPaused = false;
-    _pauseStartTime = null;
+  print('🔵 _startSegment() called for segment $_currentSegment');
+  _segmentStartTime = DateTime.now();
+  _segmentEndTime = null;
+  _totalPauseDuration = Duration.zero;
+  _isPaused = false;
+  _pauseStartTime = null;
 
-    GpsForegroundService.resetDistance();
-    _distance = 0.0;
-    _distanceController.text = '';
+  _gpsService.resetDistance();
+  _distance = 0.0;
+  _distanceController.text = '';
 
-    if (_useGps && _currentSegment != 1 && _currentSegment != 3) {
-      print('🟢 Starting GPS tracking (foreground) for segment $_currentSegment');
-      GpsForegroundService.start(
-        notificationTitle: 'Отслеживание маршрута',
-        notificationText: 'Сегмент ${_segments[_currentSegment]}',
-      );
-    } else {
-      print('🟡 GPS not started: useGps=$_useGps, segment=$_currentSegment');
-    }
-
-    setState(() {});
+  if (_useGps && _currentSegment != 1 && _currentSegment != 3) {
+    print('🟢 Starting GPS tracking for segment $_currentSegment');
+    _gpsService.startTracking();
+  } else {
+    print('🟡 GPS not started: useGps=$_useGps, segment=$_currentSegment');
   }
+
+  setState(() {});
+}
 
   void _togglePause() {
     setState(() {
@@ -179,13 +204,13 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
         }
         _isPaused = false;
         if (_useGps && _currentSegment != 1 && _currentSegment != 3) {
-          GpsForegroundService.resumeTracking();
+          _gpsService.resumeTracking();
         }
       } else {
         _pauseStartTime = DateTime.now();
         _isPaused = true;
         if (_useGps && _currentSegment != 1 && _currentSegment != 3) {
-          GpsForegroundService.pauseTracking();
+          _gpsService.pauseTracking();
         }
       }
     });
@@ -208,42 +233,43 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
   }
 
   void _finishSegment() {
-    print('🔵 _finishSegment() called for segment $_currentSegment');
-    _segmentEndTime = DateTime.now();
-    if (_isPaused) {
-      if (_pauseStartTime != null) {
-        _totalPauseDuration += DateTime.now().difference(_pauseStartTime!);
-        _pauseStartTime = null;
-      }
-      _isPaused = false;
+  print('🔵 _finishSegment() called for segment $_currentSegment');
+  _segmentEndTime = DateTime.now();
+  if (_isPaused) {
+    if (_pauseStartTime != null) {
+      _totalPauseDuration += DateTime.now().difference(_pauseStartTime!);
+      _pauseStartTime = null;
     }
-    if (_useGps && _currentSegment != 1 && _currentSegment != 3) {
-      print('🛑 Stopping GPS tracking (foreground) for segment $_currentSegment');
-      GpsForegroundService.stop();
-    }
+    _isPaused = false;
   }
+  if (_useGps) {
+    print('🛑 Stopping GPS tracking for segment $_currentSegment');
+    _gpsService.stopTracking();
+  }
+}
 
+  // ---- Сохранение данных текущего сегмента ----
   void _saveCurrentSegmentData() {
-    final time = _getSegmentTime();
-    final distance = _getDistance();
-    print('📊 Saving segment $_currentSegment: time=$time, distance=$distance');
-    switch (_currentSegment) {
-      case 0:
-        _timeToShop = time;
-        _distanceToShop = distance;
-        break;
-      case 1:
-        _timeReceiving = time;
-        break;
-      case 2:
-        _timeToClient = time;
-        _distanceToClient = distance;
-        break;
-      case 3:
-        _timeDelivery = time;
-        break;
-    }
+  final time = _getSegmentTime();
+  final distance = _getDistance();
+  print('📊 Saving segment $_currentSegment: time=$time, distance=$distance');
+  switch (_currentSegment) {
+    case 0:
+      _timeToShop = time;
+      _distanceToShop = distance;
+      break;
+    case 1:
+      _timeReceiving = time;
+      break;
+    case 2:
+      _timeToClient = time;
+      _distanceToClient = distance;
+      break;
+    case 3:
+      _timeDelivery = time;
+      break;
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -455,7 +481,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
             _buildToggleButton('Вручную', !_useGps, () {
               setState(() {
                 _useGps = false;
-                GpsForegroundService.stop();
+                _gpsService.stopTracking();
                 _distance = 0.0;
                 _distanceController.text = '';
               });
@@ -464,11 +490,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
             _buildToggleButton('GPS', _useGps, () {
               setState(() {
                 _useGps = true;
-                // Запускаем сервис заново
-                GpsForegroundService.start(
-                  notificationTitle: 'Отслеживание маршрута',
-                  notificationText: 'Сегмент ${_segments[_currentSegment]}',
-                );
+                _gpsService.startTracking();
                 _distance = 0.0;
                 _distanceController.text = '';
               });
@@ -726,7 +748,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
             _buildToggleButton('Вручную', !_useGps, () {
               setState(() {
                 _useGps = false;
-                GpsForegroundService.stop();
+                _gpsService.stopTracking();
                 _distance = 0.0;
                 _distanceController.text = '';
               });
@@ -735,10 +757,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
             _buildToggleButton('GPS', _useGps, () {
               setState(() {
                 _useGps = true;
-                GpsForegroundService.start(
-                  notificationTitle: 'Отслеживание маршрута',
-                  notificationText: 'Сегмент ${_segments[_currentSegment]}',
-                );
+                _gpsService.startTracking();
                 _distance = 0.0;
                 _distanceController.text = '';
               });
@@ -1155,7 +1174,10 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
   }
 
   void _handleMainAction() {
+    // Сначала завершаем текущий сегмент (устанавливаем _segmentEndTime)
     _finishSegment();
+    
+    // Потом сохраняем данные (используя _getSegmentTime(), который теперь знает время окончания)
     _saveCurrentSegmentData();
 
     switch (_currentSegment) {
@@ -1192,6 +1214,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     final apartment = _apartmentController.text.trim();
     if (apartment.isEmpty) return;
 
+    // Завершаем последний сегмент и сохраняем данные
     _finishSegment();
     _saveCurrentSegmentData();
 

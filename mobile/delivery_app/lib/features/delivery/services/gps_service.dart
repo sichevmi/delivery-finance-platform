@@ -1,4 +1,4 @@
-// gps_service.dart – Финальная стрим-версия (без фильтра скорости, minDistance=0.5м)
+// gps_service.dart – финальная версия (стрим, без фильтра скорости, minDistance=0.5)
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -16,11 +16,11 @@ class GpsService {
   Position? _lastPosition;
   bool _isPaused = false;
 
-  // ---- КОНСТАНТЫ (оптимальные) ----
+  // ---- Константы (оптимальные) ----
   static const double _maxAccuracy = 30.0;   // максимальная точность (м)
-  static const double _minDistance = 0.5;    // минимальное перемещение для учёта (м) – теперь 0.5
+  static const double _minDistance = 0.5;    // минимальное перемещение для учёта (м)
   static const double _maxJump = 100.0;      // защита от выбросов (м)
-  // Фильтр скорости полностью убран – никаких проверок speed
+  // Фильтр скорости полностью убран
 
   // Логирование
   bool _isLoggingEnabled = false;
@@ -136,7 +136,7 @@ class GpsService {
     );
     _log('📏 Raw distance: ${distance.toStringAsFixed(2)}m');
 
-    // Минимальное расстояние (теперь 0.5 м)
+    // Минимальное расстояние (0.5 м)
     if (distance < _minDistance) {
       _log('📏 Too small (< ${_minDistance}m), ignoring');
       return;
