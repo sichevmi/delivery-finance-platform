@@ -1,4 +1,4 @@
-// gps_service.dart – Версия A: Адаптивный Калман (улучшенный)
+// gps_service.dart – Версия B: Интеграция скорости GPS
 // Использует geolocator
 import 'dart:async';
 import 'dart:io';
@@ -7,7 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class GpsService {
-  static const String VERSION = 'ADAPTIVE KALMAN v3.0';
+  static const String VERSION = 'SPEED INTEGRATION v1.0';
 
   bool _isTracking = false;
   bool _isPaused = false;
@@ -16,14 +16,11 @@ class GpsService {
   DateTime? _lastTimestamp;
   double _totalDistance = 0.0;
 
-  double _filteredDistance = 0.0;
-  double _k = 0.268;
-  double _q = 0.1;
-  double _r = 3.0;
-
-  static const double MIN_GAIN = 0.12;
-  static const double MAX_GAIN = 0.8;
-  static const double STATIONARY_SPEED_THRESHOLD = 0.3;
+  // Константы для фильтрации скорости
+  static const double MIN_SPEED = 0.2;        // м/с – игнорируем медленное движение (шум)
+  static const double MAX_SPEED = 40.0;       // м/с – ограничение (144 км/ч)
+  static const double MIN_DISTANCE_INCREMENT = 0.5;  // минимальное приращение для учёта
+  static const double MAX_DISTANCE_INCREMENT = 100.0; // максимальное приращение за один шаг
 
   final List<String> _log = [];
   bool _logEnabled = false;
@@ -45,7 +42,7 @@ class GpsService {
     _isPaused = false;
     _isFirstFix = true;
     _lastPosition = null;
-    _filteredDistance = 0.0;
+    _lastTimestamp = null;
     _log.clear();
     _addLog('🟢 GPS: startTracking() V$VERSION');
   }
@@ -75,8 +72,8 @@ class GpsService {
 
   void resetDistance() {
     _totalDistance = 0.0;
-    _filteredDistance = 0.0;
     _lastPosition = null;
+    _lastTimestamp = null;
     _isFirstFix = true;
     _addLog('🔄 GPS: resetDistance()');
     _distanceController.add(_totalDistance);
@@ -89,70 +86,54 @@ class GpsService {
   void onLocationChanged(Position position) {
     if (!_isTracking || _isPaused) return;
 
+    final speed = position.speed; // в м/с
+    if (speed == null) return;
+
+    final timestamp = DateTime.now();
+
     if (_isFirstFix) {
       _lastPosition = position;
-      _lastTimestamp = DateTime.now();
+      _lastTimestamp = timestamp;
       _isFirstFix = false;
       _addLog('📍 GPS: first position, initializing');
       return;
     }
 
-    final rawDistance = _calculateDistance(_lastPosition!, position);
-    final speed = position.speed;
-    final accuracy = position.accuracy;
+    final dt = timestamp.difference(_lastTimestamp!).inSeconds.toDouble();
+    if (dt <= 0.0) {
+      _lastTimestamp = timestamp;
+      return;
+    }
 
-    if (rawDistance < 0.5) {
+    final effectiveDt = dt.clamp(0.5, 5.0);
+    double effectiveSpeed = speed;
+    if (effectiveSpeed < MIN_SPEED) {
+      effectiveSpeed = 0.0;
+    } else if (effectiveSpeed > MAX_SPEED) {
+      effectiveSpeed = MAX_SPEED;
+    }
+
+    double distance = effectiveSpeed * effectiveDt;
+
+    if (distance < MIN_DISTANCE_INCREMENT) {
+      _lastTimestamp = timestamp;
       _lastPosition = position;
       return;
     }
 
-    _adaptParameters(speed, accuracy);
-
-    final dynamicThreshold = _calculateDynamicThreshold(speed);
-    double clampedRaw = rawDistance;
-    if (rawDistance > dynamicThreshold && speed > 1.0) {
-      clampedRaw = rawDistance.clamp(0.0, dynamicThreshold);
-      _addLog('⚠️ GPS: large jump limited to ${clampedRaw.toStringAsFixed(1)}m');
+    if (distance > MAX_DISTANCE_INCREMENT) {
+      distance = MAX_DISTANCE_INCREMENT;
     }
 
-    _applyKalman(clampedRaw, speed);
+    _totalDistance += distance;
+    _distanceController.add(_totalDistance);
+    _addLog('📏 GPS: accepted ${distance.toStringAsFixed(2)}m, total: ${(_totalDistance/1000).toStringAsFixed(4)} km');
 
+    _lastTimestamp = timestamp;
     _lastPosition = position;
-    _lastTimestamp = DateTime.now();
   }
 
-  void _adaptParameters(double speed, double accuracy) {
-    double newK;
-    if (accuracy > 30.0) newK = 0.1;
-    else if (accuracy > 15.0) newK = 0.2;
-    else if (speed > 10.0) newK = 0.8;
-    else if (speed > 5.0) newK = 0.6;
-    else if (speed > 2.0) newK = 0.4;
-    else if (speed > 0.5) newK = 0.25;
-    else newK = 0.12;
-    _k = _k * 0.7 + newK * 0.3;
-    _q = (0.1 + speed * 0.05).clamp(0.05, 0.8);
-    _r = (1.0 + accuracy * 0.3).clamp(1.0, 10.0);
-  }
-
-  double _calculateDynamicThreshold(double speed) {
-    final expected = speed * 2.0 * 1.5 + 10.0;
-    return expected.clamp(10.0, 80.0);
-  }
-
-  void _applyKalman(double rawDistance, double speed) {
-    final predicted = _filteredDistance;
-    final innovation = rawDistance - predicted;
-    _filteredDistance = predicted + _k * innovation;
-
-    if (_filteredDistance > 0.01) {
-      _totalDistance += _filteredDistance;
-      _distanceController.add(_totalDistance);
-      _addLog('📏 GPS: accepted ${_filteredDistance.toStringAsFixed(2)}m, total: ${(_totalDistance/1000).toStringAsFixed(4)} km');
-    }
-    _filteredDistance = 0.0;
-  }
-
+  // Расчёт расстояния не используется, но оставляем для совместимости
   double _calculateDistance(Position from, Position to) {
     const R = 6371000;
     final dLat = _toRadians(to.latitude - from.latitude);
