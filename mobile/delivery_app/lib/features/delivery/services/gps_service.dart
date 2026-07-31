@@ -17,7 +17,7 @@ class GpsService {
   bool _isPaused = false;
 
   static const double _maxAccuracy = 30.0;
-  static const double _minDistance = 0.5;
+  static const double _minDistance = 0.3;
   static const double _maxJump = 100.0;
 
   // Логирование
