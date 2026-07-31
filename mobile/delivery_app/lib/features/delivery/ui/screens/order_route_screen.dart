@@ -353,7 +353,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
                 fontWeight: FontWeight.w500,
                 color: Colors.white,
               ),
-              softWrap: true,  // разрешаем перенос
+              softWrap: true,
             ),
           ),
         ],
@@ -363,7 +363,6 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
 
   // Блок GPS + пауза (отображается только в сегментах 0 и 2)
   Widget _buildGpsControl() {
-    // Скрываем блок в сегментах 1 и 3
     if (_currentSegment == 1 || _currentSegment == 3) {
       return const SizedBox.shrink();
     }
@@ -532,10 +531,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
             const SizedBox(height: 10),
             _buildGpsControl(),
             const SizedBox(height: 12),
-            // Основной контент сегмента
             _buildSegmentContent(),
-            // Растягиваем пространство, чтобы кнопка была внизу
-            const Spacer(),
             const SizedBox(height: 20),
             _buildActionButtons(),
             const SizedBox(height: 12),
@@ -949,7 +945,6 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
         final weight = double.tryParse(_weightController.text.replaceAll(',', '.')) ?? 0.0;
         if (weight <= 0) return;
         _weight = weight;
-        // Устанавливаем временное сообщение, как при первой доставке
         _clientAddress = 'Адрес клиента будет определён позже';
         setState(() {
           _currentSegment = 2;
@@ -1040,7 +1035,6 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     setState(() {
       _deliveryNumber++;
       _currentSegment = 2;
-      // Исправлено: теперь не мок, а стандартное сообщение
       _clientAddress = 'Адрес клиента будет определён позже';
       _apartmentController.clear();
       _isApartmentValid = false;
