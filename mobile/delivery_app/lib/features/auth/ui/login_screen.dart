@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:delivery_app/core/widgets/gradient_button.dart';
 import 'package:delivery_app/features/auth/providers/auth_provider.dart';
-import 'package:delivery_app/features/delivery/ui/home_screen.dart'; // ← правильный импорт
+import 'package:delivery_app/features/delivery/ui/screens/home_screen.dart'; // ← правильный импорт
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:delivery_app/core/theme/app_theme.dart';
 import 'package:delivery_app/features/auth/ui/login_screen.dart';
-import 'package:delivery_app/features/delivery/ui/home_screen.dart';
+import 'package:delivery_app/features/delivery/ui/screens/home_screen.dart';
 
 void main() {
   runApp(const ProviderScope(child: DeliveryApp()));
