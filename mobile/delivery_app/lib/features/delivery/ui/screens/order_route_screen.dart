@@ -58,8 +58,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
   final List<String> _segments = ['В магазин', 'Получение', 'К клиенту', 'Выдача'];
   late int _currentSegment;
 
-  // ---- Данные сегмента (время, пробег, паузы) ----
-
+  // ---- Данные сегмента ----
   DateTime? _segmentStartTime;
   DateTime? _segmentEndTime;
   Duration _totalPauseDuration = Duration.zero;
@@ -92,6 +91,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
 
   final TextEditingController _apartmentController = TextEditingController();
   bool _isApartmentValid = false;
+  bool _isPrivateHouse = false; // чекбокс "частный дом"
 
   int _deliveryNumber = 1;
   final List<Delivery> _completedDeliveries = [];
@@ -112,24 +112,6 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     _startSegment();
   }
 
-  Future<void> _checkPermissionsAndInit() async {
-  final hasPermission = await PermissionService.requestLocationPermission(context);
-  if (hasPermission) {
-    _gpsSubscription = _gpsService.distanceStream.listen((distance) {
-      if (mounted) {
-        setState(() {
-          _distance = distance;
-        });
-      }
-    });
-    _isGpsInitialized = true;
-  } else {
-    setState(() {
-      _useGps = false;
-    });
-  }
-}
-
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -141,26 +123,24 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     super.dispose();
   }
 
-  // В _initGps используем метод с диалогами
-Future<void> _initGps() async {
-  final hasPermission = await PermissionService.requestLocationPermission(context);
-  if (hasPermission) {
-    // Включаем логирование (теперь все логи GPS и геокодера будут в одном файле)
-    await _gpsService.startLogging();
-    _gpsSubscription = _gpsService.distanceStream.listen((distance) {
-      if (mounted) {
-        setState(() {
-          _distance = distance;
-        });
-      }
-    });
-    _isGpsInitialized = true;
-  } else {
-    setState(() {
-      _useGps = false;
-    });
+  Future<void> _initGps() async {
+    final hasPermission = await PermissionService.requestLocationPermission(context);
+    if (hasPermission) {
+      await _gpsService.startLogging();
+      _gpsSubscription = _gpsService.distanceStream.listen((distance) {
+        if (mounted) {
+          setState(() {
+            _distance = distance;
+          });
+        }
+      });
+      _isGpsInitialized = true;
+    } else {
+      setState(() {
+        _useGps = false;
+      });
+    }
   }
-}
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -177,26 +157,26 @@ Future<void> _initGps() async {
   }
 
   void _startSegment() {
-  print('🔵 _startSegment() called for segment $_currentSegment');
-  _segmentStartTime = DateTime.now();
-  _segmentEndTime = null;
-  _totalPauseDuration = Duration.zero;
-  _isPaused = false;
-  _pauseStartTime = null;
+    print('🔵 _startSegment() called for segment $_currentSegment');
+    _segmentStartTime = DateTime.now();
+    _segmentEndTime = null;
+    _totalPauseDuration = Duration.zero;
+    _isPaused = false;
+    _pauseStartTime = null;
 
-  _gpsService.resetDistance();
-  _distance = 0.0;
-  _distanceController.text = '';
+    _gpsService.resetDistance();
+    _distance = 0.0;
+    _distanceController.text = '';
 
-  if (_useGps && _currentSegment != 1 && _currentSegment != 3) {
-    print('🟢 Starting GPS tracking for segment $_currentSegment');
-    _gpsService.startTracking();
-  } else {
-    print('🟡 GPS not started: useGps=$_useGps, segment=$_currentSegment');
+    if (_useGps && _currentSegment != 1 && _currentSegment != 3) {
+      print('🟢 Starting GPS tracking for segment $_currentSegment');
+      _gpsService.startTracking();
+    } else {
+      print('🟡 GPS not started: useGps=$_useGps, segment=$_currentSegment');
+    }
+
+    setState(() {});
   }
-
-  setState(() {});
-}
 
   void _togglePause() {
     setState(() {
@@ -236,55 +216,267 @@ Future<void> _initGps() async {
   }
 
   void _finishSegment() {
-  print('🔵 _finishSegment() called for segment $_currentSegment');
-  _segmentEndTime = DateTime.now();
-  if (_isPaused) {
-    if (_pauseStartTime != null) {
-      _totalPauseDuration += DateTime.now().difference(_pauseStartTime!);
-      _pauseStartTime = null;
+    print('🔵 _finishSegment() called for segment $_currentSegment');
+    _segmentEndTime = DateTime.now();
+    if (_isPaused) {
+      if (_pauseStartTime != null) {
+        _totalPauseDuration += DateTime.now().difference(_pauseStartTime!);
+        _pauseStartTime = null;
+      }
+      _isPaused = false;
     }
-    _isPaused = false;
+    if (_useGps) {
+      print('🛑 Stopping GPS tracking for segment $_currentSegment');
+      _gpsService.stopTracking();
+    }
   }
-  if (_useGps) {
-    print('🛑 Stopping GPS tracking for segment $_currentSegment');
-    _gpsService.stopTracking();
-  }
-}
 
-  // ---- Сохранение данных текущего сегмента ----
   void _saveCurrentSegmentData() {
-  final time = _getSegmentTime();
-  final distance = _getDistance();
-  print('📊 Saving segment $_currentSegment: time=$time, distance=$distance');
-  switch (_currentSegment) {
-    case 0:
-      _timeToShop = time;
-      _distanceToShop = distance;
-      break;
-    case 1:
-      _timeReceiving = time;
-      break;
-    case 2:
-      _timeToClient = time;
-      _distanceToClient = distance;
-      break;
-    case 3:
-      _timeDelivery = time;
-      break;
+    final time = _getSegmentTime();
+    final distance = _getDistance();
+    print('📊 Saving segment $_currentSegment: time=$time, distance=$distance');
+    switch (_currentSegment) {
+      case 0:
+        _timeToShop = time;
+        _distanceToShop = distance;
+        break;
+      case 1:
+        _timeReceiving = time;
+        break;
+      case 2:
+        _timeToClient = time;
+        _distanceToClient = distance;
+        break;
+      case 3:
+        _timeDelivery = time;
+        break;
+    }
   }
-}
 
   // ---- Получение текущих координат (для геокодера) ----
   Future<Position?> _getCurrentPosition() async {
-  try {
-    return await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.bestForNavigation,
-    );
-  } catch (e) {
-    _gpsService.addLog('❌ Ошибка получения позиции: $e');
-    return null;
+    try {
+      return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.bestForNavigation,
+      );
+    } catch (e) {
+      _gpsService.addLog('❌ Ошибка получения позиции: $e');
+      return null;
+    }
   }
-}
+
+  // ===================== НОВЫЕ ВИДЖЕТЫ =====================
+
+  // Карточка заказа
+  Widget _buildOrderCard() {
+    final deliveryLabel = _deliveryNumber > 1 ? 'Доставка #$_deliveryNumber' : 'Заказ';
+    final pricing = ref.watch(pricingProvider);
+
+    double cost = 0;
+    // Стоимость рассчитывается только если известен вес и мы в сегментах 2 или 3
+    if (_currentSegment >= 2 && _weight != null) {
+      cost = (pricing.receivingFee + (_weight! * pricing.pricePerKg)) * _coefficient;
+      if (_currentSegment == 3) {
+        cost += (pricing.deliveryFee + (_getDistance() * pricing.pricePerKm)) * _coefficient;
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF6C63FF), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                deliveryLabel,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              // Коэффициент
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6C63FF).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'К: ${_coefficient.toString()}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF6C63FF),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          if (_shopAddress != null)
+            _buildInfoLine(Icons.storefront, 'Магазин', _shopAddress!),
+          if (_clientAddress != null && _currentSegment >= 2)
+            _buildInfoLine(Icons.location_on, 'Клиент', _clientAddress!),
+          if (_weight != null)
+            _buildInfoLine(Icons.fitness_center, 'Вес', '${_weight!.toStringAsFixed(1)} кг'),
+          if (cost > 0)
+            _buildInfoLine(Icons.attach_money, 'Стоимость', '${cost.toStringAsFixed(0)} руб.'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoLine(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: const Color(0xFF6C63FF)),
+          const SizedBox(width: 6),
+          Text(
+            '$label: ',
+            style: const TextStyle(
+              fontSize: 12,
+              color: Color(0xFF888888),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Colors.white,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Блок управления GPS + пауза
+  Widget _buildGpsControl() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF2C2C2C), width: 1),
+      ),
+      child: Row(
+        children: [
+          _buildToggleButton('GPS', _useGps, () {
+            setState(() {
+              _useGps = true;
+              if (_currentSegment != 1 && _currentSegment != 3) {
+                _gpsService.startTracking();
+              }
+              _distance = 0.0;
+              _distanceController.text = '';
+            });
+          }),
+          const SizedBox(width: 6),
+          _buildToggleButton('Вручную', !_useGps, () {
+            setState(() {
+              _useGps = false;
+              _gpsService.stopTracking();
+              _distance = 0.0;
+              _distanceController.text = '';
+            });
+          }),
+          const Spacer(),
+          // Расстояние
+          if (_useGps)
+            Row(
+              children: [
+                const Icon(Icons.straighten, size: 16, color: Color(0xFF6C63FF)),
+                const SizedBox(width: 4),
+                Text(
+                  '${_distance.toStringAsFixed(2)} км',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            )
+          else
+            SizedBox(
+              width: 60,
+              child: TextField(
+                controller: _distanceController,
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  isDense: true,
+                  hintText: '0.0',
+                  hintStyle: TextStyle(color: Color(0xFF666666)),
+                ),
+                onChanged: (value) {
+                  final parsed = double.tryParse(value.replaceAll(',', '.'));
+                  if (parsed != null && parsed >= 0) {
+                    setState(() {
+                      _distance = parsed;
+                    });
+                  }
+                },
+              ),
+            ),
+          const SizedBox(width: 8),
+          // Кнопка паузы
+          GestureDetector(
+            onTap: _togglePause,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: _isPaused ? Colors.green.withOpacity(0.15) : Colors.orange.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: _isPaused ? Colors.green.withOpacity(0.3) : Colors.orange.withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _isPaused ? Icons.play_arrow : Icons.pause,
+                    size: 14,
+                    color: _isPaused ? Colors.green : Colors.orange,
+                  ),
+                  const SizedBox(width: 2),
+                  Text(
+                    _isPaused ? 'Старт' : 'Пауза',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: _isPaused ? Colors.green : Colors.orange,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===== ОСНОВНОЙ BUILD =====
 
   @override
   Widget build(BuildContext context) {
@@ -336,8 +528,10 @@ Future<void> _initGps() async {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildSegmentProgress(),
-            const SizedBox(height: 20),
-            _buildCoefficientDisplay(),
+            const SizedBox(height: 12),
+            _buildOrderCard(),
+            const SizedBox(height: 10),
+            _buildGpsControl(),
             const SizedBox(height: 12),
             _buildSegmentContent(),
             const SizedBox(height: 20),
@@ -348,6 +542,8 @@ Future<void> _initGps() async {
       ),
     );
   }
+
+  // ===== ВСПОМОГАТЕЛЬНЫЕ ВИДЖЕТЫ =====
 
   Widget _buildSegmentProgress() {
     return Row(
@@ -420,47 +616,6 @@ Future<void> _initGps() async {
     );
   }
 
-  Widget _buildCoefficientDisplay() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: const Color(0xFF2C2C2C),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Text(
-            'Коэффициент нагрузки',
-            style: TextStyle(
-              fontSize: 13,
-              color: Color(0xFF888888),
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-            decoration: BoxDecoration(
-              color: const Color(0xFF6C63FF).withOpacity(0.15),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              _coefficient.toString(),
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF6C63FF),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSegmentContent() {
     switch (_currentSegment) {
       case 0:
@@ -476,148 +631,24 @@ Future<void> _initGps() async {
     }
   }
 
-  // ---- Сегмент 1: В магазин ----
-
+  // ---- Сегмент 0: В магазин (только заголовок) ----
   Widget _buildShopSegment() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Бесплатный пробег',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            _buildToggleButton('Вручную', !_useGps, () {
-              setState(() {
-                _useGps = false;
-                _gpsService.stopTracking();
-                _distance = 0.0;
-                _distanceController.text = '';
-              });
-            }),
-            const SizedBox(width: 8),
-            _buildToggleButton('GPS', _useGps, () {
-              setState(() {
-                _useGps = true;
-                _gpsService.startTracking();
-                _distance = 0.0;
-                _distanceController.text = '';
-              });
-            }),
-            const Spacer(),
-            _buildPauseButton(),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              flex: 2,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Пробег',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF888888),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  if (_useGps)
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.gps_fixed,
-                          size: 18,
-                          color: Color(0xFF6C63FF),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${_distance.toStringAsFixed(2)} км',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    )
-                  else
-                    Row(
-                      children: [
-                        SizedBox(
-                          width: 80,
-                          child: TextField(
-                            controller: _distanceController,
-                            keyboardType: TextInputType.numberWithOptions(decimal: true),
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              isDense: true,
-                              hintText: '0.0',
-                              hintStyle: TextStyle(
-                                color: Color(0xFF666666),
-                              ),
-                            ),
-                            onChanged: (value) {
-                              final parsed = double.tryParse(value.replaceAll(',', '.'));
-                              if (parsed != null && parsed >= 0) {
-                                setState(() {
-                                  _distance = parsed;
-                                });
-                              }
-                            },
-                            onTap: () {
-                              _distanceController.selection = TextSelection(
-                                baseOffset: 0,
-                                extentOffset: _distanceController.text.length,
-                              );
-                            },
-                          ),
-                        ),
-                        const Text(
-                          ' км',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ],
+    return const Text(
+      'Пробег до магазина (бесплатный)',
+      style: TextStyle(fontSize: 14, color: Colors.white),
     );
   }
 
-  // ---- Сегмент 2: Получение ----
-
+  // ---- Сегмент 1: Получение (только вес) ----
   Widget _buildReceivingSegment() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (_shopAddress != null)
-          _buildInfoRow(
-            icon: Icons.location_on,
-            label: 'Магазин',
-            value: _shopAddress!,
-          ),
-        const SizedBox(height: 12),
+        const Text(
+          'Введите вес бандероли',
+          style: TextStyle(fontSize: 14, color: Colors.white),
+        ),
+        const SizedBox(height: 8),
         Row(
           children: [
             Expanded(
@@ -627,19 +658,13 @@ Future<void> _initGps() async {
                   color: const Color(0xFF1E1E1E),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: _isWeightValid
-                        ? const Color(0xFF6C63FF)
-                        : const Color(0xFF2C2C2C),
+                    color: _isWeightValid ? const Color(0xFF6C63FF) : const Color(0xFF2C2C2C),
                     width: 1,
                   ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(
-                      Icons.fitness_center,
-                      size: 18,
-                      color: Color(0xFF6C63FF),
-                    ),
+                    const Icon(Icons.fitness_center, size: 18, color: Color(0xFF6C63FF)),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
@@ -647,10 +672,7 @@ Future<void> _initGps() async {
                         children: [
                           const Text(
                             'Вес',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF888888),
-                            ),
+                            style: TextStyle(fontSize: 11, color: Color(0xFF888888)),
                           ),
                           TextField(
                             controller: _weightController,
@@ -664,9 +686,7 @@ Future<void> _initGps() async {
                               border: InputBorder.none,
                               isDense: true,
                               hintText: '0.0',
-                              hintStyle: TextStyle(
-                                color: Color(0xFF666666),
-                              ),
+                              hintStyle: TextStyle(color: Color(0xFF666666)),
                             ),
                             onChanged: (value) {
                               final parsed = double.tryParse(value.replaceAll(',', '.'));
@@ -679,237 +699,40 @@ Future<void> _initGps() async {
                                 }
                               });
                             },
-                            onTap: () {
-                              _weightController.selection = TextSelection(
-                                baseOffset: 0,
-                                extentOffset: _weightController.text.length,
-                              );
-                            },
                           ),
                         ],
                       ),
                     ),
                     if (_isWeightValid)
-                      const Icon(
-                        Icons.check_circle,
-                        size: 16,
-                        color: Colors.green,
-                      ),
+                      const Icon(Icons.check_circle, size: 16, color: Colors.green),
                   ],
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            _buildPauseButton(),
           ],
         ),
       ],
     );
   }
 
-  // ---- Сегмент 3: К клиенту ----
-
+  // ---- Сегмент 2: К клиенту (заголовок) ----
   Widget _buildClientSegment() {
-    final deliveryLabel = _deliveryNumber > 1 ? ' (Доставка #$_deliveryNumber)' : '';
-
-    final pricing = ref.watch(pricingProvider);
-    double currentCost = pricing.receivingFee * _coefficient;
-    if (_weight != null && _weight! > 0) {
-      currentCost += _weight! * pricing.pricePerKg * _coefficient;
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (_shopAddress != null)
-          _buildInfoRow(
-            icon: Icons.storefront,
-            label: 'Магазин',
-            value: _shopAddress!,
-          ),
-        const SizedBox(height: 12),
-        _buildInfoRow(
-          icon: Icons.fitness_center,
-          label: 'Вес',
-          value: '${_weight?.toStringAsFixed(1) ?? '0.0'} кг',
-        ),
-        const SizedBox(height: 8),
-        _buildInfoRow(
-          icon: Icons.attach_money,
-          label: 'Стоимость (получение + вес)',
-          value: '${currentCost.toStringAsFixed(0)} руб.',
-          valueColor: const Color(0xFF6C63FF),
-        ),
-        const SizedBox(height: 16),
-        const Divider(color: Color(0xFF2C2C2C)),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Text(
-              'Платный пробег$deliveryLabel',
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-            const Spacer(),
-            _buildPauseButton(),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            _buildToggleButton('Вручную', !_useGps, () {
-              setState(() {
-                _useGps = false;
-                _gpsService.stopTracking();
-                _distance = 0.0;
-                _distanceController.text = '';
-              });
-            }),
-            const SizedBox(width: 8),
-            _buildToggleButton('GPS', _useGps, () {
-              setState(() {
-                _useGps = true;
-                _gpsService.startTracking();
-                _distance = 0.0;
-                _distanceController.text = '';
-              });
-            }),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              flex: 2,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Пробег',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF888888),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  if (_useGps)
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.gps_fixed,
-                          size: 18,
-                          color: Color(0xFF6C63FF),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${_distance.toStringAsFixed(2)} км',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    )
-                  else
-                    Row(
-                      children: [
-                        SizedBox(
-                          width: 80,
-                          child: TextField(
-                            controller: _distanceController,
-                            keyboardType: TextInputType.numberWithOptions(decimal: true),
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              isDense: true,
-                              hintText: '0.0',
-                              hintStyle: TextStyle(
-                                color: Color(0xFF666666),
-                              ),
-                            ),
-                            onChanged: (value) {
-                              final parsed = double.tryParse(value.replaceAll(',', '.'));
-                              if (parsed != null && parsed >= 0) {
-                                setState(() {
-                                  _distance = parsed;
-                                });
-                              }
-                            },
-                            onTap: () {
-                              _distanceController.selection = TextSelection(
-                                baseOffset: 0,
-                                extentOffset: _distanceController.text.length,
-                              );
-                            },
-                          ),
-                        ),
-                        const Text(
-                          ' км',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ],
+    return const Text(
+      'Пробег до клиента (платный)',
+      style: TextStyle(fontSize: 14, color: Colors.white),
     );
   }
 
-  // ---- Сегмент 4: Выдача ----
-
+  // ---- Сегмент 3: Выдача (квартира с чекбоксом) ----
   Widget _buildDeliverySegment() {
-    final deliveryLabel = _deliveryNumber > 1 ? ' (Доставка #$_deliveryNumber)' : '';
-
-    final pricing = ref.watch(pricingProvider);
-    double currentCost = (pricing.deliveryFee + (_getDistance() * pricing.pricePerKm)) * _coefficient;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (_shopAddress != null)
-          _buildInfoRow(
-            icon: Icons.storefront,
-            label: 'Магазин',
-            value: _shopAddress!,
-          ),
-        const SizedBox(height: 8),
-        if (_clientAddress != null)
-          _buildInfoRow(
-            icon: Icons.location_on,
-            label: 'Адрес клиента$deliveryLabel',
-            value: _clientAddress!,
-          ),
-        const SizedBox(height: 12),
-        _buildInfoRow(
-          icon: Icons.fitness_center,
-          label: 'Вес',
-          value: '${_weight?.toStringAsFixed(1) ?? '0.0'} кг',
+        const Text(
+          'Введите номер квартиры',
+          style: TextStyle(fontSize: 14, color: Colors.white),
         ),
         const SizedBox(height: 8),
-        _buildInfoRow(
-          icon: Icons.attach_money,
-          label: 'Стоимость (выдача + пробег)',
-          value: '${currentCost.toStringAsFixed(0)} руб.',
-          valueColor: const Color(0xFF6C63FF),
-        ),
-        const SizedBox(height: 16),
-        const Divider(color: Color(0xFF2C2C2C)),
-        const SizedBox(height: 12),
         Row(
           children: [
             Expanded(
@@ -919,7 +742,7 @@ Future<void> _initGps() async {
                   color: const Color(0xFF1E1E1E),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: _isApartmentValid
+                    color: _isApartmentValid || _isPrivateHouse
                         ? const Color(0xFF6C63FF)
                         : const Color(0xFF2C2C2C),
                     width: 1,
@@ -927,11 +750,7 @@ Future<void> _initGps() async {
                 ),
                 child: Row(
                   children: [
-                    const Icon(
-                      Icons.home,
-                      size: 18,
-                      color: Color(0xFF6C63FF),
-                    ),
+                    const Icon(Icons.home, size: 18, color: Color(0xFF6C63FF)),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
@@ -939,25 +758,23 @@ Future<void> _initGps() async {
                         children: [
                           const Text(
                             'Квартира',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF888888),
-                            ),
+                            style: TextStyle(fontSize: 11, color: Color(0xFF888888)),
                           ),
                           TextField(
                             controller: _apartmentController,
+                            enabled: !_isPrivateHouse,
                             keyboardType: TextInputType.number,
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
                             ),
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               border: InputBorder.none,
                               isDense: true,
-                              hintText: 'Введите номер квартиры',
+                              hintText: _isPrivateHouse ? 'Частный дом' : 'Введите номер',
                               hintStyle: TextStyle(
-                                color: Color(0xFF666666),
+                                color: _isPrivateHouse ? Color(0xFF888888) : Color(0xFF666666),
                                 fontSize: 14,
                               ),
                             ),
@@ -966,28 +783,41 @@ Future<void> _initGps() async {
                                 _isApartmentValid = value.trim().isNotEmpty;
                               });
                             },
-                            onTap: () {
-                              _apartmentController.selection = TextSelection(
-                                baseOffset: 0,
-                                extentOffset: _apartmentController.text.length,
-                              );
-                            },
                           ),
                         ],
                       ),
                     ),
-                    if (_isApartmentValid)
-                      const Icon(
-                        Icons.check_circle,
-                        size: 16,
-                        color: Colors.green,
-                      ),
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: _isPrivateHouse,
+                          onChanged: (val) {
+                            setState(() {
+                              _isPrivateHouse = val ?? false;
+                              if (_isPrivateHouse) {
+                                _apartmentController.text = '1';
+                                _isApartmentValid = true;
+                              } else {
+                                _apartmentController.clear();
+                                _isApartmentValid = false;
+                              }
+                            });
+                          },
+                          activeColor: const Color(0xFF6C63FF),
+                          side: BorderSide(
+                            color: _isPrivateHouse ? const Color(0xFF6C63FF) : const Color(0xFF666666),
+                          ),
+                        ),
+                        const Text(
+                          'Частный дом',
+                          style: TextStyle(fontSize: 12, color: Color(0xFF888888)),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            _buildPauseButton(),
           ],
         ),
         const SizedBox(height: 8),
@@ -1003,10 +833,7 @@ Future<void> _initGps() async {
           icon: const Icon(Icons.assignment_return, size: 16, color: Colors.orange),
           label: const Text(
             'Возврат товара в магазин',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.orange,
-            ),
+            style: TextStyle(fontSize: 12, color: Colors.orange),
           ),
           style: TextButton.styleFrom(
             alignment: Alignment.centerLeft,
@@ -1016,59 +843,7 @@ Future<void> _initGps() async {
     );
   }
 
-  // ---- Вспомогательные виджеты ----
-
-  Widget _buildInfoRow({
-    required IconData icon,
-    required String label,
-    required String value,
-    Color valueColor = Colors.white,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: const Color(0xFF2C2C2C),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            size: 18,
-            color: const Color(0xFF6C63FF),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF888888),
-                  ),
-                ),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: valueColor,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
+  // ---- Кнопка переключения (используется и в GPS, и для вкладок) ----
   Widget _buildToggleButton(String label, bool isSelected, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
@@ -1094,46 +869,7 @@ Future<void> _initGps() async {
     );
   }
 
-  Widget _buildPauseButton() {
-    return GestureDetector(
-      onTap: _togglePause,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: _isPaused
-              ? Colors.green.withOpacity(0.15)
-              : Colors.orange.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: _isPaused
-                ? Colors.green.withOpacity(0.3)
-                : Colors.orange.withOpacity(0.3),
-            width: 1.5,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              _isPaused ? Icons.play_arrow : Icons.pause,
-              size: 16,
-              color: _isPaused ? Colors.green : Colors.orange,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              _isPaused ? 'Старт' : 'Пауза',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: _isPaused ? Colors.green : Colors.orange,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
+  // ---- Кнопка действия ----
   Widget _buildActionButtons() {
     String mainButtonText = 'Далее';
     bool isMainEnabled = true;
@@ -1155,7 +891,7 @@ Future<void> _initGps() async {
         break;
       case 3:
         mainButtonText = 'Завершить доставку$deliveryLabel';
-        isMainEnabled = _isApartmentValid;
+        isMainEnabled = _isPrivateHouse || _isApartmentValid; // изменено
         break;
       default:
         mainButtonText = 'Далее';
@@ -1167,14 +903,10 @@ Future<void> _initGps() async {
       child: ElevatedButton(
         onPressed: isMainEnabled ? _handleMainAction : null,
         style: ElevatedButton.styleFrom(
-          backgroundColor: isMainEnabled
-              ? const Color(0xFF6C63FF)
-              : const Color(0xFF2C2C2C),
+          backgroundColor: isMainEnabled ? const Color(0xFF6C63FF) : const Color(0xFF2C2C2C),
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
         child: Text(
           mainButtonText,
@@ -1188,79 +920,80 @@ Future<void> _initGps() async {
     );
   }
 
+  // ---- Обработчики действий ----
   void _handleMainAction() async {
-  _finishSegment();
-  _saveCurrentSegmentData();
+    _finishSegment();
+    _saveCurrentSegmentData();
 
-  switch (_currentSegment) {
-    case 0:
-      _gpsService.addLog('🔍 Получение адреса магазина...');
-      final currentPos = await _getCurrentPosition();
-      if (currentPos != null) {
-        final address = await GeocoderService.reverseGeocode(
-          currentPos.latitude,
-          currentPos.longitude,
-          onLog: _gpsService.addLog, // передаём колбэк
-        );
+    switch (_currentSegment) {
+      case 0:
+        _gpsService.addLog('🔍 Получение адреса магазина...');
+        final currentPos = await _getCurrentPosition();
+        if (currentPos != null) {
+          final address = await GeocoderService.reverseGeocode(
+            currentPos.latitude,
+            currentPos.longitude,
+            onLog: _gpsService.addLog,
+          );
+          setState(() {
+            _shopAddress = address ?? 'Адрес не определён';
+          });
+        } else {
+          setState(() {
+            _shopAddress = 'Адрес не определён (нет GPS)';
+          });
+        }
         setState(() {
-          _shopAddress = address ?? 'Адрес не определён';
+          _currentSegment = 1;
         });
-      } else {
-        setState(() {
-          _shopAddress = 'Адрес не определён (нет GPS)';
-        });
-      }
-      setState(() {
-        _currentSegment = 1;
-      });
-      _startSegment();
-      break;
+        _startSegment();
+        break;
 
-    case 1:
-      final weight = double.tryParse(_weightController.text.replaceAll(',', '.')) ?? 0.0;
-      if (weight <= 0) return;
-      _weight = weight;
-      _clientAddress = 'Адрес клиента будет определён позже';
-      setState(() {
-        _currentSegment = 2;
-      });
-      _startSegment();
-      break;
-
-    case 2:
-      _gpsService.addLog('🔍 Получение адреса клиента...');
-      final currentPos = await _getCurrentPosition();
-      if (currentPos != null) {
-        final address = await GeocoderService.reverseGeocode(
-          currentPos.latitude,
-          currentPos.longitude,
-          onLog: _gpsService.addLog,
-        );
+      case 1:
+        final weight = double.tryParse(_weightController.text.replaceAll(',', '.')) ?? 0.0;
+        if (weight <= 0) return;
+        _weight = weight;
+        _clientAddress = 'Адрес клиента будет определён позже';
         setState(() {
-          _clientAddress = address ?? 'Адрес не определён';
+          _currentSegment = 2;
         });
-      } else {
-        setState(() {
-          _clientAddress = 'Адрес не определён (нет GPS)';
-        });
-      }
-      setState(() {
-        _currentSegment = 3;
-      });
-      _startSegment();
-      break;
+        _startSegment();
+        break;
 
-    case 3:
-      _completeDelivery();
-      break;
+      case 2:
+        _gpsService.addLog('🔍 Получение адреса клиента...');
+        final currentPos = await _getCurrentPosition();
+        if (currentPos != null) {
+          final address = await GeocoderService.reverseGeocode(
+            currentPos.latitude,
+            currentPos.longitude,
+            onLog: _gpsService.addLog,
+          );
+          setState(() {
+            _clientAddress = address ?? 'Адрес не определён';
+          });
+        } else {
+          setState(() {
+            _clientAddress = 'Адрес не определён (нет GPS)';
+          });
+        }
+        setState(() {
+          _currentSegment = 3;
+        });
+        _startSegment();
+        break;
+
+      case 3:
+        _completeDelivery();
+        break;
+    }
   }
-}
 
   void _completeDelivery() async {
-    final apartment = _apartmentController.text.trim();
-    if (apartment.isEmpty) return;
+    String apartment = _apartmentController.text.trim();
+    if (!_isPrivateHouse && apartment.isEmpty) return;
+    if (_isPrivateHouse) apartment = 'частный дом (1)';
 
-    // Завершаем последний сегмент и сохраняем данные
     _finishSegment();
     _saveCurrentSegmentData();
 
@@ -1313,6 +1046,7 @@ Future<void> _initGps() async {
       _clientAddress = 'ул. Новая, ${_deliveryNumber * 5}, г. Москва';
       _apartmentController.clear();
       _isApartmentValid = false;
+      _isPrivateHouse = false;
     });
     _startSegment();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1325,39 +1059,30 @@ Future<void> _initGps() async {
 
   int _calculateTotalTime() {
     if (_completedDeliveries.isEmpty) return 0;
-
     final first = _completedDeliveries.first;
     int total = first.timeToShop + first.timeReceiving;
-
     for (final d in _completedDeliveries) {
       total += d.timeToClient + d.timeDelivery;
     }
-
     return total;
   }
 
   double _calculateTotalDistance() {
     if (_completedDeliveries.isEmpty) return 0.0;
-
     double total = _completedDeliveries.first.distanceToShop;
-
     for (final d in _completedDeliveries) {
       total += d.distanceToClient;
     }
-
     return total;
   }
 
   double _calculateTotalCost(PricingConfig pricing) {
     if (_completedDeliveries.isEmpty) return 0.0;
-
     final first = _completedDeliveries.first;
     double total = (pricing.receivingFee + (first.weight * pricing.pricePerKg)) * _coefficient;
-
     for (final d in _completedDeliveries) {
       total += (pricing.deliveryFee + (d.distanceToClient * pricing.pricePerKm)) * _coefficient;
     }
-
     return total;
   }
 
@@ -1371,10 +1096,7 @@ Future<void> _initGps() async {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text(
-          'Отменить заказ?',
-          style: TextStyle(color: Colors.white),
-        ),
+        title: const Text('Отменить заказ?', style: TextStyle(color: Colors.white)),
         content: const Text(
           'Вы уверены, что хотите отменить заказ? Все данные будут потеряны.',
           style: TextStyle(color: Color(0xFF888888)),
