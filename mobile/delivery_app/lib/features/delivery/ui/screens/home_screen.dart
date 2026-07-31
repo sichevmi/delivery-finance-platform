@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:delivery_app/features/auth/providers/auth_provider.dart';
-import 'package:delivery_app/features/delivery/providers/shift_provider.dart';
-import 'package:delivery_app/features/delivery/providers/tab_provider.dart';
-import 'package:delivery_app/features/delivery/ui/widgets/metrics_grid.dart';
-import 'package:delivery_app/features/delivery/ui/widgets/start_shift_button.dart';
-import 'package:delivery_app/features/delivery/ui/tabs/orders_tab.dart';
-import 'package:delivery_app/features/delivery/ui/tabs/analytics_tab.dart';
-import 'package:delivery_app/features/delivery/ui/tabs/directories_tab.dart';
-import 'package:delivery_app/features/delivery/ui/tabs/more_tab.dart';
+import 'package:delivery_app/lib/features/auth/providers/auth_provider.dart';
+import 'package:delivery_app/lib/features/delivery/providers/shift_provider.dart';
+import 'package:delivery_app/lib/features/delivery/providers/tab_provider.dart';
+import 'package:delivery_app/lib/features/delivery/ui/widgets/metrics_grid.dart';
+import 'package:delivery_app/lib/features/delivery/ui/widgets/start_shift_button.dart';
+import 'package:delivery_app/lib/features/delivery/ui/tabs/orders_tab.dart';
+import 'package:delivery_app/lib/features/delivery/ui/tabs/analytics_tab.dart';
+import 'package:delivery_app/lib/features/delivery/ui/tabs/directories_tab.dart';
+import 'package:delivery_app/lib/features/delivery/ui/tabs/more_tab.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
