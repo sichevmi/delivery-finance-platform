@@ -1,4 +1,4 @@
-// gps_service.dart – финальная версия с публичным логированием
+// gps_service.dart – финальная версия с настраиваемыми параметрами
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -10,54 +10,54 @@ class GpsService {
   factory GpsService() => _instance;
   GpsService._internal();
 
+  // ---- НАСТРАИВАЕМЫЕ ПАРАМЕТРЫ (меняйте здесь) ----
+  static const double _minDistance = 0.15;      // минимальное перемещение для учёта (м) – 0.2 или 0.1
+  static const double _maxAccuracy = 50.0;     // максимальная точность (м) – 50 вместо 30
+  static const double _maxJump = 100.0;        // защита от выбросов (м)
+  // Фильтр скорости полностью убран (не проверяем speed)
+
+  // ---- Логирование ----
+  bool _isLoggingEnabled = false;
+  String _logBuffer = '';
+  final int _maxLogSize = 500 * 1024;
+  File? _logFile;
+
+  // ---- Внутреннее состояние ----
   StreamSubscription<Position>? _positionSubscription;
   bool _isTracking = false;
   double _totalDistance = 0.0;
   Position? _lastPosition;
   bool _isPaused = false;
 
-  static const double _maxAccuracy = 30.0;
-  static const double _minDistance = 0.3;
-  static const double _maxJump = 100.0;
-
-  // Логирование
-  bool _isLoggingEnabled = false;
-  String _logBuffer = '';
-  final int _maxLogSize = 500 * 1024;
-  File? _logFile;
-
   double get currentDistance => _totalDistance;
   final _distanceStreamController = StreamController<double>.broadcast();
   Stream<double> get distanceStream => _distanceStreamController.stream;
 
-  // ---- Публичные методы логирования ----
+  // ---- Публичные методы ----
   Future<void> startLogging() async {
     if (_isLoggingEnabled) return;
     _isLoggingEnabled = true;
     _logBuffer = '';
-    _logBuffer += '=== GPS LOG STARTED (FINAL NO-SPEED-FILTER) ===\n';
+    _logBuffer += '=== GPS LOG (minDistance=${_minDistance}m, maxAccuracy=${_maxAccuracy}m) ===\n';
     _logBuffer += 'Timestamp: ${DateTime.now()}\n';
-    _logBuffer += 'Min distance: ${_minDistance}m\n';
     _logBuffer += '========================\n\n';
-    _log('📁 GPS logging started (FINAL)');
+    _log('📁 GPS logging started');
     await _saveLogToFile();
   }
 
   Future<void> stopLogging() async {
     if (!_isLoggingEnabled) return;
     _isLoggingEnabled = false;
-    _log('📁 GPS logging stopped (FINAL)');
+    _log('📁 GPS logging stopped');
     await _saveLogToFile();
   }
 
-  /// Публичный метод для добавления внешних логов (например, от геокодера)
   void addLog(String message) {
     if (!_isLoggingEnabled) return;
     _log(message);
   }
 
   void _log(String message) {
-    if (!_isLoggingEnabled) return;
     final timestamp = DateTime.now().toIso8601String();
     _logBuffer += '[$timestamp] $message\n';
     print(message);
@@ -89,9 +89,8 @@ class GpsService {
     }
   }
 
-  // ---- Основные методы GPS (без изменений) ----
   void startTracking() {
-    _log('🟢 GPS: startTracking() FINAL');
+    _log('🟢 GPS: startTracking()');
     if (_isTracking) {
       _log('🟡 GPS: already tracking');
       return;
@@ -121,11 +120,13 @@ class GpsService {
 
     _log('📍 GPS: lat: ${position.latitude}, lon: ${position.longitude}, acc: ${position.accuracy}m');
 
+    // Фильтр точности
     if (position.accuracy > _maxAccuracy) {
       _log('⚠️ Accuracy too poor (${position.accuracy}m), ignoring');
       return;
     }
 
+    // Первая позиция
     if (_lastPosition == null) {
       _lastPosition = position;
       _log('🟢 First position stored');
@@ -140,11 +141,13 @@ class GpsService {
     );
     _log('📏 Raw distance: ${distance.toStringAsFixed(2)}m');
 
+    // Минимальное расстояние
     if (distance < _minDistance) {
       _log('📏 Too small (< ${_minDistance}m), ignoring');
       return;
     }
 
+    // Защита от выбросов
     if (distance > _maxJump) {
       _log('⚠️ Jump > ${_maxJump}m (${distance.toStringAsFixed(2)}m), ignoring');
       return;
