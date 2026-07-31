@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:delivery_app/models/parameter_model.dart';
-import 'package:delivery_app/widgets/edit_parameter_dialog.dart';
+import 'package:delivery_app/features/delivery/models/parameter_model.dart';
+import 'package:delivery_app/features/delivery/ui/widgets/edit_parameter_dialog.dart';
 
 class EditableParameterCard extends StatelessWidget {
   final Parameter parameter;

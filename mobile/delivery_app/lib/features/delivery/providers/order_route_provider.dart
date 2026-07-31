@@ -6,6 +6,7 @@ import 'package:delivery_app/features/delivery/services/gps_service.dart';
 import 'package:delivery_app/features/delivery/services/geocoder_service.dart';
 import 'package:delivery_app/features/delivery/providers/pricing_provider.dart';
 import 'package:delivery_app/features/delivery/providers/tab_provider.dart';
+import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 
 final orderRouteProvider = StateNotifierProvider<OrderRouteNotifier, OrderRouteState>((ref) {
   return OrderRouteNotifier(ref);
