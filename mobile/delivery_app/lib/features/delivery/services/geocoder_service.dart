@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class GeocoderService {
   // Замените на свой API-ключ
-  static const String _apiKey = '5ca7e701-237d-4fc0-9327-a1cdf7171dcd';
+  static const String _apiKey = 'dbe233fd-bd01-4f15-bfc9-4b9a4313b6a1';
 
   static Future<String?> reverseGeocode(
     double lat,
@@ -13,11 +13,14 @@ class GeocoderService {
     onLog?.call('🌍 Запрос геокодера: lat=$lat, lon=$lon');
 
     final url = Uri.parse(
-      'https://geocode-maps.yandex.ru/1.x/'
-      '?apikey=$_apiKey'
-      '&geocode=$lat,$lon'
-      '&format=json'
-      '&results=1'
+        'https://geocode-maps.yandex.ru/1.x/'
+        '?apikey=$_apiKey'
+        '&geocode=$lat,$lon'
+        '&kind=house'           // ищем дома, а не страны
+        '&lang=ru_RU'           // явный язык
+        '&format=json'
+        '&sco=latlong'
+        '&results=1'
     );
 
     try {
