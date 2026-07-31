@@ -91,7 +91,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
 
   final TextEditingController _apartmentController = TextEditingController();
   bool _isApartmentValid = false;
-  bool _isPrivateHouse = false; // чекбокс "частный дом"
+  bool _isPrivateHouse = false;
 
   int _deliveryNumber = 1;
   final List<Delivery> _completedDeliveries = [];
@@ -253,7 +253,6 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     }
   }
 
-  // ---- Получение текущих координат (для геокодера) ----
   Future<Position?> _getCurrentPosition() async {
     try {
       return await Geolocator.getCurrentPosition(
@@ -265,15 +264,13 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     }
   }
 
-  // ===================== НОВЫЕ ВИДЖЕТЫ =====================
+  // ===================== ВИДЖЕТЫ =====================
 
-  // Карточка заказа
   Widget _buildOrderCard() {
     final deliveryLabel = _deliveryNumber > 1 ? 'Доставка #$_deliveryNumber' : 'Заказ';
     final pricing = ref.watch(pricingProvider);
 
     double cost = 0;
-    // Стоимость рассчитывается только если известен вес и мы в сегментах 2 или 3
     if (_currentSegment >= 2 && _weight != null) {
       cost = (pricing.receivingFee + (_weight! * pricing.pricePerKg)) * _coefficient;
       if (_currentSegment == 3) {
@@ -302,7 +299,6 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
                   color: Colors.white,
                 ),
               ),
-              // Коэффициент
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
@@ -338,6 +334,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, size: 14, color: const Color(0xFF6C63FF)),
           const SizedBox(width: 6),
@@ -356,7 +353,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
                 fontWeight: FontWeight.w500,
                 color: Colors.white,
               ),
-              overflow: TextOverflow.ellipsis,
+              softWrap: true,  // разрешаем перенос
             ),
           ),
         ],
@@ -364,8 +361,13 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     );
   }
 
-  // Блок управления GPS + пауза
+  // Блок GPS + пауза (отображается только в сегментах 0 и 2)
   Widget _buildGpsControl() {
+    // Скрываем блок в сегментах 1 и 3
+    if (_currentSegment == 1 || _currentSegment == 3) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
@@ -395,7 +397,6 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
             });
           }),
           const Spacer(),
-          // Расстояние
           if (_useGps)
             Row(
               children: [
@@ -439,7 +440,6 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
               ),
             ),
           const SizedBox(width: 8),
-          // Кнопка паузы
           GestureDetector(
             onTap: _togglePause,
             child: Container(
@@ -476,8 +476,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     );
   }
 
-  // ===== ОСНОВНОЙ BUILD =====
-
+  // ---- ОСНОВНОЙ BUILD ----
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -533,7 +532,10 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
             const SizedBox(height: 10),
             _buildGpsControl(),
             const SizedBox(height: 12),
+            // Основной контент сегмента
             _buildSegmentContent(),
+            // Растягиваем пространство, чтобы кнопка была внизу
+            const Spacer(),
             const SizedBox(height: 20),
             _buildActionButtons(),
             const SizedBox(height: 12),
@@ -543,79 +545,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     );
   }
 
-  // ===== ВСПОМОГАТЕЛЬНЫЕ ВИДЖЕТЫ =====
-
-  Widget _buildSegmentProgress() {
-    return Row(
-      children: List.generate(_segments.length, (index) {
-        final isActive = index == _currentSegment;
-        final isCompleted = index < _currentSegment;
-        return Expanded(
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 2,
-                      decoration: BoxDecoration(
-                        color: isCompleted || isActive
-                            ? const Color(0xFF6C63FF)
-                            : const Color(0xFF2C2C2C),
-                      ),
-                    ),
-                  ),
-                  if (index < _segments.length - 1) const SizedBox(width: 2),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 22,
-                    height: 22,
-                    decoration: BoxDecoration(
-                      color: isActive
-                          ? const Color(0xFF6C63FF)
-                          : isCompleted
-                              ? const Color(0xFF6C63FF).withOpacity(0.3)
-                              : const Color(0xFF2C2C2C),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        '${index + 1}',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: isActive || isCompleted
-                              ? Colors.white
-                              : const Color(0xFF888888),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    _segments[index],
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: isActive || isCompleted
-                          ? Colors.white
-                          : const Color(0xFF888888),
-                      fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      }),
-    );
-  }
-
+  // ---- СОДЕРЖИМОЕ СЕГМЕНТОВ ----
   Widget _buildSegmentContent() {
     switch (_currentSegment) {
       case 0:
@@ -631,7 +561,6 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     }
   }
 
-  // ---- Сегмент 0: В магазин (только заголовок) ----
   Widget _buildShopSegment() {
     return const Text(
       'Пробег до магазина (бесплатный)',
@@ -639,7 +568,6 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     );
   }
 
-  // ---- Сегмент 1: Получение (только вес) ----
   Widget _buildReceivingSegment() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -715,7 +643,6 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     );
   }
 
-  // ---- Сегмент 2: К клиенту (заголовок) ----
   Widget _buildClientSegment() {
     return const Text(
       'Пробег до клиента (платный)',
@@ -723,7 +650,6 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     );
   }
 
-  // ---- Сегмент 3: Выдача (квартира с чекбоксом) ----
   Widget _buildDeliverySegment() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -843,7 +769,78 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     );
   }
 
-  // ---- Кнопка переключения (используется и в GPS, и для вкладок) ----
+  // ---- ВСПОМОГАТЕЛЬНЫЕ ВИДЖЕТЫ ----
+  Widget _buildSegmentProgress() {
+    return Row(
+      children: List.generate(_segments.length, (index) {
+        final isActive = index == _currentSegment;
+        final isCompleted = index < _currentSegment;
+        return Expanded(
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 2,
+                      decoration: BoxDecoration(
+                        color: isCompleted || isActive
+                            ? const Color(0xFF6C63FF)
+                            : const Color(0xFF2C2C2C),
+                      ),
+                    ),
+                  ),
+                  if (index < _segments.length - 1) const SizedBox(width: 2),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: isActive
+                          ? const Color(0xFF6C63FF)
+                          : isCompleted
+                              ? const Color(0xFF6C63FF).withOpacity(0.3)
+                              : const Color(0xFF2C2C2C),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${index + 1}',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: isActive || isCompleted
+                              ? Colors.white
+                              : const Color(0xFF888888),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _segments[index],
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isActive || isCompleted
+                          ? Colors.white
+                          : const Color(0xFF888888),
+                      fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+
   Widget _buildToggleButton(String label, bool isSelected, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
@@ -869,7 +866,6 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     );
   }
 
-  // ---- Кнопка действия ----
   Widget _buildActionButtons() {
     String mainButtonText = 'Далее';
     bool isMainEnabled = true;
@@ -891,7 +887,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
         break;
       case 3:
         mainButtonText = 'Завершить доставку$deliveryLabel';
-        isMainEnabled = _isPrivateHouse || _isApartmentValid; // изменено
+        isMainEnabled = _isPrivateHouse || _isApartmentValid;
         break;
       default:
         mainButtonText = 'Далее';
@@ -920,7 +916,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     );
   }
 
-  // ---- Обработчики действий ----
+  // ---- ОБРАБОТЧИКИ ДЕЙСТВИЙ ----
   void _handleMainAction() async {
     _finishSegment();
     _saveCurrentSegmentData();
@@ -953,6 +949,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
         final weight = double.tryParse(_weightController.text.replaceAll(',', '.')) ?? 0.0;
         if (weight <= 0) return;
         _weight = weight;
+        // Устанавливаем временное сообщение, как при первой доставке
         _clientAddress = 'Адрес клиента будет определён позже';
         setState(() {
           _currentSegment = 2;
@@ -1043,7 +1040,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> with Widget
     setState(() {
       _deliveryNumber++;
       _currentSegment = 2;
-      _clientAddress = 'ул. Новая, ${_deliveryNumber * 5}, г. Москва';
+      // Исправлено: теперь не мок, а стандартное сообщение
+      _clientAddress = 'Адрес клиента будет определён позже';
       _apartmentController.clear();
       _isApartmentValid = false;
       _isPrivateHouse = false;
