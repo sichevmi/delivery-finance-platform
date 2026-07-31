@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:delivery_app/models/analytics_enums.dart';
+import 'package:delivery_app/feature/analytics/models/analytics_enums.dart';
 
 class AnalyticsPeriodSelector extends StatelessWidget {
   final AnalyticsPeriod selectedPeriod;

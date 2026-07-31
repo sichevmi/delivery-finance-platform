@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:delivery_app/models/analytics_models.dart';
+import 'package:delivery_app/feature/analytics/models/analytics_models.dart';
 
 class AnalyticsChart extends StatelessWidget {
   final List<AnalyticsChartPoint> points;
