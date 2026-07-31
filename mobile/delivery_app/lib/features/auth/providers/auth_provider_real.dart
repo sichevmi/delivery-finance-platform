@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
-import 'package:delivery_app/services/storage_service.dart';
-import 'package:delivery_app/models/user.dart';
-import 'package:delivery_app/providers/api_provider.dart';
+import 'package:delivery_app/core/services/storage_service.dart';
+import 'package:delivery_app/features/auth/models/user.dart';
+import 'package:delivery_app/core/providers/api_provider.dart';
 
 class AuthState {
   final User? user;
