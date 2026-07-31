@@ -1,5 +1,5 @@
-import 'package:delivery_app/models/analytics_models.dart';
-import 'package:delivery_app/models/analytics_enums.dart';
+import 'package:delivery_app/features/analytics/models/analytics_models.dart';
+import 'package:delivery_app/features/analytics/models/analytics_enums.dart';
 import 'dart:math';
 
 class MockAnalyticsRepository {
