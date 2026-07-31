@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:delivery_app/lib/features/delivery/models/parameter_model.dart';
-import 'package:delivery_app/lib/features/delivery/widgets/editable_parameter_card.dart';
+import 'package:delivery_app/features/delivery/models/parameter_model.dart';
+import 'package:delivery_app/features/delivery/widgets/editable_parameter_card.dart';
 
 class ExpensesDirectory extends StatefulWidget {
   const ExpensesDirectory({super.key});

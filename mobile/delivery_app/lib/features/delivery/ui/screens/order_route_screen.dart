@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:delivery_app/lib/features/delivery/providers/order_route_provider.dart';
-import 'package:delivery_app/lib/features/delivery/ui/widgets/segment_progress.dart';
-import 'package:delivery_app/lib/features/delivery/ui/widgets/order_card.dart';
-import 'package:delivery_app/lib/features/delivery/ui/widgets/gps_control.dart';
-import 'package:delivery_app/lib/features/delivery/ui/widgets/segment_content.dart';
-import 'package:delivery_app/lib/features/delivery/ui/widgets/action_buttons.dart';
+import 'package:delivery_app/features/delivery/providers/order_route_provider.dart';
+import 'package:delivery_app/features/delivery/ui/widgets/segment_progress.dart';
+import 'package:delivery_app/features/delivery/ui/widgets/order_card.dart';
+import 'package:delivery_app/features/delivery/ui/widgets/gps_control.dart';
+import 'package:delivery_app/features/delivery/ui/widgets/segment_content.dart';
+import 'package:delivery_app/features/delivery/ui/widgets/action_buttons.dart';
 
 class OrderRouteScreen extends ConsumerStatefulWidget {
   final String serviceName;

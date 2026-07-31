@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:delivery_app/providers/auth_provider.dart';
-import 'package:delivery_app/screens/register_screen.dart';
-import 'package:delivery_app/screens/home_screen.dart';
+import 'package:delivery_app/features/auth/providers/auth_provider.dart';
+import 'package:delivery_app/features/auth/ui/screens/register_screen.dart';
+import 'package:delivery_app/features/delivery/ui/screens/home_screen.dart';
 import 'package:email_validator/email_validator.dart';
-import 'package:delivery_app/providers/api_provider.dart';
+import 'package:delivery_app/core/providers/api_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});

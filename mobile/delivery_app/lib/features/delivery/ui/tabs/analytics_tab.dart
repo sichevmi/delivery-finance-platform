@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:delivery_app/lib/features/analytics/models/analytics_models.dart';
-import 'package:delivery_app/lib/features/analytics/models/analytics_enums.dart';
-import 'package:delivery_app/lib/features/analytics/services/mock_analytics_repository.dart';
-import 'package:delivery_app/lib/features/analytics/ui/widgets/kpi_card.dart';
-import 'package:delivery_app/lib/features/analytics/ui/widgets/analytics_chart.dart';
-import 'package:delivery_app/lib/features/analytics/ui/widgets/analytics_period_selector.dart';
-import 'package:delivery_app/lib/features/analytics/ui/widgets/analytics_tile.dart';
+import 'package:delivery_app/features/analytics/models/analytics_models.dart';
+import 'package:delivery_app/features/analytics/models/analytics_enums.dart';
+import 'package:delivery_app/features/analytics/services/mock_analytics_repository.dart';
+import 'package:delivery_app/features/analytics/ui/widgets/kpi_card.dart';
+import 'package:delivery_app/features/analytics/ui/widgets/analytics_chart.dart';
+import 'package:delivery_app/features/analytics/ui/widgets/analytics_period_selector.dart';
+import 'package:delivery_app/features/analytics/ui/widgets/analytics_tile.dart';
 
 class AnalyticsTab extends StatefulWidget {
   const AnalyticsTab({super.key});

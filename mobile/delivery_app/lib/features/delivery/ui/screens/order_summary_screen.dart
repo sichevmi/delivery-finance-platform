@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:delivery_app/lib/features/delivery/providers/tab_provider.dart';
-import 'package:delivery_app/lib/features/delivery/providers/pricing_provider.dart';
+import 'package:delivery_app/features/delivery/providers/tab_provider.dart';
+import 'package:delivery_app/features/delivery/providers/pricing_provider.dart';
 import 'order_route_screen.dart';
 
 class OrderSummaryScreen extends ConsumerWidget {

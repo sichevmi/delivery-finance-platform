@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:delivery_app/lib/features/delivery/providers/gps_provider.dart';
-import 'package:delivery_app/lib/features/delivery/services/gps_service.dart';
+import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
+import 'package:delivery_app/features/delivery/services/gps_service.dart';
 
 class MoreTab extends ConsumerStatefulWidget {
   const MoreTab({super.key});
