@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class GeocoderService {
   // Замените на свой API-ключ
-  static const String _apiKey = 'dbe233fd-bd01-4f15-bfc9-4b9a4313b6a1';
+  static const String _apiKey = '5ca7e701-237d-4fc0-9327-a1cdf7171dcd';
 
   static Future<String?> reverseGeocode(
     double lat,
