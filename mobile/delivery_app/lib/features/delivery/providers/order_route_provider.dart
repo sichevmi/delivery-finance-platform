@@ -180,16 +180,15 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
 
   // ===== ПОЛНЫЙ СБРОС ДЛЯ НОВОГО ЗАКАЗА =====
   void resetToInitial() {
-  // Проверяем, инициализирован ли _gpsService
-  if (_gpsService != null) {
-    _gpsService.stopTracking();
-    _gpsSubscription?.cancel();
+    if (_gpsService != null) {
+      _gpsService.stopTracking();
+      _gpsSubscription?.cancel();
+    }
+    state = OrderRouteState.initial(
+      coefficient: state.coefficient,
+      segmentIndex: 0,
+    );
   }
-  state = OrderRouteState.initial(
-    coefficient: state.coefficient,
-    segmentIndex: 0,
-  );
-}
 
   Future<void> _initGps() async {
     _gpsSubscription = _gpsService.distanceStream.listen((distance) {
@@ -392,18 +391,18 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     _gpsSubscription?.cancel();
   }
 
-  // ===== ОТМЕНА ЗАКАЗА (исправлено) =====
+  // ===== ОТМЕНА ЗАКАЗА =====
   void cancelOrder() {
-  if (_gpsService != null) {
-    _gpsService.stopTracking();
-    _gpsSubscription?.cancel();
+    if (_gpsService != null) {
+      _gpsService.stopTracking();
+      _gpsSubscription?.cancel();
+    }
+    state = OrderRouteState.initial(
+      coefficient: state.coefficient,
+      segmentIndex: 0,
+    );
+    state = state.copyWith(shouldNavigateToHome: true);
   }
-  state = OrderRouteState.initial(
-    coefficient: state.coefficient,
-    segmentIndex: 0,
-  );
-  state = state.copyWith(shouldNavigateToHome: true);
-}
 
   void dispose() {
     _gpsSubscription?.cancel();

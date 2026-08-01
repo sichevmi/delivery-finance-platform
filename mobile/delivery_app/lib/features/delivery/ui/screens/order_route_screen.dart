@@ -31,15 +31,16 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
 
   @override
   void initState() {
-  super.initState();
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    final notifier = ref.read(orderRouteProvider.notifier);
-    notifier.init(
-      coefficient: widget.coefficient,
-      segmentIndex: widget.segmentIndex,
-    );
-  });
-}
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final notifier = ref.read(orderRouteProvider.notifier);
+      notifier.resetToInitial(); // Полный сброс перед инициализацией
+      notifier.init(
+        coefficient: widget.coefficient,
+        segmentIndex: widget.segmentIndex,
+      );
+    });
+  }
 
   @override
   void dispose() {
@@ -56,10 +57,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
     if (state.shouldNavigateToHome) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         notifier.resetNavigationFlag();
-        // Возврат на главный экран
         Navigator.of(context).popUntil((route) => route.isFirst);
-        // Или можно перейти на экран выбора сервиса:
-        // Navigator.pushReplacementNamed(context, '/home');
       });
     }
 
