@@ -13,10 +13,10 @@ class PricingConfig {
 
   factory PricingConfig.defaultConfig() {
     return const PricingConfig(
-      receivingFee: 50.0,
-      deliveryFee: 100.0,
-      pricePerKg: 10.0,
-      pricePerKm: 15.0,
+      receivingFee: 75.0,
+      deliveryFee: 105.0,
+      pricePerKg: 2.0,
+      pricePerKm: 30.0,
     );
   }
 }
