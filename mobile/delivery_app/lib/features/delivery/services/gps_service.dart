@@ -170,6 +170,7 @@ class GpsService {
 
   void stopTracking() {
     _log('🛑 Stop');
+    print('🔴 stopTracking() called from: ${StackTrace.current}');
     _isTracking = false;
     _isPaused = false;
     _positionSubscription?.cancel();
