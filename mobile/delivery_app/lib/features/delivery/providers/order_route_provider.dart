@@ -37,7 +37,7 @@ class OrderRouteState {
   final String apartment;
   final bool isApartmentValid;
   final bool isPrivateHouse;
-  final bool showSummary; // новый флаг
+  final bool showSummary;
 
   const OrderRouteState({
     required this.currentSegment,
@@ -183,7 +183,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
       totalPauseDuration: Duration.zero,
       isPaused: false,
       pauseStartTime: null,
-      showSummary: false, // сбрасываем флаг
+      showSummary: false,
     );
     _gpsService.resetDistance();
     state = state.copyWith(distance: 0.0);
@@ -339,12 +339,11 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     final updatedList = List<Delivery>.from(state.completedDeliveries)..add(delivery);
     state = state.copyWith(
       completedDeliveries: updatedList,
-      showSummary: true, // сигнализируем UI показать итоги
+      showSummary: true,
     );
   }
 
   void resetAfterSummary() {
-    // Вызывается после того, как UI показал итоги и пользователь нажал "Продолжить" или "Завершить"
     state = state.copyWith(showSummary: false);
     _startNextDelivery();
   }
@@ -362,6 +361,13 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
       showSummary: false,
     );
     _startSegment();
+  }
+
+  void finishOrder() {
+    // Сбрасываем состояние и выходим на главный экран
+    state = OrderRouteState.initial(coefficient: state.coefficient, segmentIndex: 0);
+    _gpsService.stopTracking();
+    _gpsSubscription?.cancel();
   }
 
   void cancelOrder() {
