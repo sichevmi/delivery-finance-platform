@@ -6,8 +6,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:path_provider/path_provider.dart';
 
 class GpsService {
-  static final GpsService _instance = GpsService._internal();
-  factory GpsService() => _instance;
+  //static final GpsService _instance = GpsService._internal();
+  //factory GpsService() => _instance;
   GpsService._internal();
 
   // ---- НАСТРАИВАЕМЫЕ ПАРАМЕТРЫ (меняйте здесь) ----
