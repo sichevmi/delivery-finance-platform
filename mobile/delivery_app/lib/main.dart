@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:delivery_app/core/theme/app_theme.dart';
 import 'package:delivery_app/features/auth/ui/login_screen.dart';
+import 'package:delivery_app/features/delivery/ui/screens/home_screen.dart';
+import 'package:delivery_app/features/delivery/services/permission_service.dart';
+import 'package:delivery_app/features/auth/providers/auth_provider.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const ProviderScope(child: DeliveryApp()));
 }
 
@@ -16,8 +20,9 @@ class DeliveryApp extends StatelessWidget {
       title: 'FinFlow Delivery',
       theme: AppTheme.dark,
       debugShowCheckedModeBanner: false,
-      home: const PermissionCheckScreen(),
+      initialRoute: '/',
       routes: {
+        '/': (context) => const AuthWrapper(),
         '/login': (context) => const LoginScreen(),
         '/home': (context) => const HomeScreen(),
       },
@@ -25,34 +30,77 @@ class DeliveryApp extends StatelessWidget {
   }
 }
 
-class PermissionCheckScreen extends StatefulWidget {
-  const PermissionCheckScreen({super.key});
+// ============================================================
+// 1. Обёртка для проверки авторизации и разрешений
+// ============================================================
+class AuthWrapper extends ConsumerStatefulWidget {
+  const AuthWrapper({super.key});
 
   @override
-  State<PermissionCheckScreen> createState() => _PermissionCheckScreenState();
+  ConsumerState<AuthWrapper> createState() => _AuthWrapperState();
 }
 
-class _PermissionCheckScreenState extends State<PermissionCheckScreen> {
+class _AuthWrapperState extends ConsumerState<AuthWrapper> {
+  bool _isChecking = true;
+
   @override
   void initState() {
     super.initState();
-    _checkPermissions();
+    _checkAuthAndPermissions();
   }
 
-  Future<void> _checkPermissions() async {
+  Future<void> _checkAuthAndPermissions() async {
+    // Сначала проверяем разрешение на геолокацию
     final hasPermission = await PermissionService.requestLocationPermission(context);
-    if (hasPermission) {
-      // Переход на экран логина
-      Navigator.pushReplacementNamed(context, '/login');
+    
+    if (!hasPermission) {
+      // Если разрешение не получено — показываем экран запроса
+      if (mounted) {
+        setState(() => _isChecking = false);
+      }
+      return;
+    }
+
+    // Проверяем авторизацию
+    final authNotifier = ref.read(authProvider.notifier);
+    final isAuthenticated = await authNotifier.autoLogin();
+
+    if (!mounted) return;
+
+    if (isAuthenticated) {
+      Navigator.pushReplacementNamed(context, '/home');
     } else {
-      // Если разрешение не получено — остаёмся на этом экране
-      // и показываем сообщение
-      setState(() {});
+      Navigator.pushReplacementNamed(context, '/login');
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isChecking) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF121212),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(
+                color: Color(0xFF6C63FF),
+              ),
+              SizedBox(height: 20),
+              Text(
+                'Загрузка...',
+                style: TextStyle(
+                  color: Color(0xFF888888),
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Если разрешение не получено — показываем экран запроса
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
       body: Center(
@@ -84,7 +132,7 @@ class _PermissionCheckScreenState extends State<PermissionCheckScreen> {
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: _checkPermissions,
+              onPressed: _checkAuthAndPermissions,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF6C63FF),
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),

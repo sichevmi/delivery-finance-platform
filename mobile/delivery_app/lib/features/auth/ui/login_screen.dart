@@ -150,45 +150,31 @@ Widget build(BuildContext context) {
   }
 
   Future<void> _login() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+  if (!_isFormValid) return;
+
+  setState(() => _isLoading = true);
+
+  try {
+    final authNotifier = ref.read(authProvider.notifier);
+    await authNotifier.login(_emailController.text, _passwordController.text);
+    
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
+    }
+  } catch (e) {
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Пожалуйста, заполните все поля'),
+        SnackBar(
+          content: Text(ref.read(authProvider).error ?? 'Ошибка входа'),
           backgroundColor: Colors.red,
         ),
       );
-      return;
     }
-
-    setState(() => _isLoading = true);
-
-    try {
-      await Future.delayed(const Duration(seconds: 2));
-      
-      await ref.read(authProvider.notifier).login(
-        _emailController.text,
-        _passwordController.text,
-      );
-      
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Ошибка входа: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
+  } finally {
+    if (mounted) setState(() => _isLoading = false);
   }
+}
 }

@@ -1,62 +1,52 @@
-import 'dart:convert';
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:delivery_app/services/storage_service.dart';
-
-// Базовый URL по умолчанию — для локальной разработки
-const String defaultBaseUrl = 'http://localhost:8001/api/v1';
-
-// Получаем URL из dart-define или используем default
-String get baseUrl {
-  // const String.fromEnvironment работает только если переменная передана через --dart-define
-  const String envBaseUrl = String.fromEnvironment('API_BASE_URL');
-  return envBaseUrl.isNotEmpty ? envBaseUrl : defaultBaseUrl;
-}
+import 'package:dio/dio.dart';
+import 'package:dio/dio.dart' as dio_service;
+import 'package:delivery_app/core/services/storage_service.dart';
 
 final dioProvider = Provider<Dio>((ref) {
   final dio = Dio(BaseOptions(
-    baseUrl: baseUrl,
+    baseUrl: 'https://тест.финфлоу.рф', // ЗАМЕНИТЕ НА ВАШ URL
     connectTimeout: const Duration(seconds: 30),
     receiveTimeout: const Duration(seconds: 30),
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
   ));
 
-  // Разрешаем самоподписанные сертификаты для тестового стенда (если используете HTTPS)
-  // (dio.httpClientAdapter as DefaultHttpClientAdapter).onHttpClientCreate = (client) {
-  //   client.badCertificateCallback = (X509Certificate cert, String host, int port) => true;
-  //   return client;
-  // };
-
-  // Интерцепторы (без изменений)
+  // Добавляем интерцептор для автоматической подстановки токена
   dio.interceptors.add(InterceptorsWrapper(
     onRequest: (options, handler) async {
       final storage = ref.read(storageServiceProvider);
       final token = await storage.getAccessToken();
-      if (token != null) {
+      if (token != null && token.isNotEmpty) {
         options.headers['Authorization'] = 'Bearer $token';
       }
       return handler.next(options);
     },
     onError: (error, handler) async {
+      // Если 401 – пробуем обновить токен
       if (error.response?.statusCode == 401) {
         final storage = ref.read(storageServiceProvider);
         final refreshToken = await storage.getRefreshToken();
-        if (refreshToken != null) {
+        if (refreshToken != null && refreshToken.isNotEmpty) {
           try {
-            final response = await dio
-                .post('/auth/refresh', data: {'refresh_token': refreshToken});
-            final newAccess = response.data['access_token'];
-            final newRefresh = response.data['refresh_token'] ?? refreshToken;
-            await storage.saveTokens(newAccess, newRefresh);
-            final opts = error.requestOptions;
-            opts.headers['Authorization'] = 'Bearer $newAccess';
-            final clone = await dio.request(opts.path,
-                options: Options(method: opts.method, headers: opts.headers),
-                data: opts.data,
-                queryParameters: opts.queryParameters);
-            return handler.resolve(clone);
+            // Обновляем токен
+            final response = await dio.post(
+              '/auth/refresh',
+              data: {'refresh_token': refreshToken},
+            );
+            final newToken = response.data['access_token'];
+            await storage.updateAccessToken(newToken);
+            
+            // Повторяем оригинальный запрос с новым токеном
+            error.requestOptions.headers['Authorization'] = 'Bearer $newToken';
+            final retryResponse = await dio.fetch(error.requestOptions);
+            return handler.resolve(retryResponse);
           } catch (e) {
+            // Если не удалось обновить – очищаем и выдаём ошибку
             await storage.clearTokens();
-            return handler.reject(error);
+            return handler.next(error);
           }
         }
       }
@@ -66,6 +56,3 @@ final dioProvider = Provider<Dio>((ref) {
 
   return dio;
 });
-
-final storageServiceProvider =
-    Provider<StorageService>((ref) => StorageService());
