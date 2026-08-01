@@ -1,47 +1,55 @@
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart'; // <-- добавлено
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class StorageService {
   static const String _accessTokenKey = 'access_token';
   static const String _refreshTokenKey = 'refresh_token';
   static const String _userIdKey = 'user_id';
 
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  Future<SharedPreferences> get _prefs async => await SharedPreferences.getInstance();
 
   Future<void> saveTokens(String accessToken, String refreshToken) async {
-    await _storage.write(key: _accessTokenKey, value: accessToken);
-    await _storage.write(key: _refreshTokenKey, value: refreshToken);
+    final prefs = await _prefs;
+    await prefs.setString(_accessTokenKey, accessToken);
+    await prefs.setString(_refreshTokenKey, refreshToken);
   }
 
   Future<String?> getAccessToken() async {
-    return await _storage.read(key: _accessTokenKey);
+    final prefs = await _prefs;
+    return prefs.getString(_accessTokenKey);
   }
 
   Future<String?> getRefreshToken() async {
-    return await _storage.read(key: _refreshTokenKey);
+    final prefs = await _prefs;
+    return prefs.getString(_refreshTokenKey);
   }
 
   Future<void> updateAccessToken(String newAccessToken) async {
-    await _storage.write(key: _accessTokenKey, value: newAccessToken);
+    final prefs = await _prefs;
+    await prefs.setString(_accessTokenKey, newAccessToken);
   }
 
   Future<void> saveUserId(String userId) async {
-    await _storage.write(key: _userIdKey, value: userId);
+    final prefs = await _prefs;
+    await prefs.setString(_userIdKey, userId);
   }
 
   Future<String?> getUserId() async {
-    return await _storage.read(key: _userIdKey);
+    final prefs = await _prefs;
+    return prefs.getString(_userIdKey);
   }
 
   Future<bool> hasTokens() async {
-    final refresh = await getRefreshToken();
+    final prefs = await _prefs;
+    final refresh = prefs.getString(_refreshTokenKey);
     return refresh != null && refresh.isNotEmpty;
   }
 
   Future<void> clearTokens() async {
-    await _storage.delete(key: _accessTokenKey);
-    await _storage.delete(key: _refreshTokenKey);
-    await _storage.delete(key: _userIdKey);
+    final prefs = await _prefs;
+    await prefs.remove(_accessTokenKey);
+    await prefs.remove(_refreshTokenKey);
+    await prefs.remove(_userIdKey);
   }
 }
 

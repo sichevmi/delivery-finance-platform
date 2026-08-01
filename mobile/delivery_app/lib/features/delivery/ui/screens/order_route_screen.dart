@@ -31,14 +31,15 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
 
   @override
   void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(orderRouteProvider.notifier).init(
-            coefficient: widget.coefficient,
-            segmentIndex: widget.segmentIndex,
-          );
-    });
-  }
+  super.initState();
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    final notifier = ref.read(orderRouteProvider.notifier);
+    notifier.init(
+      coefficient: widget.coefficient,
+      segmentIndex: widget.segmentIndex,
+    );
+  });
+}
 
   @override
   void dispose() {
@@ -51,7 +52,18 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
     final state = ref.watch(orderRouteProvider);
     final notifier = ref.read(orderRouteProvider.notifier);
 
-    // Показываем экран итогов, если доставка завершена
+    // Обработка отмены заказа
+    if (state.shouldNavigateToHome) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifier.resetNavigationFlag();
+        // Возврат на главный экран
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        // Или можно перейти на экран выбора сервиса:
+        // Navigator.pushReplacementNamed(context, '/home');
+      });
+    }
+
+    // Показываем экран итогов
     if (state.showSummary && !_isSummaryShown) {
       _isSummaryShown = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -135,10 +147,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
     ).then((result) {
       _isSummaryShown = false;
       if (result == true) {
-        // Пользователь выбрал "Продолжить" – начинаем следующую доставку
         notifier.resetAfterSummary();
       } else {
-        // Пользователь выбрал "Завершить" – выходим на главный экран
         notifier.finishOrder();
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
@@ -147,39 +157,30 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
 
   int _calculateTotalTime(OrderRouteState state) {
     if (state.completedDeliveries.isEmpty) return 0;
-
     final first = state.completedDeliveries.first;
     int total = first.timeToShop + first.timeReceiving;
-
     for (final d in state.completedDeliveries) {
       total += d.timeToClient + d.timeDelivery;
     }
-
     return total;
   }
 
   double _calculateTotalDistance(OrderRouteState state) {
     if (state.completedDeliveries.isEmpty) return 0.0;
-
     double total = state.completedDeliveries.first.distanceToShop;
-
     for (final d in state.completedDeliveries) {
       total += d.distanceToClient;
     }
-
     return total;
   }
 
   double _calculateTotalCost(OrderRouteState state, PricingConfig pricing) {
     if (state.completedDeliveries.isEmpty) return 0.0;
-
     final first = state.completedDeliveries.first;
     double total = (pricing.receivingFee + (first.weight * pricing.pricePerKg)) * state.coefficient;
-
     for (final d in state.completedDeliveries) {
       total += (pricing.deliveryFee + (d.distanceToClient * pricing.pricePerKm)) * state.coefficient;
     }
-
     return total;
   }
 }

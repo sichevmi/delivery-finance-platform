@@ -38,6 +38,7 @@ class OrderRouteState {
   final bool isApartmentValid;
   final bool isPrivateHouse;
   final bool showSummary;
+  final bool shouldNavigateToHome;
 
   const OrderRouteState({
     required this.currentSegment,
@@ -65,6 +66,7 @@ class OrderRouteState {
     required this.isApartmentValid,
     required this.isPrivateHouse,
     this.showSummary = false,
+    this.shouldNavigateToHome = false,
   });
 
   factory OrderRouteState.initial({required double coefficient, required int segmentIndex}) {
@@ -94,6 +96,7 @@ class OrderRouteState {
       isApartmentValid: false,
       isPrivateHouse: false,
       showSummary: false,
+      shouldNavigateToHome: false,
     );
   }
 
@@ -123,6 +126,7 @@ class OrderRouteState {
     bool? isApartmentValid,
     bool? isPrivateHouse,
     bool? showSummary,
+    bool? shouldNavigateToHome,
   }) {
     return OrderRouteState(
       currentSegment: currentSegment ?? this.currentSegment,
@@ -150,6 +154,7 @@ class OrderRouteState {
       isApartmentValid: isApartmentValid ?? this.isApartmentValid,
       isPrivateHouse: isPrivateHouse ?? this.isPrivateHouse,
       showSummary: showSummary ?? this.showSummary,
+      shouldNavigateToHome: shouldNavigateToHome ?? this.shouldNavigateToHome,
     );
   }
 }
@@ -162,12 +167,29 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
 
   OrderRouteNotifier(this.ref) : super(OrderRouteState.initial(coefficient: 1.0, segmentIndex: 0));
 
+  void resetNavigationFlag() {
+    state = state.copyWith(shouldNavigateToHome: false);
+  }
+
   void init({required double coefficient, required int segmentIndex}) {
     _gpsService = ref.read(gpsServiceProvider);
     state = OrderRouteState.initial(coefficient: coefficient, segmentIndex: segmentIndex);
     _initGps();
     _startSegment();
   }
+
+  // ===== ПОЛНЫЙ СБРОС ДЛЯ НОВОГО ЗАКАЗА =====
+  void resetToInitial() {
+  // Проверяем, инициализирован ли _gpsService
+  if (_gpsService != null) {
+    _gpsService.stopTracking();
+    _gpsSubscription?.cancel();
+  }
+  state = OrderRouteState.initial(
+    coefficient: state.coefficient,
+    segmentIndex: 0,
+  );
+}
 
   Future<void> _initGps() async {
     _gpsSubscription = _gpsService.distanceStream.listen((distance) {
@@ -184,6 +206,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
       isPaused: false,
       pauseStartTime: null,
       showSummary: false,
+      shouldNavigateToHome: false,
     );
     _gpsService.resetDistance();
     state = state.copyWith(distance: 0.0);
@@ -364,15 +387,23 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   }
 
   void finishOrder() {
-    // Сбрасываем состояние и выходим на главный экран
     state = OrderRouteState.initial(coefficient: state.coefficient, segmentIndex: 0);
     _gpsService.stopTracking();
     _gpsSubscription?.cancel();
   }
 
+  // ===== ОТМЕНА ЗАКАЗА (исправлено) =====
   void cancelOrder() {
-    state = OrderRouteState.initial(coefficient: state.coefficient, segmentIndex: 0);
+  if (_gpsService != null) {
+    _gpsService.stopTracking();
+    _gpsSubscription?.cancel();
   }
+  state = OrderRouteState.initial(
+    coefficient: state.coefficient,
+    segmentIndex: 0,
+  );
+  state = state.copyWith(shouldNavigateToHome: true);
+}
 
   void dispose() {
     _gpsSubscription?.cancel();

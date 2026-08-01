@@ -44,7 +44,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       await dio.post(
-        '/auth/register',
+        '/api/v1/auth/register',
         data: {'email': email, 'password': password, 'name': name},
       );
       await login(email, password);
@@ -71,7 +71,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final response = await dio.post(
-        '/auth/login',
+        '/api/v1/auth/login',
         data: {'email': email, 'password': password},
       );
       print('🔐 Login response status: ${response.statusCode}');
@@ -81,11 +81,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final refresh = response.data['refresh_token'];
       await storage.saveTokens(access, refresh);
 
-      final userResponse = await dio.get('/auth/me');
+      // Используем правильный эндпоинт /api/v1/auth/hello
+      final userResponse = await dio.get('/api/v1/auth/hello');
       print('👤 User response: ${userResponse.data}');
-      final user = User.fromJson(userResponse.data);
       
-      await storage.saveUserId(user.id.toString()); // <-- исправлено
+      // Если ответ содержит пользователя в поле 'user'
+      dynamic userData;
+      if (userResponse.data is Map && userResponse.data.containsKey('user')) {
+        userData = userResponse.data['user'];
+      } else {
+        userData = userResponse.data;
+      }
+      
+      final user = User.fromJson(userData);
+      await storage.saveUserId(user.id.toString());
       
       state = state.copyWith(
         user: user,
@@ -140,16 +149,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       try {
         final refreshResponse = await dio.post(
-          '/auth/refresh',
+          '/api/v1/auth/refresh',
           data: {'refresh_token': refreshToken},
         );
         
         final newAccessToken = refreshResponse.data['access_token'];
         await storage.updateAccessToken(newAccessToken);
         
-        final userResponse = await dio.get('/auth/me');
-        final user = User.fromJson(userResponse.data);
-        await storage.saveUserId(user.id.toString()); // <-- исправлено
+        // Используем правильный эндпоинт /api/v1/auth/hello
+        final userResponse = await dio.get('/api/v1/auth/hello');
+        dynamic userData;
+        if (userResponse.data is Map && userResponse.data.containsKey('user')) {
+          userData = userResponse.data['user'];
+        } else {
+          userData = userResponse.data;
+        }
+        
+        final user = User.fromJson(userData);
+        await storage.saveUserId(user.id.toString());
         
         state = state.copyWith(
           user: user,
@@ -194,7 +211,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
 
       final response = await dio.post(
-        '/auth/refresh',
+        '/api/v1/auth/refresh',
         data: {'refresh_token': refreshToken},
       );
       
@@ -209,7 +226,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   // ===== ВЫХОД =====
   Future<void> logout() async {
     try {
-      await dio.post('/auth/logout');
+      await dio.post('/api/v1/auth/logout');
     } catch (e) {
       // Игнорируем ошибки при выходе
     }
@@ -222,8 +239,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final token = await storage.getAccessToken();
     if (token != null) {
       try {
-        final response = await dio.get('/auth/me');
-        final user = User.fromJson(response.data);
+        final response = await dio.get('/api/v1/auth/hello');
+        dynamic userData;
+        if (response.data is Map && response.data.containsKey('user')) {
+          userData = response.data['user'];
+        } else {
+          userData = response.data;
+        }
+        final user = User.fromJson(userData);
         state = state.copyWith(
           user: user,
           isAuthenticated: true,

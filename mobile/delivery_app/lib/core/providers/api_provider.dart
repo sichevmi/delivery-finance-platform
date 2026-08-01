@@ -1,11 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
-import 'package:dio/dio.dart' as dio_service;
 import 'package:delivery_app/core/services/storage_service.dart';
 
 final dioProvider = Provider<Dio>((ref) {
   final dio = Dio(BaseOptions(
-    baseUrl: 'https://тест.финфлоу.рф', // ЗАМЕНИТЕ НА ВАШ URL
+    baseUrl: 'https://xn--e1aybc.xn--h1agffzbc.xn--p1ai', // ЗАМЕНИТЕ НА ВАШ URL
     connectTimeout: const Duration(seconds: 30),
     receiveTimeout: const Duration(seconds: 30),
     headers: {
@@ -14,7 +13,6 @@ final dioProvider = Provider<Dio>((ref) {
     },
   ));
 
-  // Добавляем интерцептор для автоматической подстановки токена
   dio.interceptors.add(InterceptorsWrapper(
     onRequest: (options, handler) async {
       final storage = ref.read(storageServiceProvider);

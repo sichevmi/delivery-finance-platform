@@ -1,12 +1,114 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
+import 'dart:html' as html;
 
 class PermissionService {
   static Future<bool> requestLocationPermission(BuildContext context) async {
-      print('🔵 PermissionService: requestLocationPermission called');
-        var status = await Permission.location.status;
-        print('🔵 PermissionService: current status = $status');
+    print('🔵 PermissionService: requestLocationPermission called');
+
+    // ===== ВЕБ-ВЕРСИЯ =====
+    if (const bool.fromEnvironment('dart.library.html')) {
+      return _requestWebPermission(context);
+    }
+
+    // ===== NATIVE (Android/iOS) =====
+    return _requestNativePermission(context);
+  }
+
+  // ===== ВЕБ =====
+  static Future<bool> _requestWebPermission(BuildContext context) async {
+    try {
+      // Проверяем, доступен ли Permissions API
+      final permissions = html.window.navigator.permissions;
+      if (permissions != null) {
+        try {
+          final permission = await permissions.query({'name': 'geolocation'});
+          print('🔵 Web permission state: ${permission.state}');
+
+          if (permission.state == 'granted') {
+            return true;
+          }
+
+          if (permission.state == 'prompt') {
+            // Запрашиваем доступ, получая позицию
+            try {
+              await html.window.navigator.geolocation.getCurrentPosition();
+              return true;
+            } catch (e) {
+              print('❌ Web geolocation error: $e');
+              return false;
+            }
+          }
+
+          if (permission.state == 'denied') {
+            await _showWebSettingsDialog(context);
+            return false;
+          }
+        } catch (e) {
+          print('❌ Permissions API error: $e');
+          // Если ошибка – пробуем напрямую запросить
+        }
+      }
+
+      // Если Permissions API недоступен или упал – пробуем напрямую
+      try {
+        await html.window.navigator.geolocation.getCurrentPosition();
+        return true;
+      } catch (_) {
+        return false;
+      }
+    } catch (e) {
+      print('❌ Web permission error: $e');
+      return false;
+    }
+  }
+
+  static Future<void> _showWebSettingsDialog(BuildContext context) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text(
+          'Доступ к геолокации',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'Доступ к геолокации запрещён в браузере.\n'
+          'Пожалуйста, разрешите доступ в настройках сайта.\n\n'
+          'В Chrome: нажмите на иконку замка🔒 слева от адресной строки → '
+          'Разрешения → Местоположение → Разрешить.',
+          style: TextStyle(color: Color(0xFFB0B0B0)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Закрыть',
+              style: TextStyle(color: Color(0xFF888888)),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Пытаемся обновить страницу для повторного запроса
+              html.window.location.reload();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6C63FF),
+            ),
+            child: const Text('Обновить страницу'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===== NATIVE =====
+  static Future<bool> _requestNativePermission(BuildContext context) async {
+    var status = await Permission.location.status;
+    print('🔵 PermissionService: current status = $status');
 
     if (status.isGranted) {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -47,6 +149,7 @@ class PermissionService {
     return false;
   }
 
+  // ===== ДИАЛОГИ (только для нативных платформ) =====
   static Future<bool> _showExplanationDialog(BuildContext context) async {
     return await showDialog<bool>(
       context: context,
