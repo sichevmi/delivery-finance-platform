@@ -172,25 +172,26 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   }
 
   void init({required double coefficient, required int segmentIndex}) {
-    _gpsService = ref.read(gpsServiceProvider);
-    state = OrderRouteState.initial(coefficient: coefficient, segmentIndex: segmentIndex);
-    _initGps(); // всегда пересоздаём
-    _startSegment();
-  }
+  // Получаем сервис
+  _gpsService = ref.read(gpsServiceProvider);
+  // Создаём новое состояние
+  state = OrderRouteState.initial(coefficient: coefficient, segmentIndex: segmentIndex);
+  // Подписываемся на GPS заново
+  _initGps();
+  // Запускаем сегмент
+  _startSegment();
+}
 
-  Future<void> _initGps() async {
-    // Отменяем старую подписку, если есть
-    _gpsSubscription?.cancel();
-    _gpsSubscription = null;
-    
-    // Создаём новую подписку
-    _gpsSubscription = _gpsService.distanceStream.listen((distance) {
-      if (mounted) {
-        state = state.copyWith(distance: distance);
-      }
-    });
-    _isGpsInitialized = true;
-  }
+// ===== ИНИЦИАЛИЗАЦИЯ GPS =====
+void _initGps() {
+  // Отменяем старую подписку
+  _gpsSubscription?.cancel();
+  _gpsSubscription = null;
+  // Создаём новую
+  _gpsSubscription = _gpsService.distanceStream.listen((distance) {
+    state = state.copyWith(distance: distance);
+  });
+}
 
   void _startSegment() {
     state = state.copyWith(
@@ -387,15 +388,21 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     state = OrderRouteState.initial(coefficient: state.coefficient, segmentIndex: 0);
   }
 
-  void resetToInitial() {
+  // ===== ПОЛНЫЙ СБРОС ДЛЯ НОВОГО ЗАКАЗА =====
+void resetToInitial() {
+  // Останавливаем GPS
+  if (_gpsService != null) {
     _gpsService.stopTracking();
-    _gpsSubscription?.cancel();
-    _gpsSubscription = null;
-    state = OrderRouteState.initial(
-      coefficient: state.coefficient,
-      segmentIndex: 0,
-    );
   }
+  // Отменяем подписку
+  _gpsSubscription?.cancel();
+  _gpsSubscription = null;
+  // Сбрасываем состояние
+  state = OrderRouteState.initial(
+    coefficient: state.coefficient,
+    segmentIndex: 0,
+  );
+}
 
   void cancelOrder() {
     _gpsService.stopTracking();

@@ -30,17 +30,17 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   bool _isSummaryShown = false;
 
   @override
-void initState() {
-  super.initState();
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    final notifier = ref.read(orderRouteProvider.notifier);
-    //notifier.resetToInitial(); // Обязательно сбрасываем
-    notifier.init(
-      coefficient: widget.coefficient,
-      segmentIndex: widget.segmentIndex,
-    );
-  });
-}
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final notifier = ref.read(orderRouteProvider.notifier);
+      notifier.resetToInitial(); // сначала сбрасываем
+      notifier.init(
+        coefficient: widget.coefficient,
+        segmentIndex: widget.segmentIndex,
+      );
+    });
+  }
 
   @override
   void dispose() {
