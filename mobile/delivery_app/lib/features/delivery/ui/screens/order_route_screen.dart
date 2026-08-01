@@ -34,7 +34,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final notifier = ref.read(orderRouteProvider.notifier);
-      notifier.resetToInitial(); // Полный сброс перед инициализацией
+      // Только инициализация, без сброса
       notifier.init(
         coefficient: widget.coefficient,
         segmentIndex: widget.segmentIndex,
