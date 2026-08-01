@@ -34,7 +34,7 @@ void initState() {
   super.initState();
   WidgetsBinding.instance.addPostFrameCallback((_) {
     final notifier = ref.read(orderRouteProvider.notifier);
-    notifier.resetToInitial(); // Обязательно сбрасываем
+    //notifier.resetToInitial(); // Обязательно сбрасываем
     notifier.init(
       coefficient: widget.coefficient,
       segmentIndex: widget.segmentIndex,
