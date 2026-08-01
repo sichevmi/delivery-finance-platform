@@ -1,4 +1,4 @@
-// gps_service.dart – финальная версия (БЕЗ СИНГЛТОНА)
+// gps_service.dart – финальная версия с настраиваемыми параметрами
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -6,12 +6,21 @@ import 'package:geolocator/geolocator.dart';
 import 'package:path_provider/path_provider.dart';
 
 class GpsService {
-  // УБИРАЕМ СИНГЛТОН:
-  // static final GpsService _instance = GpsService._internal();
-  // factory GpsService() => _instance;
-  
-  // Оставляем обычный конструктор
-  GpsService();
+  static final GpsService _instance = GpsService._internal();
+  factory GpsService() => _instance;
+  GpsService._internal();
+
+  // ---- НАСТРАИВАЕМЫЕ ПАРАМЕТРЫ (меняйте здесь) ----
+  static const double _minDistance = 0.1;      // минимальное перемещение для учёта (м) – 0.2 или 0.1
+  static const double _maxAccuracy = 50.0;     // максимальная точность (м) – 50 вместо 30
+  static const double _maxJump = 100.0;        // защита от выбросов (м)
+  // Фильтр скорости полностью убран (не проверяем speed)
+
+  // ---- Логирование ----
+  bool _isLoggingEnabled = false;
+  String _logBuffer = '';
+  final int _maxLogSize = 500 * 1024;
+  File? _logFile;
 
   // ---- Внутреннее состояние ----
   StreamSubscription<Position>? _positionSubscription;
@@ -20,22 +29,11 @@ class GpsService {
   Position? _lastPosition;
   bool _isPaused = false;
 
-  // ---- Константы ----
-  static const double _maxAccuracy = 50.0;
-  static const double _minDistance = 0.1;
-  static const double _maxJump = 100.0;
-
-  // ---- Логирование ----
-  bool _isLoggingEnabled = false;
-  String _logBuffer = '';
-  final int _maxLogSize = 500 * 1024;
-  File? _logFile;
-
   double get currentDistance => _totalDistance;
   final _distanceStreamController = StreamController<double>.broadcast();
   Stream<double> get distanceStream => _distanceStreamController.stream;
 
-  // ---- Публичные методы логирования ----
+  // ---- Публичные методы ----
   Future<void> startLogging() async {
     if (_isLoggingEnabled) return;
     _isLoggingEnabled = true;
@@ -91,7 +89,6 @@ class GpsService {
     }
   }
 
-  // ---- Основные методы GPS ----
   void startTracking() {
     _log('🟢 GPS: startTracking()');
     if (_isTracking) {
@@ -123,11 +120,13 @@ class GpsService {
 
     _log('📍 GPS: lat: ${position.latitude}, lon: ${position.longitude}, acc: ${position.accuracy}m');
 
+    // Фильтр точности
     if (position.accuracy > _maxAccuracy) {
       _log('⚠️ Accuracy too poor (${position.accuracy}m), ignoring');
       return;
     }
 
+    // Первая позиция
     if (_lastPosition == null) {
       _lastPosition = position;
       _log('🟢 First position stored');
@@ -142,11 +141,13 @@ class GpsService {
     );
     _log('📏 Raw distance: ${distance.toStringAsFixed(2)}m');
 
+    // Минимальное расстояние
     if (distance < _minDistance) {
       _log('📏 Too small (< ${_minDistance}m), ignoring');
       return;
     }
 
+    // Защита от выбросов
     if (distance > _maxJump) {
       _log('⚠️ Jump > ${_maxJump}m (${distance.toStringAsFixed(2)}m), ignoring');
       return;
@@ -175,7 +176,6 @@ class GpsService {
     _positionSubscription?.cancel();
     _positionSubscription = null;
     _lastPosition = null;
-    _totalDistance = 0.0;
     _distanceStreamController.add(0.0);
     if (_isLoggingEnabled) _saveLogToFile();
   }

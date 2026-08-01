@@ -171,11 +171,8 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   }
 
   void init({required double coefficient, required int segmentIndex}) {
-    _gpsService = ref.read(gpsServiceProvider);
-    // Принудительно останавливаем GPS
-    _gpsService.stopTracking();
-    _gpsService.resetDistance();
-    
+    _gpsService = GpsService(); // <-- НЕ через ref, а new!
+  
     state = OrderRouteState.initial(coefficient: coefficient, segmentIndex: segmentIndex);
     _initGps();
     _startSegment();
