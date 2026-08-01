@@ -170,18 +170,15 @@ class GpsService {
   }
 
   void stopTracking() {
-  _log('🛑 Stop');
-  _isTracking = false;
-  _isPaused = false;
-  _pollingTimer?.cancel();
-  _pollingTimer = null;
-  _lastPosition = null;
-  _filteredDistance = 0.0;
-  _distanceStreamController.add(0.0);
-  if (_isLoggingEnabled) {
-    _saveLogToFile();
+    _log('🛑 Stop');
+    _isTracking = false;
+    _isPaused = false;
+    _positionSubscription?.cancel();
+    _positionSubscription = null;
+    _lastPosition = null;
+    _distanceStreamController.add(0.0);
+    if (_isLoggingEnabled) _saveLogToFile();
   }
-}
 
   void forceRefresh() => _log('🔄 ForceRefresh (no-op)');
 
