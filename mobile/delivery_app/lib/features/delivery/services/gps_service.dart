@@ -11,7 +11,7 @@ class GpsService {
   GpsService._internal();
 
   // ---- НАСТРАИВАЕМЫЕ ПАРАМЕТРЫ (меняйте здесь) ----
-  static const double _minDistance = 0.15;      // минимальное перемещение для учёта (м) – 0.2 или 0.1
+  static const double _minDistance = 0.1;      // минимальное перемещение для учёта (м) – 0.2 или 0.1
   static const double _maxAccuracy = 50.0;     // максимальная точность (м) – 50 вместо 30
   static const double _maxJump = 100.0;        // защита от выбросов (м)
   // Фильтр скорости полностью убран (не проверяем speed)

@@ -37,6 +37,7 @@ class OrderRouteState {
   final String apartment;
   final bool isApartmentValid;
   final bool isPrivateHouse;
+  final bool isDeliveryComplete; // новый флаг
 
   const OrderRouteState({
     required this.currentSegment,
@@ -63,6 +64,7 @@ class OrderRouteState {
     required this.apartment,
     required this.isApartmentValid,
     required this.isPrivateHouse,
+    required this.isDeliveryComplete,
   });
 
   factory OrderRouteState.initial({required double coefficient, required int segmentIndex}) {
@@ -91,6 +93,7 @@ class OrderRouteState {
       apartment: '',
       isApartmentValid: false,
       isPrivateHouse: false,
+      isDeliveryComplete: false,
     );
   }
 
@@ -119,6 +122,7 @@ class OrderRouteState {
     String? apartment,
     bool? isApartmentValid,
     bool? isPrivateHouse,
+    bool? isDeliveryComplete,
   }) {
     return OrderRouteState(
       currentSegment: currentSegment ?? this.currentSegment,
@@ -145,6 +149,7 @@ class OrderRouteState {
       apartment: apartment ?? this.apartment,
       isApartmentValid: isApartmentValid ?? this.isApartmentValid,
       isPrivateHouse: isPrivateHouse ?? this.isPrivateHouse,
+      isDeliveryComplete: isDeliveryComplete ?? this.isDeliveryComplete,
     );
   }
 }
@@ -165,9 +170,6 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   }
 
   Future<void> _initGps() async {
-    // Здесь запрос разрешений и подписка на стрим
-    // Используйте PermissionService.requestLocationPermission
-    // Для простоты пока пропустим, подпишемся напрямую
     _gpsSubscription = _gpsService.distanceStream.listen((distance) {
       state = state.copyWith(distance: distance);
     });
@@ -181,6 +183,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
       totalPauseDuration: Duration.zero,
       isPaused: false,
       pauseStartTime: null,
+      isDeliveryComplete: false, // сбрасываем флаг при старте нового сегмента
     );
     _gpsService.resetDistance();
     state = state.copyWith(distance: 0.0);
@@ -302,6 +305,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
         break;
       case 3:
         await _completeDelivery();
+        // После завершения доставки НЕ переключаем сегмент, только устанавливаем флаг isDeliveryComplete = true
         break;
     }
   }
@@ -315,7 +319,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     }
   }
 
-  Future<void> _completeDelivery() async {
+    Future<void> _completeDelivery() async {
     String apartment = state.apartment.trim();
     if (!state.isPrivateHouse && apartment.isEmpty) return;
     if (state.isPrivateHouse) apartment = 'частный дом (1)';
@@ -333,18 +337,16 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
       timeDelivery: state.timeDelivery,
     );
 
-    // Добавляем в список
     final updatedList = List<Delivery>.from(state.completedDeliveries)..add(delivery);
-    state = state.copyWith(completedDeliveries: updatedList);
-
-    // Переход к экрану итогов (будет реализован в UI через callback)
-    // Пока просто увеличим номер доставки и перейдём на сегмент 2
-    // В будущем здесь будет навигация на OrderSummaryScreen
-    // Сейчас для демонстрации:
-    _startNextDelivery();
+    state = state.copyWith(
+      completedDeliveries: updatedList,
+      isDeliveryComplete: true, // поднимаем флаг
+    );
+    // Не вызываем _startNextDelivery()
   }
 
-  void _startNextDelivery() {
+  // Новый метод для перехода к следующей доставке (вызывается из UI после показа экрана итогов)
+  void startNextDelivery() {
     state = state.copyWith(
       deliveryNumber: state.deliveryNumber + 1,
       currentSegment: 2,
@@ -354,10 +356,29 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
       isPrivateHouse: false,
       weight: null,
       isWeightValid: false,
+      isDeliveryComplete: false,
     );
     _startSegment();
-    // Здесь можно показать SnackBar через ref, но это будет сделано в UI
   }
+
+  // Метод для завершения всего заказа (если пользователь не хочет продолжать)
+  void finishOrder() {
+    // Сброс состояния и переход на главный экран (будет обработано в UI)
+    state = OrderRouteState.initial(coefficient: state.coefficient, segmentIndex: 0);
+    // В UI нужно будет сделать ref.read(selectedTabProvider.notifier).state = 0 и Navigator.pop
+  }
+
+  void cancelOrder() {
+    // Сброс состояния
+    state = OrderRouteState.initial(coefficient: state.coefficient, segmentIndex: 0);
+  }
+
+  void dispose() {
+    _gpsSubscription?.cancel();
+    _gpsService.stopTracking();
+    super.dispose();
+  }
+}
 
   void cancelOrder() {
     // Сброс состояния и переход на главный экран
