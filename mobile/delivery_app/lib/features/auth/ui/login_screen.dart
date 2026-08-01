@@ -16,6 +16,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool get _isFormValid {
+  return _emailController.text.isNotEmpty && _passwordController.text.isNotEmpty;
+}
 
   @override
   void dispose() {

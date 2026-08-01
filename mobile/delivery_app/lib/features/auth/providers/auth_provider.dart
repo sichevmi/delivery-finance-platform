@@ -47,7 +47,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         '/auth/register',
         data: {'email': email, 'password': password, 'name': name},
       );
-      // После регистрации сразу логинимся
       await login(email, password);
     } on DioException catch (e) {
       final errorMsg = e.response?.data['detail'] ?? 
@@ -82,12 +81,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final refresh = response.data['refresh_token'];
       await storage.saveTokens(access, refresh);
 
-      // Получаем данные пользователя
       final userResponse = await dio.get('/auth/me');
       print('👤 User response: ${userResponse.data}');
       final user = User.fromJson(userResponse.data);
       
-      await storage.saveUserId(user.id);
+      await storage.saveUserId(user.id.toString()); // <-- исправлено
       
       state = state.copyWith(
         user: user,
@@ -140,7 +138,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         return false;
       }
 
-      // Пытаемся обновить access-токен
       try {
         final refreshResponse = await dio.post(
           '/auth/refresh',
@@ -150,10 +147,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         final newAccessToken = refreshResponse.data['access_token'];
         await storage.updateAccessToken(newAccessToken);
         
-        // Получаем данные пользователя
         final userResponse = await dio.get('/auth/me');
         final user = User.fromJson(userResponse.data);
-        await storage.saveUserId(user.id);
+        await storage.saveUserId(user.id.toString()); // <-- исправлено
         
         state = state.copyWith(
           user: user,
@@ -163,7 +159,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
         return true;
       } on DioException catch (e) {
-        // Если refresh-токен истёк – чистим хранилище
         if (e.response?.statusCode == 401) {
           await storage.clearTokens();
           state = state.copyWith(
@@ -214,7 +209,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
   // ===== ВЫХОД =====
   Future<void> logout() async {
     try {
-      // Уведомляем сервер о выходе (опционально)
       await dio.post('/auth/logout');
     } catch (e) {
       // Игнорируем ошибки при выходе

@@ -1,22 +1,27 @@
 class User {
-  final int id;
+  final String id;
   final String email;
-  final String role;
-  final bool isActive;
+  final String name;
 
-  User(
-      {required this.id,
-      required this.email,
-      required this.role,
-      required this.isActive});
+  User({
+    required this.id,
+    required this.email,
+    required this.name,
+  });
 
-  // Для ответа от /auth/hello (поле user — это email)
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      id: json['id'] ?? 0, // если id нет — ставим 0 (временно)
-      email: json['user'] ?? json['email'] ?? '',
-      role: json['role'] ?? 'user',
-      isActive: json['is_active'] ?? true,
+      id: json['id']?.toString() ?? '',
+      email: json['email'] ?? '',
+      name: json['name'] ?? json['email'] ?? 'Курьер',
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'email': email,
+      'name': name,
+    };
   }
 }

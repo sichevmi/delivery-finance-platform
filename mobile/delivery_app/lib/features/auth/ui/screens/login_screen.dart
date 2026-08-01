@@ -18,6 +18,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscure = true;
+  bool get _isFormValid {
+  return _emailController.text.isNotEmpty && _passwordController.text.isNotEmpty;
+}
 
   @override
   Widget build(BuildContext context) {
