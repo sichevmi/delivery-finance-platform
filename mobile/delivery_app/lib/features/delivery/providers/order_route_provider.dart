@@ -161,7 +161,7 @@ class OrderRouteState {
 
 class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   final Ref ref;
-  late final GpsService _gpsService;
+  late GpsService _gpsService;
   StreamSubscription<double>? _gpsSubscription;
 
   OrderRouteNotifier(this.ref) : super(OrderRouteState.initial(coefficient: 1.0, segmentIndex: 0));
@@ -170,9 +170,11 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     state = state.copyWith(shouldNavigateToHome: false);
   }
 
+  // ===== ИНИЦИАЛИЗАЦИЯ НОВОГО ЗАКАЗА =====
   void init({required double coefficient, required int segmentIndex}) {
-    _gpsService = GpsService(); // <-- НЕ через ref, а new!
-  
+    // ВСЕГДА СОЗДАЁМ НОВЫЙ ЭКЗЕМПЛЯР
+    _gpsService = GpsService();
+    
     state = OrderRouteState.initial(coefficient: coefficient, segmentIndex: segmentIndex);
     _initGps();
     _startSegment();
@@ -381,16 +383,6 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     _gpsSubscription?.cancel();
     _gpsSubscription = null;
     state = OrderRouteState.initial(coefficient: state.coefficient, segmentIndex: 0);
-  }
-
-  void resetToInitial() {
-    _gpsService.stopTracking();
-    _gpsSubscription?.cancel();
-    _gpsSubscription = null;
-    state = OrderRouteState.initial(
-      coefficient: state.coefficient,
-      segmentIndex: 0,
-    );
   }
 
   void cancelOrder() {
