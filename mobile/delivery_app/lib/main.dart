@@ -8,7 +8,6 @@ import 'package:delivery_app/features/auth/providers/auth_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SharedPreferences.getInstance();
   runApp(const ProviderScope(child: DeliveryApp()));
 }
 
@@ -32,7 +31,7 @@ class DeliveryApp extends StatelessWidget {
 }
 
 // ============================================================
-// 1. Обёртка для проверки авторизации и разрешений
+// AuthWrapper с проверкой при восстановлении
 // ============================================================
 class AuthWrapper extends ConsumerStatefulWidget {
   const AuthWrapper({super.key});
@@ -41,14 +40,32 @@ class AuthWrapper extends ConsumerStatefulWidget {
   ConsumerState<AuthWrapper> createState() => _AuthWrapperState();
 }
 
-class _AuthWrapperState extends ConsumerState<AuthWrapper> {
+class _AuthWrapperState extends ConsumerState<AuthWrapper> with WidgetsBindingObserver {
   bool _isChecking = true;
+  bool _isAuthChecked = false;
 
   @override
   void initState() {
     super.initState();
-    print('🔐 AuthWrapper: initState вызван');
+    print('🔐🔐🔐 AuthWrapper: initState ВЫЗВАН 🔐🔐🔐');
+    WidgetsBinding.instance.addObserver(this);
     _checkAuthAndPermissions();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    print('🔐 AuthWrapper: didChangeAppLifecycleState = $state');
+    if (state == AppLifecycleState.resumed && _isAuthChecked) {
+      // При возвращении на передний план проверяем авторизацию заново
+      print('🔐 AuthWrapper: приложение возобновлено, проверяем авторизацию...');
+      _checkAuthAndPermissions();
+    }
   }
 
   Future<void> _checkAuthAndPermissions() async {
@@ -69,6 +86,7 @@ class _AuthWrapperState extends ConsumerState<AuthWrapper> {
       final authNotifier = ref.read(authProvider.notifier);
       final isAuthenticated = await authNotifier.autoLogin();
       print('🔐 AuthWrapper: isAuthenticated = $isAuthenticated');
+      _isAuthChecked = true;
 
       if (!mounted) return;
 
@@ -114,7 +132,6 @@ class _AuthWrapperState extends ConsumerState<AuthWrapper> {
       );
     }
 
-    // Если разрешение не получено — показываем экран запроса
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
       body: Center(
