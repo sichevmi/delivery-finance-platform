@@ -47,47 +47,49 @@ class _AuthWrapperState extends ConsumerState<AuthWrapper> {
   @override
   void initState() {
     super.initState();
+    print('🔐 AuthWrapper: initState вызван');
     _checkAuthAndPermissions();
   }
 
   Future<void> _checkAuthAndPermissions() async {
-  print('🔐 AuthWrapper: началась проверка...');
-  
-  final hasPermission = await PermissionService.requestLocationPermission(context);
-  print('🔐 AuthWrapper: разрешение на геолокацию = $hasPermission');
-  
-  if (!hasPermission) {
-    if (mounted) {
-      setState(() => _isChecking = false);
+    print('🔐 AuthWrapper: началась проверка...');
+    
+    final hasPermission = await PermissionService.requestLocationPermission(context);
+    print('🔐 AuthWrapper: разрешение на геолокацию = $hasPermission');
+    
+    if (!hasPermission) {
+      if (mounted) {
+        setState(() => _isChecking = false);
+      }
+      return;
     }
-    return;
+
+    try {
+      print('🔐 AuthWrapper: проверка авторизации...');
+      final authNotifier = ref.read(authProvider.notifier);
+      final isAuthenticated = await authNotifier.autoLogin();
+      print('🔐 AuthWrapper: isAuthenticated = $isAuthenticated');
+
+      if (!mounted) return;
+
+      if (isAuthenticated) {
+        print('🔐 AuthWrapper: пользователь авторизован, переход на /home');
+        Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        print('🔐 AuthWrapper: пользователь НЕ авторизован, переход на /login');
+        Navigator.pushReplacementNamed(context, '/login');
+      }
+    } catch (e) {
+      print('🔐 AuthWrapper: ошибка при проверке авторизации: $e');
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/login');
+      }
+    }
   }
-
-  try {
-    print('🔐 AuthWrapper: проверка авторизации...');
-    final authNotifier = ref.read(authProvider.notifier);
-    final isAuthenticated = await authNotifier.autoLogin();
-    print('🔐 AuthWrapper: isAuthenticated = $isAuthenticated');
-
-    if (!mounted) return;
-
-    if (isAuthenticated) {
-      print('🔐 AuthWrapper: пользователь авторизован, переход на /home');
-      Navigator.pushReplacementNamed(context, '/home');
-    } else {
-      print('🔐 AuthWrapper: пользователь НЕ авторизован, переход на /login');
-      Navigator.pushReplacementNamed(context, '/login');
-    }
-  } catch (e) {
-    print('🔐 AuthWrapper: ошибка при проверке авторизации: $e');
-    if (mounted) {
-      Navigator.pushReplacementNamed(context, '/login');
-    }
-  }
-}
 
   @override
   Widget build(BuildContext context) {
+    print('🔐 AuthWrapper: build вызван, _isChecking = $_isChecking');
     if (_isChecking) {
       return const Scaffold(
         backgroundColor: Color(0xFF121212),
