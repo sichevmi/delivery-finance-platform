@@ -11,8 +11,59 @@ void main() async {
   runApp(const ProviderScope(child: DeliveryApp()));
 }
 
-class DeliveryApp extends StatelessWidget {
+class DeliveryApp extends ConsumerStatefulWidget {
   const DeliveryApp({super.key});
+
+  @override
+  ConsumerState<DeliveryApp> createState() => _DeliveryAppState();
+}
+
+class _DeliveryAppState extends ConsumerState<DeliveryApp> {
+  bool _isLoading = true;
+  bool _isAuthenticated = false;
+  bool _hasPermission = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    print('🔐 DeliveryApp: инициализация...');
+    
+    // 1. Проверяем разрешение на геолокацию
+    final hasPermission = await PermissionService.requestLocationPermission(context);
+    print('🔐 DeliveryApp: разрешение на геолокацию = $hasPermission');
+    
+    if (!hasPermission) {
+      setState(() {
+        _hasPermission = false;
+        _isLoading = false;
+      });
+      return;
+    }
+
+    // 2. Проверяем авторизацию
+    try {
+      final authNotifier = ref.read(authProvider.notifier);
+      final isAuthenticated = await authNotifier.autoLogin();
+      print('🔐 DeliveryApp: isAuthenticated = $isAuthenticated');
+      
+      setState(() {
+        _hasPermission = true;
+        _isAuthenticated = isAuthenticated;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('🔐 DeliveryApp: ошибка при проверке авторизации: $e');
+      setState(() {
+        _hasPermission = true;
+        _isAuthenticated = false;
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,75 +71,12 @@ class DeliveryApp extends StatelessWidget {
       title: 'FinFlow Delivery',
       theme: AppTheme.dark,
       debugShowCheckedModeBanner: false,
-      initialRoute: '/',
-      routes: {
-        '/': (context) => const AuthWrapper(),
-        '/login': (context) => const LoginScreen(),
-        '/home': (context) => const HomeScreen(),
-      },
+      home: _buildHome(),
     );
   }
-}
 
-// ============================================================
-// AuthWrapper с проверкой при восстановлении
-// ============================================================
-class AuthWrapper extends ConsumerStatefulWidget {
-  const AuthWrapper({super.key});
-
-  @override
-  ConsumerState<AuthWrapper> createState() => _AuthWrapperState();
-}
-
-class _AuthWrapperState extends ConsumerState<AuthWrapper> {
-  bool _isChecking = true;
-
-  @override
-  void initState() {
-    super.initState();
-    print('🔐 AuthWrapper: initState вызван');
-    _checkAuthAndPermissions();
-  }
-
-  Future<void> _checkAuthAndPermissions() async {
-    print('🔐 AuthWrapper: началась проверка...');
-    
-    final hasPermission = await PermissionService.requestLocationPermission(context);
-    print('🔐 AuthWrapper: разрешение на геолокацию = $hasPermission');
-    
-    if (!hasPermission) {
-      if (mounted) {
-        setState(() => _isChecking = false);
-      }
-      return;
-    }
-
-    try {
-      print('🔐 AuthWrapper: проверка авторизации...');
-      final authNotifier = ref.read(authProvider.notifier);
-      final isAuthenticated = await authNotifier.autoLogin();
-      print('🔐 AuthWrapper: isAuthenticated = $isAuthenticated');
-
-      if (!mounted) return;
-
-      if (isAuthenticated) {
-        print('🔐 AuthWrapper: пользователь авторизован, переход на /home');
-        Navigator.pushReplacementNamed(context, '/home');
-      } else {
-        print('🔐 AuthWrapper: пользователь НЕ авторизован, переход на /login');
-        Navigator.pushReplacementNamed(context, '/login');
-      }
-    } catch (e) {
-      print('🔐 AuthWrapper: ошибка при проверке авторизации: $e');
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, '/login');
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_isChecking) {
+  Widget _buildHome() {
+    if (_isLoading) {
       return const Scaffold(
         backgroundColor: Color(0xFF121212),
         body: Center(
@@ -104,37 +92,42 @@ class _AuthWrapperState extends ConsumerState<AuthWrapper> {
       );
     }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF121212),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.delivery_dining, size: 80, color: Color(0xFF6C63FF)),
-            const SizedBox(height: 20),
-            const Text('FinFlow Доставка', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
-            const SizedBox(height: 12),
-            const Text(
-              'Для работы приложения требуется доступ к геолокации',
-              style: TextStyle(fontSize: 14, color: Color(0xFF888888)),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () {
-                setState(() => _isChecking = true);
-                _checkAuthAndPermissions();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6C63FF),
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    if (!_hasPermission) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF121212),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.delivery_dining, size: 80, color: Color(0xFF6C63FF)),
+              const SizedBox(height: 20),
+              const Text('FinFlow Доставка', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+              const SizedBox(height: 12),
+              const Text(
+                'Для работы приложения требуется доступ к геолокации',
+                style: TextStyle(fontSize: 14, color: Color(0xFF888888)),
+                textAlign: TextAlign.center,
               ),
-              child: const Text('Разрешить доступ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            ),
-          ],
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: _initializeApp,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6C63FF),
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Разрешить доступ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    }
+
+    if (_isAuthenticated) {
+      return const HomeScreen();
+    } else {
+      return const LoginScreen();
+    }
   }
 }

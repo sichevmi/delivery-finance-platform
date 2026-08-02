@@ -30,7 +30,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
 
-    // Если уже авторизован – переходим на главную
+    // Если уже авторизован – переходим на главную (проверка на случай, если что-то пошло не так)
     if (authState.isAuthenticated && authState.user != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Navigator.pushReplacementNamed(context, '/home');
@@ -153,7 +153,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 _passwordController.text,
                               );
                               if (mounted && authState.isAuthenticated) {
-                                Navigator.pushReplacementNamed(context, '/home');
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const HomeScreen()),
+                                );
                               }
                             } finally {
                               if (mounted) setState(() => _isLoading = false);
