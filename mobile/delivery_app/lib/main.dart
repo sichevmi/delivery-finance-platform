@@ -40,32 +40,14 @@ class AuthWrapper extends ConsumerStatefulWidget {
   ConsumerState<AuthWrapper> createState() => _AuthWrapperState();
 }
 
-class _AuthWrapperState extends ConsumerState<AuthWrapper> with WidgetsBindingObserver {
+class _AuthWrapperState extends ConsumerState<AuthWrapper> {
   bool _isChecking = true;
-  bool _isAuthChecked = false;
 
   @override
   void initState() {
     super.initState();
-    print('🔐🔐🔐 AuthWrapper: initState ВЫЗВАН 🔐🔐🔐');
-    WidgetsBinding.instance.addObserver(this);
+    print('🔐 AuthWrapper: initState вызван');
     _checkAuthAndPermissions();
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    print('🔐 AuthWrapper: didChangeAppLifecycleState = $state');
-    if (state == AppLifecycleState.resumed && _isAuthChecked) {
-      // При возвращении на передний план проверяем авторизацию заново
-      print('🔐 AuthWrapper: приложение возобновлено, проверяем авторизацию...');
-      _checkAuthAndPermissions();
-    }
   }
 
   Future<void> _checkAuthAndPermissions() async {
@@ -86,7 +68,6 @@ class _AuthWrapperState extends ConsumerState<AuthWrapper> with WidgetsBindingOb
       final authNotifier = ref.read(authProvider.notifier);
       final isAuthenticated = await authNotifier.autoLogin();
       print('🔐 AuthWrapper: isAuthenticated = $isAuthenticated');
-      _isAuthChecked = true;
 
       if (!mounted) return;
 
@@ -107,7 +88,6 @@ class _AuthWrapperState extends ConsumerState<AuthWrapper> with WidgetsBindingOb
 
   @override
   Widget build(BuildContext context) {
-    print('🔐 AuthWrapper: build вызван, _isChecking = $_isChecking');
     if (_isChecking) {
       return const Scaffold(
         backgroundColor: Color(0xFF121212),
@@ -115,17 +95,9 @@ class _AuthWrapperState extends ConsumerState<AuthWrapper> with WidgetsBindingOb
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircularProgressIndicator(
-                color: Color(0xFF6C63FF),
-              ),
+              CircularProgressIndicator(color: Color(0xFF6C63FF)),
               SizedBox(height: 20),
-              Text(
-                'Загрузка...',
-                style: TextStyle(
-                  color: Color(0xFF888888),
-                  fontSize: 14,
-                ),
-              ),
+              Text('Загрузка...', style: TextStyle(color: Color(0xFF888888))),
             ],
           ),
         ),
@@ -138,27 +110,13 @@ class _AuthWrapperState extends ConsumerState<AuthWrapper> with WidgetsBindingOb
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.delivery_dining,
-              size: 80,
-              color: Color(0xFF6C63FF),
-            ),
+            const Icon(Icons.delivery_dining, size: 80, color: Color(0xFF6C63FF)),
             const SizedBox(height: 20),
-            const Text(
-              'FinFlow Доставка',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
+            const Text('FinFlow Доставка', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
             const SizedBox(height: 12),
             const Text(
               'Для работы приложения требуется доступ к геолокации',
-              style: TextStyle(
-                fontSize: 14,
-                color: Color(0xFF888888),
-              ),
+              style: TextStyle(fontSize: 14, color: Color(0xFF888888)),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -170,14 +128,9 @@ class _AuthWrapperState extends ConsumerState<AuthWrapper> with WidgetsBindingOb
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF6C63FF),
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              child: const Text(
-                'Разрешить доступ',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
+              child: const Text('Разрешить доступ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             ),
           ],
         ),
