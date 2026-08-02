@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:delivery_app/core/theme/app_theme.dart';
-import 'package:delivery_app/features/auth/ui/login_screen.dart';
+import 'package:delivery_app/features/auth/ui/screens/login_screen.dart';
 import 'package:delivery_app/features/delivery/ui/screens/home_screen.dart';
 import 'package:delivery_app/features/delivery/services/permission_service.dart';
 import 'package:delivery_app/features/auth/providers/auth_provider.dart';
@@ -50,8 +50,11 @@ class _AuthWrapperState extends ConsumerState<AuthWrapper> {
   }
 
   Future<void> _checkAuthAndPermissions() async {
+    print('🔐 AuthWrapper: началась проверка...');
+    
     // Сначала проверяем разрешение на геолокацию
     final hasPermission = await PermissionService.requestLocationPermission(context);
+    print('🔐 AuthWrapper: разрешение на геолокацию = $hasPermission');
     
     if (!hasPermission) {
       // Если разрешение не получено — показываем экран запроса
@@ -62,14 +65,18 @@ class _AuthWrapperState extends ConsumerState<AuthWrapper> {
     }
 
     // Проверяем авторизацию
+    print('🔐 AuthWrapper: проверка авторизации...');
     final authNotifier = ref.read(authProvider.notifier);
     final isAuthenticated = await authNotifier.autoLogin();
+    print('🔐 AuthWrapper: isAuthenticated = $isAuthenticated');
 
     if (!mounted) return;
 
     if (isAuthenticated) {
+      print('🔐 AuthWrapper: пользователь авторизован, переход на /home');
       Navigator.pushReplacementNamed(context, '/home');
     } else {
+      print('🔐 AuthWrapper: пользователь НЕ авторизован, переход на /login');
       Navigator.pushReplacementNamed(context, '/login');
     }
   }
@@ -132,7 +139,10 @@ class _AuthWrapperState extends ConsumerState<AuthWrapper> {
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: _checkAuthAndPermissions,
+              onPressed: () {
+                setState(() => _isChecking = true);
+                _checkAuthAndPermissions();
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF6C63FF),
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),

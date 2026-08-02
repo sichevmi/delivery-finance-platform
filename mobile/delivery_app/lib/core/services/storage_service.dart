@@ -9,20 +9,26 @@ class StorageService {
   Future<SharedPreferences> get _prefs async => await SharedPreferences.getInstance();
 
   Future<void> saveTokens(String accessToken, String refreshToken) async {
-    final prefs = await _prefs;
-    await prefs.setString(_accessTokenKey, accessToken);
-    await prefs.setString(_refreshTokenKey, refreshToken);
-  }
+  print('💾 Saving tokens...');
+  final prefs = await _prefs;
+  await prefs.setString(_accessTokenKey, accessToken);
+  await prefs.setString(_refreshTokenKey, refreshToken);
+  print('💾 Tokens saved: access=${accessToken.substring(0, 20)}...');
+}
 
-  Future<String?> getAccessToken() async {
-    final prefs = await _prefs;
-    return prefs.getString(_accessTokenKey);
-  }
+Future<String?> getAccessToken() async {
+  final prefs = await _prefs;
+  final token = prefs.getString(_accessTokenKey);
+  print('🔑 Access token: ${token != null ? token.substring(0, 20) + "..." : "null"}');
+  return token;
+}
 
-  Future<String?> getRefreshToken() async {
-    final prefs = await _prefs;
-    return prefs.getString(_refreshTokenKey);
-  }
+Future<String?> getRefreshToken() async {
+  final prefs = await _prefs;
+  final token = prefs.getString(_refreshTokenKey);
+  print('🔑 Refresh token: ${token != null ? token.substring(0, 20) + "..." : "null"}');
+  return token;
+}
 
   Future<void> updateAccessToken(String newAccessToken) async {
     final prefs = await _prefs;

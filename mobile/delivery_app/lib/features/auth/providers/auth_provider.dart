@@ -126,81 +126,81 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   // ===== АВТОМАТИЧЕСКАЯ АВТОРИЗАЦИЯ =====
   Future<bool> autoLogin() async {
-    state = state.copyWith(isLoading: true);
+  print('🔄 autoLogin() started');
+  state = state.copyWith(isLoading: true);
+  
+  try {
+    final hasTokens = await storage.hasTokens();
+    print('🔄 hasTokens: $hasTokens');
     
-    try {
-      final hasTokens = await storage.hasTokens();
-      if (!hasTokens) {
-        state = state.copyWith(
-          isLoading: false,
-          isAuthenticated: false,
-        );
-        return false;
-      }
-
-      final refreshToken = await storage.getRefreshToken();
-      if (refreshToken == null || refreshToken.isEmpty) {
-        state = state.copyWith(
-          isLoading: false,
-          isAuthenticated: false,
-        );
-        return false;
-      }
-
-      try {
-        final refreshResponse = await dio.post(
-          '/api/v1/auth/refresh',
-          data: {'refresh_token': refreshToken},
-        );
-        
-        final newAccessToken = refreshResponse.data['access_token'];
-        await storage.updateAccessToken(newAccessToken);
-        
-        // Используем правильный эндпоинт /api/v1/auth/hello
-        final userResponse = await dio.get('/api/v1/auth/hello');
-        dynamic userData;
-        if (userResponse.data is Map && userResponse.data.containsKey('user')) {
-          userData = userResponse.data['user'];
-        } else {
-          userData = userResponse.data;
-        }
-        
-        final user = User.fromJson(userData);
-        await storage.saveUserId(user.id.toString());
-        
-        state = state.copyWith(
-          user: user,
-          isLoading: false,
-          isAuthenticated: true,
-          error: null,
-        );
-        return true;
-      } on DioException catch (e) {
-        if (e.response?.statusCode == 401) {
-          await storage.clearTokens();
-          state = state.copyWith(
-            isLoading: false,
-            isAuthenticated: false,
-            error: 'Сессия истекла, войдите заново',
-          );
-        } else {
-          state = state.copyWith(
-            isLoading: false,
-            isAuthenticated: false,
-            error: 'Ошибка обновления сессии',
-          );
-        }
-        return false;
-      }
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        isAuthenticated: false,
-        error: 'Ошибка автоматического входа',
-      );
+    if (!hasTokens) {
+      print('🔄 No tokens found');
+      state = state.copyWith(isLoading: false, isAuthenticated: false);
       return false;
     }
+
+    final refreshToken = await storage.getRefreshToken();
+    print('🔄 Refresh token: ${refreshToken != null ? refreshToken.substring(0, 20) + "..." : "null"}');
+    
+    if (refreshToken == null || refreshToken.isEmpty) {
+      print('🔄 Refresh token is empty');
+      state = state.copyWith(isLoading: false, isAuthenticated: false);
+      return false;
+    }
+
+    // Пытаемся обновить токен
+    print('🔄 Trying to refresh token...');
+    try {
+      final refreshResponse = await dio.post(
+        '/api/v1/auth/refresh',
+        data: {'refresh_token': refreshToken},
+      );
+      
+      final newAccessToken = refreshResponse.data['access_token'];
+      await storage.updateAccessToken(newAccessToken);
+      print('🔄 Token refreshed successfully');
+      
+      // Получаем данные пользователя
+      final userResponse = await dio.get('/api/v1/auth/hello');
+      final user = User.fromJson(userResponse.data);
+      await storage.saveUserId(user.id.toString());
+      
+      state = state.copyWith(
+        user: user,
+        isLoading: false,
+        isAuthenticated: true,
+        error: null,
+      );
+      print('🔄 Auto-login successful! User: ${user.email}');
+      return true;
+    } on DioException catch (e) {
+      print('🔄 Refresh failed: ${e.response?.statusCode} - ${e.response?.data}');
+      if (e.response?.statusCode == 401) {
+        await storage.clearTokens();
+        state = state.copyWith(
+          isLoading: false,
+          isAuthenticated: false,
+          error: 'Сессия истекла, войдите заново',
+        );
+      } else {
+        state = state.copyWith(
+          isLoading: false,
+          isAuthenticated: false,
+          error: 'Ошибка обновления сессии',
+        );
+      }
+      return false;
+    }
+  } catch (e) {
+    print('🔄 Unexpected error in autoLogin: $e');
+    state = state.copyWith(
+      isLoading: false,
+      isAuthenticated: false,
+      error: 'Ошибка автоматического входа',
+    );
+    return false;
   }
+}
 
   // ===== ОБНОВЛЕНИЕ ACCESS-ТОКЕНА =====
   Future<bool> refreshToken() async {
