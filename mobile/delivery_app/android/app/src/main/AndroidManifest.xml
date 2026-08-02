@@ -17,8 +17,6 @@
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"
         android:allowBackup="true"
-        android:fullBackupContent="true"
-        android:dataExtractionRules="@xml/data_extraction_rules">
         
         <!-- Сервис для фоновой GPS -->
         <service
