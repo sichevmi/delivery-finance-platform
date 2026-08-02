@@ -39,7 +39,11 @@ class GpsControl extends ConsumerWidget {
                 const SizedBox(width: 4),
                 Text(
                   '${state.distance.toStringAsFixed(2)} км',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
               ],
             )
@@ -48,7 +52,11 @@ class GpsControl extends ConsumerWidget {
               width: 60,
               child: TextField(
                 keyboardType: TextInputType.numberWithOptions(decimal: true),
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
                 decoration: const InputDecoration(
                   border: InputBorder.none,
                   isDense: true,
@@ -58,7 +66,8 @@ class GpsControl extends ConsumerWidget {
                 onChanged: (value) {
                   final parsed = double.tryParse(value.replaceAll(',', '.'));
                   if (parsed != null && parsed >= 0) {
-                    notifier.state = notifier.state.copyWith(distance: parsed);
+                    // Обновляем manualDistance через специальный метод
+                    notifier.updateManualDistance(parsed);
                   }
                 },
               ),
@@ -69,10 +78,14 @@ class GpsControl extends ConsumerWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: state.isPaused ? Colors.green.withOpacity(0.15) : Colors.orange.withOpacity(0.15),
+                color: state.isPaused
+                    ? Colors.green.withOpacity(0.15)
+                    : Colors.orange.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                  color: state.isPaused ? Colors.green.withOpacity(0.3) : Colors.orange.withOpacity(0.3),
+                  color: state.isPaused
+                      ? Colors.green.withOpacity(0.3)
+                      : Colors.orange.withOpacity(0.3),
                 ),
               ),
               child: Row(

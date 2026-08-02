@@ -29,19 +29,19 @@ class OrderRouteScreen extends ConsumerStatefulWidget {
 class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   bool _isSummaryShown = false;
 
- @override
-void initState() {
-  super.initState();
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    Future.delayed(const Duration(milliseconds: 100), () {
-      final notifier = ref.read(orderRouteProvider.notifier);
-      notifier.init(
-        coefficient: widget.coefficient,
-        segmentIndex: widget.segmentIndex,
-      );
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 100), () {
+        final notifier = ref.read(orderRouteProvider.notifier);
+        notifier.init(
+          coefficient: widget.coefficient,
+          segmentIndex: widget.segmentIndex,
+        );
+      });
     });
-  });
-}
+  }
 
   @override
   void dispose() {

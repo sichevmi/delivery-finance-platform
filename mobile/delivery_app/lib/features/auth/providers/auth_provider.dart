@@ -79,7 +79,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       final access = response.data['access_token'];
       final refresh = response.data['refresh_token'];
+      print('💾 Calling storage.saveTokens...');
       await storage.saveTokens(access, refresh);
+      print('💾 storage.saveTokens completed');
 
       // Используем правильный эндпоинт /api/v1/auth/hello
       final userResponse = await dio.get('/api/v1/auth/hello');
@@ -148,7 +150,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return false;
     }
 
-    // Пытаемся обновить токен
     print('🔄 Trying to refresh token...');
     try {
       final refreshResponse = await dio.post(
@@ -160,7 +161,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await storage.updateAccessToken(newAccessToken);
       print('🔄 Token refreshed successfully');
       
-      // Получаем данные пользователя
       final userResponse = await dio.get('/api/v1/auth/hello');
       final user = User.fromJson(userResponse.data);
       await storage.saveUserId(user.id.toString());
@@ -177,18 +177,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
       print('🔄 Refresh failed: ${e.response?.statusCode} - ${e.response?.data}');
       if (e.response?.statusCode == 401) {
         await storage.clearTokens();
-        state = state.copyWith(
-          isLoading: false,
-          isAuthenticated: false,
-          error: 'Сессия истекла, войдите заново',
-        );
-      } else {
-        state = state.copyWith(
-          isLoading: false,
-          isAuthenticated: false,
-          error: 'Ошибка обновления сессии',
-        );
       }
+      state = state.copyWith(
+        isLoading: false,
+        isAuthenticated: false,
+        error: e.response?.statusCode == 401 ? 'Сессия истекла, войдите заново' : 'Ошибка обновления сессии',
+      );
       return false;
     }
   } catch (e) {
@@ -196,7 +190,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(
       isLoading: false,
       isAuthenticated: false,
-      error: 'Ошибка автоматического входа',
+      error: 'Ошибка автоматического входа: $e',
     );
     return false;
   }

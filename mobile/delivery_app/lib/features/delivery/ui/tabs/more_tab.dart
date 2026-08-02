@@ -4,6 +4,7 @@ import 'package:delivery_app/features/auth/providers/auth_provider.dart';
 import 'package:delivery_app/features/auth/ui/screens/login_screen.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 import 'package:delivery_app/features/delivery/services/gps_service.dart';
+import 'package:share_plus/share_plus.dart';
 
 class MoreTab extends ConsumerStatefulWidget {
   const MoreTab({super.key});
@@ -361,34 +362,41 @@ class _MoreTabState extends ConsumerState<MoreTab> {
   }
 
   void _shareLogFile(GpsService gpsService) async {
-    try {
-      final logPath = await gpsService.getLogFilePath();
-      if (logPath == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Лог-файл не найден'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-        return;
-      }
-
-      // TODO: реализовать отправку логов (через share_plus или email)
+  try {
+    final logPath = await gpsService.getLogFilePath();
+    if (logPath == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Функция отправки логов в разработке'),
+          content: Text('Лог-файл не найден'),
           backgroundColor: Colors.orange,
         ),
       );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Ошибка: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      return;
     }
+
+    final content = await gpsService.readLogFile();
+    
+    // Отправляем через Share
+    await Share.share(
+      content,
+      subject: 'GPS Logs от ${DateTime.now()}',
+    );
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Логи отправлены'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Ошибка: $e'),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
+}
 
   void _showLogoutDialog(BuildContext context, AuthNotifier authNotifier) {
     showDialog(

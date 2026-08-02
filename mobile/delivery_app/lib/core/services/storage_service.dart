@@ -1,5 +1,4 @@
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class StorageService {
   static const String _accessTokenKey = 'access_token';
@@ -9,30 +8,35 @@ class StorageService {
   Future<SharedPreferences> get _prefs async => await SharedPreferences.getInstance();
 
   Future<void> saveTokens(String accessToken, String refreshToken) async {
-  print('💾 Saving tokens...');
-  final prefs = await _prefs;
-  await prefs.setString(_accessTokenKey, accessToken);
-  await prefs.setString(_refreshTokenKey, refreshToken);
-  print('💾 Tokens saved: access=${accessToken.substring(0, 20)}...');
-}
+    print('💾 Saving tokens...');
+    final prefs = await _prefs;
+    await prefs.setString(_accessTokenKey, accessToken);
+    await prefs.setString(_refreshTokenKey, refreshToken);
+    print('💾 Tokens saved successfully');
+    
+    // Проверяем, что сохранилось
+    final saved = prefs.getString(_accessTokenKey);
+    print('💾 Saved access token: ${saved != null ? saved.substring(0, 20) + "..." : "null"}');
+  }
 
-Future<String?> getAccessToken() async {
-  final prefs = await _prefs;
-  final token = prefs.getString(_accessTokenKey);
-  print('🔑 Access token: ${token != null ? token.substring(0, 20) + "..." : "null"}');
-  return token;
-}
+  Future<String?> getAccessToken() async {
+    final prefs = await _prefs;
+    final token = prefs.getString(_accessTokenKey);
+    print('🔑 Access token: ${token != null ? token.substring(0, 20) + "..." : "null"}');
+    return token;
+  }
 
-Future<String?> getRefreshToken() async {
-  final prefs = await _prefs;
-  final token = prefs.getString(_refreshTokenKey);
-  print('🔑 Refresh token: ${token != null ? token.substring(0, 20) + "..." : "null"}');
-  return token;
-}
+  Future<String?> getRefreshToken() async {
+    final prefs = await _prefs;
+    final token = prefs.getString(_refreshTokenKey);
+    print('🔑 Refresh token: ${token != null ? token.substring(0, 20) + "..." : "null"}');
+    return token;
+  }
 
   Future<void> updateAccessToken(String newAccessToken) async {
     final prefs = await _prefs;
     await prefs.setString(_accessTokenKey, newAccessToken);
+    print('💾 Access token updated');
   }
 
   Future<void> saveUserId(String userId) async {
@@ -48,7 +52,9 @@ Future<String?> getRefreshToken() async {
   Future<bool> hasTokens() async {
     final prefs = await _prefs;
     final refresh = prefs.getString(_refreshTokenKey);
-    return refresh != null && refresh.isNotEmpty;
+    final has = refresh != null && refresh.isNotEmpty;
+    print('💾 hasTokens: $has');
+    return has;
   }
 
   Future<void> clearTokens() async {
@@ -56,6 +62,7 @@ Future<String?> getRefreshToken() async {
     await prefs.remove(_accessTokenKey);
     await prefs.remove(_refreshTokenKey);
     await prefs.remove(_userIdKey);
+    print('💾 Tokens cleared');
   }
 }
 

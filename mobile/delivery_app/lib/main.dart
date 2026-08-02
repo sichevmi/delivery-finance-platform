@@ -8,6 +8,7 @@ import 'package:delivery_app/features/auth/providers/auth_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await SharedPreferences.getInstance();
   runApp(const ProviderScope(child: DeliveryApp()));
 }
 
@@ -50,21 +51,19 @@ class _AuthWrapperState extends ConsumerState<AuthWrapper> {
   }
 
   Future<void> _checkAuthAndPermissions() async {
-    print('🔐 AuthWrapper: началась проверка...');
-    
-    // Сначала проверяем разрешение на геолокацию
-    final hasPermission = await PermissionService.requestLocationPermission(context);
-    print('🔐 AuthWrapper: разрешение на геолокацию = $hasPermission');
-    
-    if (!hasPermission) {
-      // Если разрешение не получено — показываем экран запроса
-      if (mounted) {
-        setState(() => _isChecking = false);
-      }
-      return;
+  print('🔐 AuthWrapper: началась проверка...');
+  
+  final hasPermission = await PermissionService.requestLocationPermission(context);
+  print('🔐 AuthWrapper: разрешение на геолокацию = $hasPermission');
+  
+  if (!hasPermission) {
+    if (mounted) {
+      setState(() => _isChecking = false);
     }
+    return;
+  }
 
-    // Проверяем авторизацию
+  try {
     print('🔐 AuthWrapper: проверка авторизации...');
     final authNotifier = ref.read(authProvider.notifier);
     final isAuthenticated = await authNotifier.autoLogin();
@@ -79,7 +78,13 @@ class _AuthWrapperState extends ConsumerState<AuthWrapper> {
       print('🔐 AuthWrapper: пользователь НЕ авторизован, переход на /login');
       Navigator.pushReplacementNamed(context, '/login');
     }
+  } catch (e) {
+    print('🔐 AuthWrapper: ошибка при проверке авторизации: $e');
+    if (mounted) {
+      Navigator.pushReplacementNamed(context, '/login');
+    }
   }
+}
 
   @override
   Widget build(BuildContext context) {

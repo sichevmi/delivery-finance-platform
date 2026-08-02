@@ -14,11 +14,17 @@ class SegmentContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     switch (state.currentSegment) {
       case 0:
-        return const Text('Пробег до магазина (бесплатный)', style: TextStyle(fontSize: 14, color: Colors.white));
+        return const Text(
+          'Пробег до магазина (бесплатный)',
+          style: TextStyle(fontSize: 14, color: Colors.white),
+        );
       case 1:
         return WeightInput(state: state, notifier: notifier);
       case 2:
-        return const Text('Пробег до клиента (платный)', style: TextStyle(fontSize: 14, color: Colors.white));
+        return const Text(
+          'Пробег до клиента (платный)',
+          style: TextStyle(fontSize: 14, color: Colors.white),
+        );
       case 3:
         return ApartmentInput(state: state, notifier: notifier);
       default:

@@ -39,6 +39,7 @@ class OrderRouteState {
   final bool isPrivateHouse;
   final bool showSummary;
   final bool shouldNavigateToHome;
+  final double manualDistance; // <-- добавлено
 
   const OrderRouteState({
     required this.currentSegment,
@@ -67,6 +68,7 @@ class OrderRouteState {
     required this.isPrivateHouse,
     this.showSummary = false,
     this.shouldNavigateToHome = false,
+    this.manualDistance = 0.0, // <-- добавлено
   });
 
   factory OrderRouteState.initial({required double coefficient, required int segmentIndex}) {
@@ -97,6 +99,7 @@ class OrderRouteState {
       isPrivateHouse: false,
       showSummary: false,
       shouldNavigateToHome: false,
+      manualDistance: 0.0,
     );
   }
 
@@ -127,6 +130,7 @@ class OrderRouteState {
     bool? isPrivateHouse,
     bool? showSummary,
     bool? shouldNavigateToHome,
+    double? manualDistance,
   }) {
     return OrderRouteState(
       currentSegment: currentSegment ?? this.currentSegment,
@@ -155,6 +159,7 @@ class OrderRouteState {
       isPrivateHouse: isPrivateHouse ?? this.isPrivateHouse,
       showSummary: showSummary ?? this.showSummary,
       shouldNavigateToHome: shouldNavigateToHome ?? this.shouldNavigateToHome,
+      manualDistance: manualDistance ?? this.manualDistance,
     );
   }
 }
@@ -180,6 +185,11 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     _startSegment();
   }
 
+  // ===== ОБНОВЛЕНИЕ РУЧНОГО РАССТОЯНИЯ =====
+  void updateManualDistance(double distance) {
+    state = state.copyWith(manualDistance: distance);
+  }
+
   void _initGps() {
     _gpsSubscription?.cancel();
     _gpsSubscription = null;
@@ -202,6 +212,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     );
     _gpsService.resetDistance();
     state = state.copyWith(distance: 0.0);
+    state = state.copyWith(manualDistance: 0.0); // сбрасываем ручное расстояние
     if (state.useGps && state.currentSegment != 1) {
       _gpsService.startTracking();
     }
@@ -244,7 +255,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     if (state.useGps) {
       return state.distance;
     } else {
-      return 0.0;
+      return state.manualDistance;
     }
   }
 
@@ -374,6 +385,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
       weight: null,
       isWeightValid: false,
       showSummary: false,
+      manualDistance: 0.0,
     );
     _startSegment();
   }
