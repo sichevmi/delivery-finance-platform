@@ -12,33 +12,90 @@ class LoginScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingObserver {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscure = true;
   bool _isLoading = false;
+  bool _isCheckingAuth = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _checkAutoLogin();
+  }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) {
-    final authState = ref.watch(authProvider);
-    final authNotifier = ref.read(authProvider.notifier);
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // При возвращении на передний план проверяем авторизацию
+      _checkAutoLogin();
+    }
+  }
 
+  Future<void> _checkAutoLogin() async {
+    print('🔐 LoginScreen: проверка авторизации...');
+    final authState = ref.read(authProvider);
+    
     // Если уже авторизован – переходим на главную
     if (authState.isAuthenticated && authState.user != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
-      });
+      print('🔐 LoginScreen: уже авторизован, переход на /home');
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/home');
+      }
+      return;
+    }
+
+    // Пробуем автологин
+    final authNotifier = ref.read(authProvider.notifier);
+    final isAuthenticated = await authNotifier.autoLogin();
+    print('🔐 LoginScreen: isAuthenticated = $isAuthenticated');
+    
+    if (mounted && isAuthenticated) {
+      print('🔐 LoginScreen: автологин успешен, переход на /home');
+      Navigator.pushReplacementNamed(context, '/home');
+    } else {
+      setState(() => _isCheckingAuth = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+
+    // Если проверка ещё идёт – показываем загрузку
+    if (_isCheckingAuth) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF121212),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: Color(0xFF6C63FF)),
+              SizedBox(height: 20),
+              Text(
+                'Проверка авторизации...',
+                style: TextStyle(color: Color(0xFF888888)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Если уже авторизован – показываем главную (но этот случай уже обработан выше)
+    if (authState.isAuthenticated && authState.user != null) {
+      return const SizedBox.shrink();
     }
 
     return Scaffold(
@@ -150,20 +207,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           if (_formKey.currentState!.validate()) {
                             setState(() => _isLoading = true);
                             try {
+                              final authNotifier = ref.read(authProvider.notifier);
                               await authNotifier.login(
                                 _emailController.text.trim(),
                                 _passwordController.text,
                               );
                               if (mounted && authState.isAuthenticated) {
-                                Navigator.pushReplacement(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const HomeScreen(),
-                                  ),
-                                );
+                                Navigator.pushReplacementNamed(context, '/home');
                               }
-                            } catch (e) {
-                              // Ошибка уже обработана в authState.error
                             } finally {
                               if (mounted) setState(() => _isLoading = false);
                             }
