@@ -41,12 +41,12 @@ class OrderSummaryScreen extends ConsumerWidget {
     final shopWeight = firstDelivery?.weight ?? 0.0;
     final shopCost = (pricing.receivingFee + (shopWeight * pricing.pricePerKg)) * coefficient;
 
-    // Рассчитываем расходы (бензин)
-    final fuelConsumption = 0.0; // TODO: брать из справочника
-    final fuelPrice = 0.0; // TODO: брать из справочника
+    // Расходы (бензин) – пока заглушка
+    final fuelConsumption = 0.0;
+    final fuelPrice = 0.0;
     final totalFuelLiters = totalDistance * (fuelConsumption / 100);
     final totalFuelCost = totalFuelLiters * fuelPrice;
-    final totalExpenses = totalFuelCost; // + амортизация и т.д.
+    final totalExpenses = totalFuelCost;
 
     // Рассчитываем стоимость каждой доставки
     double totalDeliveriesCost = 0.0;
@@ -77,7 +77,7 @@ class OrderSummaryScreen extends ConsumerWidget {
                 Text(
                   'Доставок: ${deliveries.length}',
                   style: const TextStyle(
-                    fontSize: 18,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
@@ -92,7 +92,7 @@ class OrderSummaryScreen extends ConsumerWidget {
                   child: Text(
                     'Коэф. ${coefficient.toString()}',
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 13,
                       color: Color(0xFF6C63FF),
                       fontWeight: FontWeight.w600,
                     ),
@@ -102,18 +102,18 @@ class OrderSummaryScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
 
-            // Карточка "Магазин" (убрано время, сумма в правом углу)
+            // Карточка "Магазин" (укрупнённая)
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: const Color(0xFF1E1E1E),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFF2C2C2C)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.storefront, size: 18, color: Color(0xFF6C63FF)),
-                  const SizedBox(width: 8),
+                  const Icon(Icons.storefront, size: 22, color: Color(0xFF6C63FF)),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -121,26 +121,25 @@ class OrderSummaryScreen extends ConsumerWidget {
                         const Text(
                           'Магазин',
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 16,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         Wrap(
-                          spacing: 6,
+                          spacing: 8,
                           runSpacing: 4,
                           children: [
-                            _buildChip(Icons.route, '${shopDistance.toStringAsFixed(2)} км'),
-                            _buildChip(Icons.fitness_center, '${shopWeight.toStringAsFixed(1)} кг'),
+                            _buildChip(Icons.route, '${shopDistance.toStringAsFixed(2)} км', size: 14),
+                            _buildChip(Icons.fitness_center, '${shopWeight.toStringAsFixed(1)} кг', size: 14),
                           ],
                         ),
                       ],
                     ),
                   ),
-                  // Сумма в правом углу
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: const Color(0xFF6C63FF).withOpacity(0.15),
                       borderRadius: BorderRadius.circular(10),
@@ -149,7 +148,7 @@ class OrderSummaryScreen extends ConsumerWidget {
                       '${shopCost.toStringAsFixed(0)} руб.',
                       style: const TextStyle(
                         color: Color(0xFF6C63FF),
-                        fontSize: 13,
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -159,7 +158,7 @@ class OrderSummaryScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
 
-            // Список доставок (убрано время, только адрес, дом, пробег, сумма)
+            // Список доставок (укрупнённый)
             Expanded(
               child: ListView.separated(
                 itemCount: deliveries.length,
@@ -174,60 +173,52 @@ class OrderSummaryScreen extends ConsumerWidget {
 
             const SizedBox(height: 12),
 
-            // Итоги (общее время, платный пробег, сумма без расходов, чистая прибыль)
+            // Итоги (укрупнённые, симметричные)
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: const Color(0xFF1E1E1E),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFF2C2C2C)),
               ),
               child: Column(
                 children: [
                   Row(
                     children: [
+                      // Общее время – слева
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Общее время', style: TextStyle(color: Color(0xFF888888), fontSize: 11)),
-                            Text(_formatTime(totalTime), style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                            const Text(
+                              'Общее время',
+                              style: TextStyle(color: Color(0xFF888888), fontSize: 12),
+                            ),
+                            Text(
+                              _formatTime(totalTime),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Платный пробег', style: TextStyle(color: Color(0xFF888888), fontSize: 11)),
-                            Text('${totalDistance.toStringAsFixed(2)} км', style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Divider(color: Color(0xFF2C2C2C), height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Сумма без расходов', style: TextStyle(color: Color(0xFF888888), fontSize: 11)),
-                            Text('${totalCostFinal.toStringAsFixed(0)} руб.', style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
+                      // Платный пробег – справа
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            const Text('Чистая прибыль', style: TextStyle(color: Color(0xFF888888), fontSize: 11)),
+                            const Text(
+                              'Платный пробег',
+                              style: TextStyle(color: Color(0xFF888888), fontSize: 12),
+                            ),
                             Text(
-                              '${netProfit.toStringAsFixed(0)} руб.',
-                              style: TextStyle(
-                                color: netProfit >= 0 ? Colors.green : Colors.red,
-                                fontSize: 15,
+                              '${totalDistance.toStringAsFixed(2)} км',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -236,7 +227,49 @@ class OrderSummaryScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  // Расходы (дополнительная информация)
+                  const Divider(color: Color(0xFF2C2C2C), height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Стоимость заказа',
+                              style: TextStyle(color: Color(0xFF888888), fontSize: 12),
+                            ),
+                            Text(
+                              '${totalCostFinal.toStringAsFixed(0)} руб.',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            const Text(
+                              'Чистая прибыль',
+                              style: TextStyle(color: Color(0xFF888888), fontSize: 12),
+                            ),
+                            Text(
+                              '${netProfit.toStringAsFixed(0)} руб.',
+                              style: TextStyle(
+                                color: netProfit >= 0 ? Colors.green : Colors.red,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                   if (totalExpenses > 0) ...[
                     const Divider(color: Color(0xFF2C2C2C), height: 16),
                     Row(
@@ -245,17 +278,20 @@ class OrderSummaryScreen extends ConsumerWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Расходы', style: TextStyle(color: Color(0xFF888888), fontSize: 11)),
+                              const Text(
+                                'Расходы',
+                                style: TextStyle(color: Color(0xFF888888), fontSize: 12),
+                              ),
                               Text(
                                 'Бензин: ${totalFuelLiters.toStringAsFixed(1)} л × ${fuelPrice.toStringAsFixed(0)} руб.',
-                                style: const TextStyle(color: Color(0xFF888888), fontSize: 12),
+                                style: const TextStyle(color: Color(0xFF888888), fontSize: 13),
                               ),
                             ],
                           ),
                         ),
                         Text(
                           '-${totalExpenses.toStringAsFixed(0)} руб.',
-                          style: const TextStyle(color: Colors.orange, fontSize: 14, fontWeight: FontWeight.w600),
+                          style: const TextStyle(color: Colors.orange, fontSize: 16, fontWeight: FontWeight.w600),
                         ),
                       ],
                     ),
@@ -276,9 +312,9 @@ class OrderSummaryScreen extends ConsumerWidget {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF6C63FF),
                       side: const BorderSide(color: Color(0xFF6C63FF)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                     child: const Text(
@@ -299,9 +335,9 @@ class OrderSummaryScreen extends ConsumerWidget {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF6C63FF),
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                     child: const Text(
@@ -323,17 +359,17 @@ class OrderSummaryScreen extends ConsumerWidget {
 
   Widget _buildDeliveryCard(Delivery d, double deliveryCost) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFF2C2C2C)),
       ),
       child: Row(
         children: [
           Container(
-            width: 28,
-            height: 28,
+            width: 34,
+            height: 34,
             decoration: const BoxDecoration(
               color: Color(0xFF6C63FF),
               shape: BoxShape.circle,
@@ -344,12 +380,12 @@ class OrderSummaryScreen extends ConsumerWidget {
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
-                  fontSize: 12,
+                  fontSize: 14,
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -358,7 +394,7 @@ class OrderSummaryScreen extends ConsumerWidget {
                   d.clientAddress,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: FontWeight.w500,
                   ),
                   maxLines: 1,
@@ -368,17 +404,16 @@ class OrderSummaryScreen extends ConsumerWidget {
                   'кв. ${d.apartment}',
                   style: const TextStyle(
                     color: Color(0xFF888888),
-                    fontSize: 12,
+                    fontSize: 13,
                   ),
                 ),
-                const SizedBox(height: 2),
-                _buildChip(Icons.route, '${d.distanceToClient.toStringAsFixed(2)} км'),
+                const SizedBox(height: 4),
+                _buildChip(Icons.route, '${d.distanceToClient.toStringAsFixed(2)} км', size: 13),
               ],
             ),
           ),
-          // Сумма в правом углу
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: const Color(0xFF6C63FF).withOpacity(0.15),
               borderRadius: BorderRadius.circular(10),
@@ -387,7 +422,7 @@ class OrderSummaryScreen extends ConsumerWidget {
               '${deliveryCost.toStringAsFixed(0)} руб.',
               style: const TextStyle(
                 color: Color(0xFF6C63FF),
-                fontSize: 13,
+                fontSize: 15,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -397,9 +432,9 @@ class OrderSummaryScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildChip(IconData icon, String text) {
+  Widget _buildChip(IconData icon, String text, {double size = 12}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
       decoration: BoxDecoration(
         color: const Color(0xFF2C2C2C),
         borderRadius: BorderRadius.circular(12),
@@ -407,13 +442,13 @@ class OrderSummaryScreen extends ConsumerWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: const Color(0xFF888888)),
+          Icon(icon, size: size, color: const Color(0xFF888888)),
           const SizedBox(width: 4),
           Text(
             text,
-            style: const TextStyle(
-              fontSize: 11,
-              color: Color(0xFF888888),
+            style: TextStyle(
+              fontSize: size,
+              color: const Color(0xFF888888),
             ),
           ),
         ],
