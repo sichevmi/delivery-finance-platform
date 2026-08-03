@@ -41,10 +41,13 @@ class OrderSummaryScreen extends ConsumerWidget {
     final shopWeight = firstDelivery?.weight ?? 0.0;
     final shopCost = (pricing.receivingFee + (shopWeight * pricing.pricePerKg)) * coefficient;
 
+    // Платный пробег = сумма расстояний до клиентов по всем доставкам
+    final totalPaidDistance = deliveries.fold(0.0, (sum, d) => sum + d.distanceToClient);
+
     // Расходы (бензин) – пока заглушка
     final fuelConsumption = 0.0;
     final fuelPrice = 0.0;
-    final totalFuelLiters = totalDistance * (fuelConsumption / 100);
+    final totalFuelLiters = totalPaidDistance * (fuelConsumption / 100);
     final totalFuelCost = totalFuelLiters * fuelPrice;
     final totalExpenses = totalFuelCost;
 
@@ -64,312 +67,256 @@ class OrderSummaryScreen extends ConsumerWidget {
         backgroundColor: const Color(0xFF1E1E1E),
         automaticallyImplyLeading: false,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Заголовок с количеством доставок
-            Row(
-              children: [
-                const Icon(Icons.receipt_long, color: Color(0xFF6C63FF), size: 24),
-                const SizedBox(width: 8),
-                Text(
-                  'Доставок: ${deliveries.length}',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF6C63FF).withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'Коэф. ${coefficient.toString()}',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF6C63FF),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Карточка "Магазин" (укрупнённая)
-            Container(
+      body: Column(
+        children: [
+          // ===== СКРОЛЛИРУЕМАЯ ЧАСТЬ (все плашки) =====
+          Expanded(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF2C2C2C)),
-              ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.storefront, size: 22, color: Color(0xFF6C63FF)),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Магазин',
-                          style: TextStyle(
-                            fontSize: 16,
+                  // Заголовок с количеством доставок
+                  Row(
+                    children: [
+                      const Icon(Icons.receipt_long, color: Color(0xFF6C63FF), size: 24),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Доставок: ${deliveries.length}',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF6C63FF).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          'Коэф. ${coefficient.toString()}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF6C63FF),
                             fontWeight: FontWeight.w600,
-                            color: Colors.white,
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 4,
-                          children: [
-                            _buildChip(Icons.route, '${shopDistance.toStringAsFixed(2)} км', size: 14),
-                            _buildChip(Icons.fitness_center, '${shopWeight.toStringAsFixed(1)} кг', size: 14),
-                          ],
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
+                  const SizedBox(height: 12),
+
+                  // Карточка "Магазин"
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF6C63FF).withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(10),
+                      color: const Color(0xFF1E1E1E),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF2C2C2C)),
                     ),
-                    child: Text(
-                      '${shopCost.toStringAsFixed(0)} руб.',
-                      style: const TextStyle(
-                        color: Color(0xFF6C63FF),
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Список доставок (укрупнённый)
-            Expanded(
-              child: ListView.separated(
-                itemCount: deliveries.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final d = deliveries[index];
-                  final deliveryCost = (pricing.deliveryFee + (d.distanceToClient * pricing.pricePerKm)) * coefficient;
-                  return _buildDeliveryCard(d, deliveryCost);
-                },
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            // Итоги (укрупнённые, симметричные)
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF2C2C2C)),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      // Общее время – слева
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Общее время',
-                              style: TextStyle(color: Color(0xFF888888), fontSize: 12),
-                            ),
-                            Text(
-                              _formatTime(totalTime),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Платный пробег – справа
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            const Text(
-                              'Платный пробег',
-                              style: TextStyle(color: Color(0xFF888888), fontSize: 12),
-                            ),
-                            Text(
-                              '${totalDistance.toStringAsFixed(2)} км',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Divider(color: Color(0xFF2C2C2C), height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Стоимость заказа',
-                              style: TextStyle(color: Color(0xFF888888), fontSize: 12),
-                            ),
-                            Text(
-                              '${totalCostFinal.toStringAsFixed(0)} руб.',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            const Text(
-                              'Чистая прибыль',
-                              style: TextStyle(color: Color(0xFF888888), fontSize: 12),
-                            ),
-                            Text(
-                              '${netProfit.toStringAsFixed(0)} руб.',
-                              style: TextStyle(
-                                color: netProfit >= 0 ? Colors.green : Colors.red,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (totalExpenses > 0) ...[
-                    const Divider(color: Color(0xFF2C2C2C), height: 16),
-                    Row(
+                    child: Row(
                       children: [
+                        const Icon(Icons.storefront, size: 20, color: Color(0xFF6C63FF)),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                'Расходы',
-                                style: TextStyle(color: Color(0xFF888888), fontSize: 12),
+                                'Магазин',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
                               ),
-                              Text(
-                                'Бензин: ${totalFuelLiters.toStringAsFixed(1)} л × ${fuelPrice.toStringAsFixed(0)} руб.',
-                                style: const TextStyle(color: Color(0xFF888888), fontSize: 13),
+                              const SizedBox(height: 4),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 2,
+                                children: [
+                                  _buildChip(Icons.route, '${shopDistance.toStringAsFixed(2)} км', size: 12),
+                                  _buildChip(Icons.fitness_center, '${shopWeight.toStringAsFixed(1)} кг', size: 12),
+                                ],
                               ),
                             ],
                           ),
                         ),
-                        Text(
-                          '-${totalExpenses.toStringAsFixed(0)} руб.',
-                          style: const TextStyle(color: Colors.orange, fontSize: 16, fontWeight: FontWeight.w600),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6C63FF).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '${shopCost.toStringAsFixed(0)} руб.',
+                            style: const TextStyle(
+                              color: Color(0xFF6C63FF),
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ],
                     ),
-                  ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Список доставок
+                  ...deliveries.map((d) {
+                    final deliveryCost = (pricing.deliveryFee + (d.distanceToClient * pricing.pricePerKm)) * coefficient;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _buildDeliveryCard(d, deliveryCost),
+                    );
+                  }).toList(),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+          ),
 
-            // Кнопки
-            Row(
+          // ===== НИЖНЯЯ ЧАСТЬ (фиксированная) =====
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1E1E),
+              border: Border(
+                top: BorderSide(color: const Color(0xFF2C2C2C), width: 1),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.pop(context, true);
-                    },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF6C63FF),
-                      side: const BorderSide(color: Color(0xFF6C63FF)),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                // Итоги
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Общее время', style: TextStyle(color: Color(0xFF888888), fontSize: 11)),
+                          Text(_formatTime(totalTime), style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                        ],
                       ),
                     ),
-                    child: const Text(
-                      'Добавить ещё доставку',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Text('Платный пробег', style: TextStyle(color: Color(0xFF888888), fontSize: 11)),
+                          Text('${totalPaidDistance.toStringAsFixed(2)} км', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                        ],
                       ),
                     ),
-                  ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context, false);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF6C63FF),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Стоимость заказа', style: TextStyle(color: Color(0xFF888888), fontSize: 11)),
+                          Text('${totalCostFinal.toStringAsFixed(0)} руб.', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                        ],
                       ),
                     ),
-                    child: const Text(
-                      'Завершить заказ',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Text('Чистая прибыль', style: TextStyle(color: Color(0xFF888888), fontSize: 11)),
+                          Text(
+                            '${netProfit.toStringAsFixed(0)} руб.',
+                            style: TextStyle(
+                              color: netProfit >= 0 ? Colors.green : Colors.red,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Кнопки
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          Navigator.pop(context, true);
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF6C63FF),
+                          side: const BorderSide(color: Color(0xFF6C63FF)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'Добавить ещё доставку',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context, false);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6C63FF),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'Завершить заказ',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildDeliveryCard(Delivery d, double deliveryCost) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: const Color(0xFF2C2C2C)),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 34,
-            height: 34,
+            width: 30,
+            height: 30,
             decoration: const BoxDecoration(
               color: Color(0xFF6C63FF),
               shape: BoxShape.circle,
@@ -380,12 +327,12 @@ class OrderSummaryScreen extends ConsumerWidget {
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
-                  fontSize: 14,
+                  fontSize: 13,
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -394,35 +341,36 @@ class OrderSummaryScreen extends ConsumerWidget {
                   d.clientAddress,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 15,
+                    fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  softWrap: true,
                 ),
+                const SizedBox(height: 2),
                 Text(
                   'кв. ${d.apartment}',
                   style: const TextStyle(
                     color: Color(0xFF888888),
-                    fontSize: 13,
+                    fontSize: 12,
                   ),
                 ),
                 const SizedBox(height: 4),
-                _buildChip(Icons.route, '${d.distanceToClient.toStringAsFixed(2)} км', size: 13),
+                _buildChip(Icons.route, '${d.distanceToClient.toStringAsFixed(2)} км', size: 12),
               ],
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            margin: const EdgeInsets.only(top: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               color: const Color(0xFF6C63FF).withOpacity(0.15),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               '${deliveryCost.toStringAsFixed(0)} руб.',
               style: const TextStyle(
                 color: Color(0xFF6C63FF),
-                fontSize: 15,
+                fontSize: 14,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -434,10 +382,10 @@ class OrderSummaryScreen extends ConsumerWidget {
 
   Widget _buildChip(IconData icon, String text, {double size = 12}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: const Color(0xFF2C2C2C),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

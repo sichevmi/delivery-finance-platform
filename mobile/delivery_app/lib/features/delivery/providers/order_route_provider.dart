@@ -39,7 +39,7 @@ class OrderRouteState {
   final bool isPrivateHouse;
   final bool showSummary;
   final bool shouldNavigateToHome;
-  final double manualDistance; // <-- добавлено
+  final double manualDistance;
 
   const OrderRouteState({
     required this.currentSegment,
@@ -68,7 +68,7 @@ class OrderRouteState {
     required this.isPrivateHouse,
     this.showSummary = false,
     this.shouldNavigateToHome = false,
-    this.manualDistance = 0.0, // <-- добавлено
+    this.manualDistance = 0.0,
   });
 
   factory OrderRouteState.initial({required double coefficient, required int segmentIndex}) {
@@ -172,21 +172,19 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   OrderRouteNotifier(this.ref) : super(OrderRouteState.initial(coefficient: 1.0, segmentIndex: 0));
 
   void resetNavigationFlag() {
+    if (!mounted) return;
     state = state.copyWith(shouldNavigateToHome: false);
   }
 
-  // ===== ИНИЦИАЛИЗАЦИЯ НОВОГО ЗАКАЗА =====
   void init({required double coefficient, required int segmentIndex}) {
-    // ВСЕГДА СОЗДАЁМ НОВЫЙ ЭКЗЕМПЛЯР
     _gpsService = GpsService();
-    
     state = OrderRouteState.initial(coefficient: coefficient, segmentIndex: segmentIndex);
     _initGps();
     _startSegment();
   }
 
-  // ===== ОБНОВЛЕНИЕ РУЧНОГО РАССТОЯНИЯ =====
   void updateManualDistance(double distance) {
+    if (!mounted) return;
     state = state.copyWith(manualDistance: distance);
   }
 
@@ -201,6 +199,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   }
 
   void _startSegment() {
+    if (!mounted) return;
     state = state.copyWith(
       segmentStartTime: DateTime.now(),
       segmentEndTime: null,
@@ -212,13 +211,14 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     );
     _gpsService.resetDistance();
     state = state.copyWith(distance: 0.0);
-    state = state.copyWith(manualDistance: 0.0); // сбрасываем ручное расстояние
+    state = state.copyWith(manualDistance: 0.0);
     if (state.useGps && state.currentSegment != 1) {
       _gpsService.startTracking();
     }
   }
 
   void togglePause() {
+    if (!mounted) return;
     if (state.isPaused) {
       final now = DateTime.now();
       if (state.pauseStartTime != null) {
@@ -260,6 +260,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   }
 
   void finishSegment() {
+    if (!mounted) return;
     final end = DateTime.now();
     if (state.isPaused) {
       if (state.pauseStartTime != null) {
@@ -278,6 +279,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   }
 
   void saveCurrentSegmentData() {
+    if (!mounted) return;
     final time = getSegmentTime();
     final distance = getDistance();
     switch (state.currentSegment) {
@@ -297,22 +299,26 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   }
 
   Future<void> handleMainAction() async {
+    if (!mounted) return;
     finishSegment();
     saveCurrentSegmentData();
 
     switch (state.currentSegment) {
       case 0:
         final pos = await _getCurrentPosition();
+        if (!mounted) return;
         String? addr;
         if (pos != null) {
           addr = await GeocoderService.reverseGeocode(pos.latitude, pos.longitude, onLog: _gpsService.addLog);
         }
+        if (!mounted) return;
         state = state.copyWith(shopAddress: addr ?? 'Адрес не определён');
         state = state.copyWith(currentSegment: 1);
         _startSegment();
         break;
       case 1:
         if (state.weight == null || state.weight! <= 0) return;
+        if (!mounted) return;
         state = state.copyWith(
           clientAddress: 'Адрес клиента будет определён позже',
           currentSegment: 2,
@@ -321,10 +327,12 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
         break;
       case 2:
         final pos = await _getCurrentPosition();
+        if (!mounted) return;
         String? addr;
         if (pos != null) {
           addr = await GeocoderService.reverseGeocode(pos.latitude, pos.longitude, onLog: _gpsService.addLog);
         }
+        if (!mounted) return;
         state = state.copyWith(clientAddress: addr ?? 'Адрес не определён');
         state = state.copyWith(currentSegment: 3);
         _startSegment();
@@ -337,8 +345,25 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
 
   Future<Position?> _getCurrentPosition() async {
     try {
-      return await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.bestForNavigation);
+      final lastPosition = await Geolocator.getLastKnownPosition();
+      if (lastPosition != null) {
+        return lastPosition;
+      }
+      return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.bestForNavigation,
+      ).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          print('⏰ Таймаут получения позиции');
+          throw TimeoutException('Превышено время ожидания позиции');
+        },
+      );
+    } on TimeoutException catch (e) {
+      print('⏰ Таймаут: $e');
+      _gpsService.addLog('⏰ Таймаут получения позиции');
+      return null;
     } catch (e) {
+      print('❌ Ошибка получения позиции: $e');
       _gpsService.addLog('❌ Ошибка получения позиции: $e');
       return null;
     }
@@ -363,18 +388,23 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     );
 
     final updatedList = List<Delivery>.from(state.completedDeliveries)..add(delivery);
-    state = state.copyWith(
-      completedDeliveries: updatedList,
-      showSummary: true,
-    );
+
+    if (mounted) {
+      state = state.copyWith(
+        completedDeliveries: updatedList,
+        showSummary: true,
+      );
+    }
   }
 
   void resetAfterSummary() {
+    if (!mounted) return;
     state = state.copyWith(showSummary: false);
     _startNextDelivery();
   }
 
   void _startNextDelivery() {
+    if (!mounted) return;
     state = state.copyWith(
       deliveryNumber: state.deliveryNumber + 1,
       currentSegment: 2,
@@ -391,13 +421,26 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   }
 
   void finishOrder() {
+    if (!mounted) return;
     _gpsService.stopTracking();
     _gpsSubscription?.cancel();
     _gpsSubscription = null;
     state = OrderRouteState.initial(coefficient: state.coefficient, segmentIndex: 0);
   }
 
+  void resetToInitial() {
+    if (!mounted) return;
+    _gpsService.stopTracking();
+    _gpsSubscription?.cancel();
+    _gpsSubscription = null;
+    state = OrderRouteState.initial(
+      coefficient: state.coefficient,
+      segmentIndex: 0,
+    );
+  }
+
   void cancelOrder() {
+    if (!mounted) return;
     _gpsService.stopTracking();
     _gpsSubscription?.cancel();
     _gpsSubscription = null;

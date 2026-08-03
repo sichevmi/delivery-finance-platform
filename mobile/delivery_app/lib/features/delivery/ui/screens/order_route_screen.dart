@@ -28,24 +28,25 @@ class OrderRouteScreen extends ConsumerStatefulWidget {
 
 class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   bool _isSummaryShown = false;
+  bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.delayed(const Duration(milliseconds: 100), () {
+      if (!_isInitialized) {
+        _isInitialized = true;
         final notifier = ref.read(orderRouteProvider.notifier);
         notifier.init(
           coefficient: widget.coefficient,
           segmentIndex: widget.segmentIndex,
         );
-      });
+      }
     });
   }
 
   @override
   void dispose() {
-    ref.read(orderRouteProvider.notifier).dispose();
     super.dispose();
   }
 
