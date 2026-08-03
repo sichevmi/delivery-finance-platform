@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:delivery_app/features/delivery/providers/tab_provider.dart';
 import 'package:delivery_app/features/delivery/providers/pricing_provider.dart';
-import 'order_route_screen.dart';
 import 'package:delivery_app/features/delivery/models/delivery.dart';
 import 'package:delivery_app/features/delivery/models/pricing_config.dart';
 
@@ -35,27 +34,29 @@ class OrderSummaryScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final pricing = ref.watch(pricingProvider);
 
-    // Берём первую доставку для общих данных
     final firstDelivery = deliveries.isNotEmpty ? deliveries.first : null;
 
-    // Данные по магазину (только из первой доставки)
-    final shopTime = firstDelivery?.timeToShop ?? 0;
+    // Данные по магазину
     final shopDistance = firstDelivery?.distanceToShop ?? 0.0;
-    final receivingTime = firstDelivery?.timeReceiving ?? 0;
-
-    // Рассчитываем стоимость магазина (получение + вес) с учётом коэффициента
     final shopWeight = firstDelivery?.weight ?? 0.0;
     final shopCost = (pricing.receivingFee + (shopWeight * pricing.pricePerKg)) * coefficient;
 
-    // Рассчитываем стоимость каждой доставки с учётом коэффициента
+    // Рассчитываем расходы (бензин)
+    final fuelConsumption = 0.0; // TODO: брать из справочника
+    final fuelPrice = 0.0; // TODO: брать из справочника
+    final totalFuelLiters = totalDistance * (fuelConsumption / 100);
+    final totalFuelCost = totalFuelLiters * fuelPrice;
+    final totalExpenses = totalFuelCost; // + амортизация и т.д.
+
+    // Рассчитываем стоимость каждой доставки
     double totalDeliveriesCost = 0.0;
     for (final d in deliveries) {
       final deliveryCost = (pricing.deliveryFee + (d.distanceToClient * pricing.pricePerKm)) * coefficient;
       totalDeliveriesCost += deliveryCost;
     }
 
-    // Общая стоимость = магазин + все доставки
     final totalCostFinal = shopCost + totalDeliveriesCost;
+    final netProfit = totalCostFinal - totalExpenses;
 
     return Scaffold(
       appBar: AppBar(
@@ -101,84 +102,7 @@ class OrderSummaryScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
 
-            // Карточка "Магазин"
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF2C2C2C)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.storefront, size: 18, color: Color(0xFF6C63FF)),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Магазин',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      _buildDetailChip(Icons.access_time, 'В пути: ${_formatTime(shopTime)}'),
-                      const SizedBox(width: 6),
-                      _buildDetailChip(Icons.route, '${shopDistance.toStringAsFixed(2)} км'),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      _buildDetailChip(Icons.fitness_center, 'Вес: ${shopWeight.toStringAsFixed(1)} кг'),
-                      const SizedBox(width: 6),
-                      _buildDetailChip(Icons.timer, 'Получение: ${_formatTime(receivingTime)}'),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      _buildDetailChip(
-                        Icons.attach_money,
-                        'Стоимость: ${shopCost.toStringAsFixed(0)} руб.',
-                        color: const Color(0xFF6C63FF),
-                      ),
-                      const SizedBox(width: 6),
-                      _buildDetailChip(
-                        Icons.info_outline,
-                        '(${pricing.receivingFee.toStringAsFixed(0)} руб. + ${shopWeight.toStringAsFixed(1)} кг × ${pricing.pricePerKg.toStringAsFixed(0)} руб.) × $coefficient',
-                        color: const Color(0xFF888888),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Список доставок
-            Expanded(
-              child: ListView.separated(
-                itemCount: deliveries.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final d = deliveries[index];
-                  final deliveryCost = (pricing.deliveryFee + (d.distanceToClient * pricing.pricePerKm)) * coefficient;
-                  return _buildDeliveryCard(d, deliveryCost, pricing);
-                },
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            // Итоги
+            // Карточка "Магазин" (убрано время, сумма в правом углу)
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -188,33 +112,154 @@ class OrderSummaryScreen extends ConsumerWidget {
               ),
               child: Row(
                 children: [
+                  const Icon(Icons.storefront, size: 18, color: Color(0xFF6C63FF)),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Общее время', style: TextStyle(color: Color(0xFF888888), fontSize: 11)),
-                        Text(_formatTime(totalTime), style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                        const Text(
+                          'Магазин',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            _buildChip(Icons.route, '${shopDistance.toStringAsFixed(2)} км'),
+                            _buildChip(Icons.fitness_center, '${shopWeight.toStringAsFixed(1)} кг'),
+                          ],
+                        ),
                       ],
                     ),
                   ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  // Сумма в правом углу
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF6C63FF).withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${shopCost.toStringAsFixed(0)} руб.',
+                      style: const TextStyle(
+                        color: Color(0xFF6C63FF),
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Список доставок (убрано время, только адрес, дом, пробег, сумма)
+            Expanded(
+              child: ListView.separated(
+                itemCount: deliveries.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (context, index) {
+                  final d = deliveries[index];
+                  final deliveryCost = (pricing.deliveryFee + (d.distanceToClient * pricing.pricePerKm)) * coefficient;
+                  return _buildDeliveryCard(d, deliveryCost);
+                },
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // Итоги (общее время, платный пробег, сумма без расходов, чистая прибыль)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E1E),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF2C2C2C)),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Общее время', style: TextStyle(color: Color(0xFF888888), fontSize: 11)),
+                            Text(_formatTime(totalTime), style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Платный пробег', style: TextStyle(color: Color(0xFF888888), fontSize: 11)),
+                            Text('${totalDistance.toStringAsFixed(2)} км', style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(color: Color(0xFF2C2C2C), height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Сумма без расходов', style: TextStyle(color: Color(0xFF888888), fontSize: 11)),
+                            Text('${totalCostFinal.toStringAsFixed(0)} руб.', style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            const Text('Чистая прибыль', style: TextStyle(color: Color(0xFF888888), fontSize: 11)),
+                            Text(
+                              '${netProfit.toStringAsFixed(0)} руб.',
+                              style: TextStyle(
+                                color: netProfit >= 0 ? Colors.green : Colors.red,
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  // Расходы (дополнительная информация)
+                  if (totalExpenses > 0) ...[
+                    const Divider(color: Color(0xFF2C2C2C), height: 16),
+                    Row(
                       children: [
-                        const Text('Общий пробег', style: TextStyle(color: Color(0xFF888888), fontSize: 11)),
-                        Text('${totalDistance.toStringAsFixed(2)} км', style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Расходы', style: TextStyle(color: Color(0xFF888888), fontSize: 11)),
+                              Text(
+                                'Бензин: ${totalFuelLiters.toStringAsFixed(1)} л × ${fuelPrice.toStringAsFixed(0)} руб.',
+                                style: const TextStyle(color: Color(0xFF888888), fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          '-${totalExpenses.toStringAsFixed(0)} руб.',
+                          style: const TextStyle(color: Colors.orange, fontSize: 14, fontWeight: FontWeight.w600),
+                        ),
                       ],
                     ),
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        const Text('Итого', style: TextStyle(color: Color(0xFF888888), fontSize: 11)),
-                        Text('${totalCostFinal.toStringAsFixed(0)} руб.', style: const TextStyle(color: Color(0xFF6C63FF), fontSize: 16, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -276,7 +321,7 @@ class OrderSummaryScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildDeliveryCard(Delivery d, double deliveryCost, PricingConfig pricing) {
+  Widget _buildDeliveryCard(Delivery d, double deliveryCost) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -284,100 +329,77 @@ class OrderSummaryScreen extends ConsumerWidget {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: const Color(0xFF2C2C2C)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF6C63FF),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    '${d.number}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
+          Container(
+            width: 28,
+            height: 28,
+            decoration: const BoxDecoration(
+              color: Color(0xFF6C63FF),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                '${d.number}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      d.clientAddress,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    Text(
-                      'кв. ${d.apartment}',
-                      style: const TextStyle(
-                        color: Color(0xFF888888),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF6C63FF).withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  '${deliveryCost.toStringAsFixed(0)} руб.',
-                  style: const TextStyle(
-                    color: Color(0xFF6C63FF),
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-          const SizedBox(height: 8),
-          // ---- ВСЕ ВРЕМЕНА ТЕПЕРЬ ОТОБРАЖАЮТСЯ ----
-          Wrap(
-            spacing: 6,
-            runSpacing: 4,
-            children: [
-              // Пробег до клиента
-              _buildDetailChip(Icons.route, '${d.distanceToClient.toStringAsFixed(2)} км'),
-              // Время в пути до клиента
-              _buildDetailChip(Icons.access_time, 'В пути: ${_formatTime(d.timeToClient)}'),
-              // Время выдачи
-              _buildDetailChip(Icons.home, 'Выдача: ${_formatTime(d.timeDelivery)}'),
-              // Время получения в магазине (добавили!)
-              _buildDetailChip(Icons.storefront, 'Получение: ${_formatTime(d.timeReceiving)}'),
-              // Расчёт стоимости
-              _buildDetailChip(
-                Icons.attach_money,
-                '(${pricing.deliveryFee.toStringAsFixed(0)} руб. + ${d.distanceToClient.toStringAsFixed(1)} км × ${pricing.pricePerKm.toStringAsFixed(0)} руб.) × $coefficient',
-                color: const Color(0xFF888888),
-                fontSize: 10,
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  d.clientAddress,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  'кв. ${d.apartment}',
+                  style: const TextStyle(
+                    color: Color(0xFF888888),
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                _buildChip(Icons.route, '${d.distanceToClient.toStringAsFixed(2)} км'),
+              ],
+            ),
+          ),
+          // Сумма в правом углу
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF6C63FF).withOpacity(0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '${deliveryCost.toStringAsFixed(0)} руб.',
+              style: const TextStyle(
+                color: Color(0xFF6C63FF),
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
               ),
-            ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDetailChip(IconData icon, String text, {Color color = const Color(0xFF888888), double fontSize = 11}) {
+  Widget _buildChip(IconData icon, String text) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: const Color(0xFF2C2C2C),
         borderRadius: BorderRadius.circular(12),
@@ -385,13 +407,13 @@ class OrderSummaryScreen extends ConsumerWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: color),
+          Icon(icon, size: 12, color: const Color(0xFF888888)),
           const SizedBox(width: 4),
           Text(
             text,
-            style: TextStyle(
-              fontSize: fontSize,
-              color: color,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Color(0xFF888888),
             ),
           ),
         ],
