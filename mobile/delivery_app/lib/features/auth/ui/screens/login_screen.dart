@@ -41,24 +41,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && !_isAuthChecked) {
-      print('🔐 LoginScreen: приложение возобновлено, проверяем авторизацию...');
       _checkAuth();
     }
   }
 
   Future<void> _checkAuth() async {
-    if (_isAuthChecked) {
-      print('🔐 LoginScreen: проверка уже выполнена, пропускаем');
-      return;
-    }
-
-    _isAuthChecked = true;
+    if (_isAuthChecked) return;
     
     print('🔐 LoginScreen: проверка авторизации...');
     final authState = ref.read(authProvider);
     
     if (authState.isAuthenticated && authState.user != null) {
       print('🔐 LoginScreen: уже авторизован');
+      _isAuthChecked = true;
       if (mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           Navigator.pushReplacement(
@@ -70,27 +65,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
       return;
     }
 
-    print('🔐 LoginScreen: пробуем autoLogin...');
     try {
       final authNotifier = ref.read(authProvider.notifier);
       final isAuthenticated = await authNotifier.autoLogin();
       print('🔐 LoginScreen: isAuthenticated = $isAuthenticated');
+      _isAuthChecked = true;
       
       if (mounted && isAuthenticated) {
-        print('🔐 LoginScreen: автологин успешен');
         WidgetsBinding.instance.addPostFrameCallback((_) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => const HomeScreen()),
           );
         });
-        return;
+      } else {
+        setState(() {
+          _isCheckingAuth = false;
+        });
       }
     } catch (e) {
       print('🔐 LoginScreen: ошибка: $e');
-    }
-
-    if (mounted) {
       setState(() {
         _isCheckingAuth = false;
       });
@@ -101,7 +95,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
 
-    // Если проверка ещё идёт – показываем загрузку
     if (_isCheckingAuth) {
       return const Scaffold(
         backgroundColor: Color(0xFF121212),
@@ -111,146 +104,143 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
             children: [
               CircularProgressIndicator(color: Color(0xFF6C63FF)),
               SizedBox(height: 20),
-              Text(
-                'Проверка авторизации...',
-                style: TextStyle(color: Color(0xFF888888)),
-              ),
+              Text('Проверка авторизации...', style: TextStyle(color: Color(0xFF888888))),
             ],
           ),
         ),
       );
     }
 
-    // Если уже авторизован – сразу показываем главную
     if (authState.isAuthenticated && authState.user != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
-      });
       return const SizedBox.shrink();
     }
 
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF6C63FF), Color(0xFF4A42C4)],
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Icon(
-                    Icons.delivery_dining,
-                    size: 40,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 32),
-                const Text(
-                  'Добро пожаловать!',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Войдите в свой аккаунт, чтобы продолжить',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Color(0xFFB0B0B0),
-                  ),
-                ),
-                const SizedBox(height: 40),
-                TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    hintText: 'Введите ваш email',
-                    prefixIcon: Icon(Icons.email_outlined),
-                  ),
-                  validator: (v) => v != null && EmailValidator.validate(v)
-                      ? null
-                      : 'Введите корректный email',
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: _obscure,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: 'Пароль',
-                    hintText: 'Введите ваш пароль',
-                    prefixIcon: const Icon(Icons.lock_outlined),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscure
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                        color: Colors.grey,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          physics: const BouncingScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top - MediaQuery.of(context).padding.bottom - 16,
+            ),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 16),
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF6C63FF), Color(0xFF4A42C4)],
                       ),
-                      onPressed: () => setState(() => _obscure = !_obscure),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: const Icon(
+                      Icons.delivery_dining,
+                      size: 36,
+                      color: Colors.white,
                     ),
                   ),
-                  validator: (v) =>
-                      v != null && v.length >= 6 ? null : 'Минимум 6 символов',
-                ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () {
-                      // TODO: восстановление пароля
-                    },
-                    child: const Text(
-                      'Забыли пароль?',
-                      style: TextStyle(color: Color(0xFF6C63FF)),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Добро пожаловать!',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
                   ),
-                ),
-                const SizedBox(height: 24),
-                if (authState.error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(
-                      authState.error!,
-                      style: const TextStyle(color: Colors.red),
-                      textAlign: TextAlign.center,
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Войдите в свой аккаунт, чтобы продолжить',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFFB0B0B0),
                     ),
                   ),
-                ElevatedButton(
-                  onPressed: authState.isLoading || _isLoading
-                      ? null
-                      : () async {
-                          if (_formKey.currentState!.validate()) {
-                            setState(() => _isLoading = true);
-                            try {
-                              final authNotifier = ref.read(authProvider.notifier);
-                              await authNotifier.login(
-                                _emailController.text.trim(),
-                                _passwordController.text,
-                              );
-                              // Ждём, пока состояние обновится
-                              // Используем слушатель, чтобы дождаться изменения состояния
-                              if (mounted) {
-                                // Небольшая задержка для обновления состояния
-                                await Future.delayed(const Duration(milliseconds: 300));
+                  const SizedBox(height: 32),
+                  TextFormField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    style: const TextStyle(color: Colors.white, fontSize: 15),
+                    decoration: const InputDecoration(
+                      labelText: 'Email',
+                      hintText: 'Введите ваш email',
+                      prefixIcon: Icon(Icons.email_outlined),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    ),
+                    validator: (v) => v != null && EmailValidator.validate(v)
+                        ? null
+                        : 'Введите корректный email',
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _passwordController,
+                    obscureText: _obscure,
+                    style: const TextStyle(color: Colors.white, fontSize: 15),
+                    decoration: InputDecoration(
+                      labelText: 'Пароль',
+                      hintText: 'Введите ваш пароль',
+                      prefixIcon: const Icon(Icons.lock_outlined),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscure
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                          color: Colors.grey,
+                          size: 20,
+                        ),
+                        onPressed: () => setState(() => _obscure = !_obscure),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    ),
+                    validator: (v) =>
+                        v != null && v.length >= 6 ? null : 'Минимум 6 символов',
+                  ),
+                  const SizedBox(height: 6),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () {},
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text(
+                        'Забыли пароль?',
+                        style: TextStyle(color: Color(0xFF6C63FF), fontSize: 13),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (authState.error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        authState.error!,
+                        style: const TextStyle(color: Colors.red, fontSize: 13),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ElevatedButton(
+                    onPressed: authState.isLoading || _isLoading
+                        ? null
+                        : () async {
+                            if (_formKey.currentState!.validate()) {
+                              setState(() => _isLoading = true);
+                              try {
+                                final authNotifier = ref.read(authProvider.notifier);
+                                await authNotifier.login(
+                                  _emailController.text.trim(),
+                                  _passwordController.text,
+                                );
                                 if (mounted && authState.isAuthenticated) {
                                   WidgetsBinding.instance.addPostFrameCallback((_) {
                                     if (mounted) {
@@ -261,67 +251,73 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                                     }
                                   });
                                 }
+                              } finally {
+                                if (mounted) setState(() => _isLoading = false);
                               }
-                            } catch (e) {
-                              print('❌ Login error: $e');
-                            } finally {
-                              if (mounted) setState(() => _isLoading = false);
                             }
-                          }
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6C63FF),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6C63FF),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      minimumSize: const Size(double.infinity, 48),
                     ),
+                    child: authState.isLoading || _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'Войти',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                   ),
-                  child: authState.isLoading || _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text(
-                          'Войти',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'Нет аккаунта?',
+                        style: TextStyle(color: Color(0xFFB0B0B0), fontSize: 14),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const RegisterScreen(),
+                            ),
+                          );
+                        },
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text(
-                      'Нет аккаунта?',
-                      style: TextStyle(color: Color(0xFFB0B0B0)),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const RegisterScreen(),
+                        child: const Text(
+                          'Зарегистрироваться',
+                          style: TextStyle(
+                            color: Color(0xFF6C63FF),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
                           ),
-                        );
-                      },
-                      child: const Text(
-                        'Зарегистрироваться',
-                        style: TextStyle(
-                          color: Color(0xFF6C63FF),
-                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
             ),
           ),
         ),

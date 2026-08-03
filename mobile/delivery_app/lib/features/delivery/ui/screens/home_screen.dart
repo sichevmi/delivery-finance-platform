@@ -19,11 +19,11 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final List<GlobalKey<NavigatorState>> _navigatorKeys = [
-    GlobalKey<NavigatorState>(), // Главная
-    GlobalKey<NavigatorState>(), // Заказы
-    GlobalKey<NavigatorState>(), // Справочники
-    GlobalKey<NavigatorState>(), // Аналитика
-    GlobalKey<NavigatorState>(), // Ещё
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
   ];
 
   final List<String> _tabLabels = const [
@@ -46,7 +46,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final shiftState = ref.watch(shiftProvider);
-    final selectedTab = ref.watch(selectedTabProvider); // <-- слушаем провайдер
+    final selectedTab = ref.watch(selectedTabProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -62,7 +62,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: Text(
               authState.user?.name.isNotEmpty == true
                   ? authState.user!.name[0].toUpperCase()
-                  : 'K',
+                  : 'К',
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 12,
@@ -129,63 +129,62 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildHomeTab(ShiftState shiftState) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: Row(
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      physics: const BouncingScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Дата и статус смены
+          Row(
             children: [
               const Icon(Icons.calendar_today, size: 14, color: Color(0xFF888888)),
               const SizedBox(width: 6),
-              Text(_getTodayDate(), style: const TextStyle(fontSize: 14, color: Color(0xFF888888))),
+              Text(_getTodayDate(), style: const TextStyle(fontSize: 13, color: Color(0xFF888888))),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: shiftState.isActive ? Colors.green.withOpacity(0.15) : Colors.grey.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
                   children: [
-                    Container(width: 6, height: 6, decoration: BoxDecoration(color: shiftState.isActive ? Colors.green : Colors.grey, shape: BoxShape.circle)),
+                    Container(width: 5, height: 5, decoration: BoxDecoration(color: shiftState.isActive ? Colors.green : Colors.grey, shape: BoxShape.circle)),
                     const SizedBox(width: 4),
                     Text(
                       shiftState.isActive ? 'Смена активна' : 'Смена не начата',
-                      style: TextStyle(fontSize: 12, color: shiftState.isActive ? Colors.green : Colors.grey),
+                      style: TextStyle(fontSize: 11, color: shiftState.isActive ? Colors.green : Colors.grey),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 6),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
+          const SizedBox(height: 8),
+
+          // Заголовок
+          const Row(
             children: [
-              Text('📊 Основные показатели', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+              Text('📊 Основные показатели', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
               Spacer(),
-              Text('За сутки', style: TextStyle(fontSize: 13, color: Color(0xFF888888))),
+              Text('За сутки', style: TextStyle(fontSize: 12, color: Color(0xFF888888))),
             ],
           ),
-        ),
-        const SizedBox(height: 8),
-        const Expanded(
-          flex: 5,
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: MetricsGrid(),
+          const SizedBox(height: 8),
+
+          // Metrics Grid
+          const MetricsGrid(),
+          const SizedBox(height: 12),
+
+          // Кнопка начала смены
+          SizedBox(
+            height: 46,
+            child: StartShiftButton(),
           ),
-        ),
-        const SizedBox(height: 8),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: SizedBox(height: 50, child: StartShiftButton()),
-        ),
-        const SizedBox(height: 12),
-      ],
+          const SizedBox(height: 12),
+        ],
+      ),
     );
   }
 

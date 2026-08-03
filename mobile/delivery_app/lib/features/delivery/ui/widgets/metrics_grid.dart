@@ -84,10 +84,10 @@ class MetricsGrid extends ConsumerWidget {
       ],
     ];
 
-    // Растягиваем строки на всю доступную высоту
+    // Используем IntrinsicHeight для автоматической подгонки высоты
     return Column(
       children: pairs.map((pair) {
-        return Expanded(
+        return IntrinsicHeight(
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Row(
