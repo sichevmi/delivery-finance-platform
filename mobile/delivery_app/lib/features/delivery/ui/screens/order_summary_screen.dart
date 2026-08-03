@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:delivery_app/features/delivery/providers/tab_provider.dart';
 import 'package:delivery_app/features/delivery/providers/pricing_provider.dart';
+import 'package:delivery_app/features/delivery/providers/settings_provider.dart';
 import 'package:delivery_app/features/delivery/models/delivery.dart';
 import 'package:delivery_app/features/delivery/models/pricing_config.dart';
 
@@ -33,6 +34,7 @@ class OrderSummaryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final pricing = ref.watch(pricingProvider);
+    final settings = ref.watch(settingsProvider);
 
     final firstDelivery = deliveries.isNotEmpty ? deliveries.first : null;
 
@@ -44,12 +46,21 @@ class OrderSummaryScreen extends ConsumerWidget {
     // Платный пробег = сумма расстояний до клиентов по всем доставкам
     final totalPaidDistance = deliveries.fold(0.0, (sum, d) => sum + d.distanceToClient);
 
-    // Расходы (бензин) – пока заглушка
-    final fuelConsumption = 0.0;
-    final fuelPrice = 0.0;
-    final totalFuelLiters = totalPaidDistance * (fuelConsumption / 100);
-    final totalFuelCost = totalFuelLiters * fuelPrice;
-    final totalExpenses = totalFuelCost;
+    // ОБЩИЙ пробег = пробег до магазина + все платные пробеги
+    final totalAllDistance = shopDistance + totalPaidDistance;
+
+    // ===== РАСЧЁТ РАСХОДОВ (из справочника) =====
+    // Стоимость бензина на 1 км = (расход на 100 км / 100) * цена за литр
+    final fuelCostPerKm = (settings.fuelConsumption / 100) * settings.fuelPrice;
+    
+    // Расход на бензин = общий пробег * стоимость бензина на 1 км
+    final totalFuelCost = totalAllDistance * fuelCostPerKm;
+    
+    // Расход на ремонт = общий пробег * стоимость ремонта на 1 км
+    final totalRepairCost = totalAllDistance * settings.repairCost;
+    
+    // Общие расходы = бензин + ремонт
+    final totalExpenses = totalFuelCost + totalRepairCost;
 
     // Рассчитываем стоимость каждой доставки
     double totalDeliveriesCost = 0.0;
@@ -69,14 +80,14 @@ class OrderSummaryScreen extends ConsumerWidget {
       ),
       body: Column(
         children: [
-          // ===== СКРОЛЛИРУЕМАЯ ЧАСТЬ (все плашки) =====
+          // ===== СКРОЛЛИРУЕМАЯ ЧАСТЬ =====
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Заголовок с количеством доставок
+                  // Заголовок
                   Row(
                     children: [
                       const Icon(Icons.receipt_long, color: Color(0xFF6C63FF), size: 24),
@@ -173,6 +184,41 @@ class OrderSummaryScreen extends ConsumerWidget {
                       child: _buildDeliveryCard(d, deliveryCost),
                     );
                   }).toList(),
+
+                  // Дополнительная информация о расходах
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E1E1E),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF2C2C2C)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '📊 Детали расчёта',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        _buildDetailRow('Общий пробег', '${totalAllDistance.toStringAsFixed(2)} км'),
+                        _buildDetailRow('Стоимость бензина на 1 км', '${fuelCostPerKm.toStringAsFixed(4)} руб.'),
+                        _buildDetailRow('Стоимость ремонта на 1 км', '${settings.repairCost.toStringAsFixed(2)} руб.'),
+                        const Divider(color: Color(0xFF2C2C2C), height: 12),
+                        _buildDetailRow('Расход на бензин', '${totalFuelCost.toStringAsFixed(0)} руб.', bold: true),
+                        _buildDetailRow('Расход на ремонт', '${totalRepairCost.toStringAsFixed(0)} руб.', bold: true),
+                        _buildDetailRow('Итого расходы', '${totalExpenses.toStringAsFixed(0)} руб.', 
+                          bold: true, 
+                          color: Colors.orange,
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -397,6 +443,33 @@ class OrderSummaryScreen extends ConsumerWidget {
             style: TextStyle(
               fontSize: size,
               color: const Color(0xFF888888),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, {bool bold = false, Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: const Color(0xFF888888),
+              fontSize: bold ? 13 : 12,
+              fontWeight: bold ? FontWeight.w500 : FontWeight.normal,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              color: color ?? Colors.white,
+              fontSize: bold ? 14 : 13,
+              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
             ),
           ),
         ],
