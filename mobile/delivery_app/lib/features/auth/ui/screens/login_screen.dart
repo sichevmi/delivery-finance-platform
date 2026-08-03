@@ -19,12 +19,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
   bool _obscure = true;
   bool _isLoading = false;
   bool _isCheckingAuth = true;
+  bool _isAuthChecked = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _checkAuth();
+    // Запускаем проверку ПОСЛЕ сборки виджета
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAuth();
+    });
   }
 
   @override
@@ -37,41 +41,52 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed && !_isAuthChecked) {
       print('🔐 LoginScreen: приложение возобновлено, проверяем авторизацию...');
       _checkAuth();
     }
   }
 
   Future<void> _checkAuth() async {
+    if (_isAuthChecked) return;
+    
     print('🔐 LoginScreen: проверка авторизации...');
     final authState = ref.read(authProvider);
     
     // Если уже авторизован – переходим на главную
     if (authState.isAuthenticated && authState.user != null) {
       print('🔐 LoginScreen: уже авторизован');
+      _isAuthChecked = true;
       if (mounted) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
-        return;
       }
+      return;
     }
 
     // Пробуем автологин
     print('🔐 LoginScreen: пробуем autoLogin...');
-    final authNotifier = ref.read(authProvider.notifier);
-    final isAuthenticated = await authNotifier.autoLogin();
-    print('🔐 LoginScreen: isAuthenticated = $isAuthenticated');
-    
-    if (mounted && isAuthenticated) {
-      print('🔐 LoginScreen: автологин успешен');
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
-    } else {
+    try {
+      final authNotifier = ref.read(authProvider.notifier);
+      final isAuthenticated = await authNotifier.autoLogin();
+      print('🔐 LoginScreen: isAuthenticated = $isAuthenticated');
+      _isAuthChecked = true;
+      
+      if (mounted && isAuthenticated) {
+        print('🔐 LoginScreen: автологин успешен');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+      } else {
+        setState(() {
+          _isCheckingAuth = false;
+        });
+      }
+    } catch (e) {
+      print('🔐 LoginScreen: ошибка: $e');
       setState(() {
         _isCheckingAuth = false;
       });
