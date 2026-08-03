@@ -4,7 +4,6 @@ import 'package:delivery_app/features/auth/providers/auth_provider.dart';
 import 'package:delivery_app/features/auth/ui/screens/login_screen.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 import 'package:delivery_app/features/delivery/services/gps_service.dart';
-import 'package:share_plus/share_plus.dart';
 
 class MoreTab extends ConsumerStatefulWidget {
   const MoreTab({super.key});
@@ -56,29 +55,41 @@ class _MoreTabState extends ConsumerState<MoreTab> {
             ),
           ),
           const SizedBox(height: 8),
-          _buildMenuItem(
-            icon: Icons.notifications_outlined,
-            title: 'Уведомления',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Настройки уведомлений в разработке'),
-                  backgroundColor: Colors.orange,
-                ),
-              );
-            },
+          // Убираем Container с фоном, используем только Material
+          Material(
+            color: const Color(0xFF1E1E1E),
+            borderRadius: BorderRadius.circular(8),
+            child: ListTile(
+              leading: const Icon(Icons.notifications_outlined, color: Color(0xFF6C63FF)),
+              title: const Text('Уведомления', style: TextStyle(color: Colors.white)),
+              trailing: const Icon(Icons.chevron_right, color: Color(0xFF888888)),
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Настройки уведомлений в разработке'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              },
+            ),
           ),
-          _buildMenuItem(
-            icon: Icons.language_outlined,
-            title: 'Язык',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Смена языка в разработке'),
-                  backgroundColor: Colors.orange,
-                ),
-              );
-            },
+          const SizedBox(height: 4),
+          Material(
+            color: const Color(0xFF1E1E1E),
+            borderRadius: BorderRadius.circular(8),
+            child: ListTile(
+              leading: const Icon(Icons.language_outlined, color: Color(0xFF6C63FF)),
+              title: const Text('Язык', style: TextStyle(color: Colors.white)),
+              trailing: const Icon(Icons.chevron_right, color: Color(0xFF888888)),
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Смена языка в разработке'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              },
+            ),
           ),
           const SizedBox(height: 24),
 
@@ -92,40 +103,65 @@ class _MoreTabState extends ConsumerState<MoreTab> {
             ),
           ),
           const SizedBox(height: 8),
-          _buildMenuItem(
-            icon: _isLoggingEnabled ? Icons.pause_circle_outline : Icons.play_circle_outline,
-            title: _isLoggingEnabled ? 'Остановить запись GPS' : 'Начать запись GPS',
-            subtitle: _isLoggingEnabled ? 'Логирование активно' : 'Логирование выключено',
-            trailing: _isLoggingEnabled
-                ? Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text(
-                      'Активно',
-                      style: TextStyle(
-                        color: Colors.green,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
+          Material(
+            color: const Color(0xFF1E1E1E),
+            borderRadius: BorderRadius.circular(8),
+            child: ListTile(
+              leading: Icon(
+                _isLoggingEnabled ? Icons.pause_circle_outline : Icons.play_circle_outline,
+                color: const Color(0xFF6C63FF),
+              ),
+              title: Text(
+                _isLoggingEnabled ? 'Остановить запись GPS' : 'Начать запись GPS',
+                style: const TextStyle(color: Colors.white),
+              ),
+              subtitle: Text(
+                _isLoggingEnabled ? 'Логирование активно' : 'Логирование выключено',
+                style: const TextStyle(color: Color(0xFF888888), fontSize: 12),
+              ),
+              trailing: _isLoggingEnabled
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    ),
-                  )
-                : null,
-            onTap: () => _toggleLogging(gpsService),
+                      child: const Text(
+                        'Активно',
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    )
+                  : const Icon(Icons.chevron_right, color: Color(0xFF888888)),
+              onTap: () => _toggleLogging(gpsService),
+            ),
           ),
-          _buildMenuItem(
-            icon: Icons.folder_open_outlined,
-            title: 'Просмотр логов',
-            subtitle: 'Открыть файл с логами GPS',
-            onTap: () => _showLogFile(gpsService),
+          const SizedBox(height: 4),
+          Material(
+            color: const Color(0xFF1E1E1E),
+            borderRadius: BorderRadius.circular(8),
+            child: ListTile(
+              leading: const Icon(Icons.folder_open_outlined, color: Color(0xFF6C63FF)),
+              title: const Text('Просмотр логов', style: TextStyle(color: Colors.white)),
+              subtitle: const Text('Открыть файл с логами GPS', style: TextStyle(color: Color(0xFF888888), fontSize: 12)),
+              trailing: const Icon(Icons.chevron_right, color: Color(0xFF888888)),
+              onTap: () => _showLogFile(gpsService),
+            ),
           ),
-          _buildMenuItem(
-            icon: Icons.share_outlined,
-            title: 'Отправить логи',
-            subtitle: 'Отправить файл с логами',
-            onTap: () => _shareLogFile(gpsService),
+          const SizedBox(height: 4),
+          Material(
+            color: const Color(0xFF1E1E1E),
+            borderRadius: BorderRadius.circular(8),
+            child: ListTile(
+              leading: const Icon(Icons.share_outlined, color: Color(0xFF6C63FF)),
+              title: const Text('Отправить логи', style: TextStyle(color: Colors.white)),
+              subtitle: const Text('Отправить файл с логами', style: TextStyle(color: Color(0xFF888888), fontSize: 12)),
+              trailing: const Icon(Icons.chevron_right, color: Color(0xFF888888)),
+              onTap: () => _shareLogFile(gpsService),
+            ),
           ),
           const SizedBox(height: 24),
 
@@ -139,36 +175,42 @@ class _MoreTabState extends ConsumerState<MoreTab> {
             ),
           ),
           const SizedBox(height: 8),
-          _buildMenuItem(
-            icon: Icons.info_outline,
-            title: 'Версия 1.0.0',
-            onTap: () {},
+          Material(
+            color: const Color(0xFF1E1E1E),
+            borderRadius: BorderRadius.circular(8),
+            child: ListTile(
+              leading: const Icon(Icons.info_outline, color: Color(0xFF6C63FF)),
+              title: const Text('Версия 1.0.0', style: TextStyle(color: Colors.white)),
+              trailing: const Icon(Icons.chevron_right, color: Color(0xFF888888)),
+              onTap: () {},
+            ),
           ),
-          _buildMenuItem(
-            icon: Icons.privacy_tip_outlined,
-            title: 'Политика конфиденциальности',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Политика конфиденциальности в разработке'),
-                  backgroundColor: Colors.orange,
-                ),
-              );
-            },
+          const SizedBox(height: 4),
+          Material(
+            color: const Color(0xFF1E1E1E),
+            borderRadius: BorderRadius.circular(8),
+            child: ListTile(
+              leading: const Icon(Icons.privacy_tip_outlined, color: Color(0xFF6C63FF)),
+              title: const Text('Политика конфиденциальности', style: TextStyle(color: Colors.white)),
+              trailing: const Icon(Icons.chevron_right, color: Color(0xFF888888)),
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Политика конфиденциальности в разработке'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              },
+            ),
           ),
           const SizedBox(height: 32),
 
-          // Кнопка выхода
-          Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.red.withOpacity(0.3)),
-            ),
+          // Кнопка выхода (с Material)
+          Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
             child: ListTile(
-              leading: const Icon(
-                Icons.logout_outlined,
-                color: Colors.red,
-              ),
+              leading: const Icon(Icons.logout_outlined, color: Colors.red),
               title: const Text(
                 'Выйти',
                 style: TextStyle(
@@ -176,10 +218,7 @@ class _MoreTabState extends ConsumerState<MoreTab> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              trailing: const Icon(
-                Icons.chevron_right,
-                color: Colors.red,
-              ),
+              trailing: const Icon(Icons.chevron_right, color: Colors.red),
               onTap: () => _showLogoutDialog(context, authNotifier),
             ),
           ),
@@ -237,44 +276,6 @@ class _MoreTabState extends ConsumerState<MoreTab> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildMenuItem({
-    required IconData icon,
-    required String title,
-    String? subtitle,
-    Widget? trailing,
-    required VoidCallback onTap,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF2C2C2C)),
-      ),
-      margin: const EdgeInsets.only(bottom: 4),
-      child: ListTile(
-        leading: Icon(
-          icon,
-          color: const Color(0xFF6C63FF),
-        ),
-        title: Text(
-          title,
-          style: const TextStyle(color: Colors.white),
-        ),
-        subtitle: subtitle != null
-            ? Text(
-                subtitle,
-                style: const TextStyle(color: Color(0xFF888888), fontSize: 12),
-              )
-            : null,
-        trailing: trailing ?? const Icon(
-          Icons.chevron_right,
-          color: Color(0xFF888888),
-        ),
-        onTap: onTap,
       ),
     );
   }
@@ -362,41 +363,33 @@ class _MoreTabState extends ConsumerState<MoreTab> {
   }
 
   void _shareLogFile(GpsService gpsService) async {
-  try {
-    final logPath = await gpsService.getLogFilePath();
-    if (logPath == null) {
+    try {
+      final logPath = await gpsService.getLogFilePath();
+      if (logPath == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Лог-файл не найден'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Лог-файл не найден'),
+          content: Text('Функция отправки логов в разработке'),
           backgroundColor: Colors.orange,
         ),
       );
-      return;
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ошибка: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
-
-    final content = await gpsService.readLogFile();
-    
-    // Отправляем через Share
-    await Share.share(
-      content,
-      subject: 'GPS Logs от ${DateTime.now()}',
-    );
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Логи отправлены'),
-        backgroundColor: Colors.green,
-      ),
-    );
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Ошибка: $e'),
-        backgroundColor: Colors.red,
-      ),
-    );
   }
-}
 
   void _showLogoutDialog(BuildContext context, AuthNotifier authNotifier) {
     showDialog(

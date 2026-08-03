@@ -25,7 +25,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // Запускаем проверку ПОСЛЕ сборки виджета
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAuth();
     });
@@ -48,45 +47,50 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
   }
 
   Future<void> _checkAuth() async {
-    if (_isAuthChecked) return;
+    if (_isAuthChecked) {
+      print('🔐 LoginScreen: проверка уже выполнена, пропускаем');
+      return;
+    }
+
+    _isAuthChecked = true;
     
     print('🔐 LoginScreen: проверка авторизации...');
     final authState = ref.read(authProvider);
     
-    // Если уже авторизован – переходим на главную
     if (authState.isAuthenticated && authState.user != null) {
       print('🔐 LoginScreen: уже авторизован');
-      _isAuthChecked = true;
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+          );
+        });
       }
       return;
     }
 
-    // Пробуем автологин
     print('🔐 LoginScreen: пробуем autoLogin...');
     try {
       final authNotifier = ref.read(authProvider.notifier);
       final isAuthenticated = await authNotifier.autoLogin();
       print('🔐 LoginScreen: isAuthenticated = $isAuthenticated');
-      _isAuthChecked = true;
       
       if (mounted && isAuthenticated) {
         print('🔐 LoginScreen: автологин успешен');
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
-      } else {
-        setState(() {
-          _isCheckingAuth = false;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+          );
         });
+        return;
       }
     } catch (e) {
       print('🔐 LoginScreen: ошибка: $e');
+    }
+
+    if (mounted) {
       setState(() {
         _isCheckingAuth = false;
       });
@@ -117,8 +121,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
       );
     }
 
-    // Если уже авторизован – показываем главную (но этот случай уже обработан выше)
+    // Если уже авторизован – сразу показываем главную
     if (authState.isAuthenticated && authState.user != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+      });
       return const SizedBox.shrink();
     }
 
@@ -236,12 +246,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                                 _emailController.text.trim(),
                                 _passwordController.text,
                               );
-                              if (mounted && authState.isAuthenticated) {
-                                Navigator.pushReplacement(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const HomeScreen()),
-                                );
+                              // Ждём, пока состояние обновится
+                              // Используем слушатель, чтобы дождаться изменения состояния
+                              if (mounted) {
+                                // Небольшая задержка для обновления состояния
+                                await Future.delayed(const Duration(milliseconds: 300));
+                                if (mounted && authState.isAuthenticated) {
+                                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                                    if (mounted) {
+                                      Navigator.pushReplacement(
+                                        context,
+                                        MaterialPageRoute(builder: (_) => const HomeScreen()),
+                                      );
+                                    }
+                                  });
+                                }
                               }
+                            } catch (e) {
+                              print('❌ Login error: $e');
                             } finally {
                               if (mounted) setState(() => _isLoading = false);
                             }
