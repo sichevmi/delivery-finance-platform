@@ -8,6 +8,8 @@ import 'package:delivery_app/features/delivery/ui/widgets/segment_content.dart';
 import 'package:delivery_app/features/delivery/ui/widgets/action_buttons.dart';
 import 'order_summary_screen.dart';
 import 'package:delivery_app/features/delivery/providers/pricing_provider.dart';
+import 'package:delivery_app/features/delivery/providers/settings_provider.dart';
+import 'package:delivery_app/features/delivery/providers/shift_provider.dart';
 import 'package:delivery_app/features/delivery/models/pricing_config.dart';
 
 class OrderRouteScreen extends ConsumerStatefulWidget {
@@ -55,7 +57,6 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
     final state = ref.watch(orderRouteProvider);
     final notifier = ref.read(orderRouteProvider.notifier);
 
-    // Обработка отмены заказа
     if (state.shouldNavigateToHome) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         notifier.resetNavigationFlag();
@@ -63,7 +64,6 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
       });
     }
 
-    // Показываем экран итогов
     if (state.showSummary && !_isSummaryShown) {
       _isSummaryShown = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -127,10 +127,21 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
 
   void _showSummary(BuildContext context, OrderRouteState state, OrderRouteNotifier notifier) {
     final pricing = ref.read(pricingProvider);
+    final settings = ref.read(settingsProvider);
 
     final totalTime = _calculateTotalTime(state);
     final totalDistance = _calculateTotalDistance(state);
     final totalCost = _calculateTotalCost(state, pricing);
+
+    final firstDelivery = state.completedDeliveries.isNotEmpty ? state.completedDeliveries.first : null;
+    final shopDistance = firstDelivery?.distanceToShop ?? 0.0;
+    final totalPaidDistance = state.completedDeliveries.fold(0.0, (sum, d) => sum + d.distanceToClient);
+    final totalAllDistance = shopDistance + totalPaidDistance;
+
+    final fuelCostPerKm = (settings.fuelConsumption / 100) * settings.fuelPrice;
+    final totalFuelCost = totalAllDistance * fuelCostPerKm;
+    final totalRepairCost = totalAllDistance * settings.repairCost;
+    final totalExpenses = totalFuelCost + totalRepairCost;
 
     Navigator.push(
       context,
@@ -149,10 +160,24 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
       if (result == true) {
         notifier.resetAfterSummary();
       } else {
+        _updateShiftStats(state, totalAllDistance, totalCost, totalExpenses);
         notifier.finishOrder();
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
     });
+  }
+
+  void _updateShiftStats(OrderRouteState state, double totalDistance, double totalIncome, double totalExpenses) {
+    final shiftNotifier = ref.read(shiftProvider.notifier);
+    final orderDuration = Duration(
+      seconds: _calculateTotalTime(state),
+    );
+    shiftNotifier.finishOrder(
+      totalDistance,
+      totalIncome,
+      totalExpenses,
+      orderDuration,
+    );
   }
 
   int _calculateTotalTime(OrderRouteState state) {

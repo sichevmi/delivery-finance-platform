@@ -1,10 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:delivery_app/features/auth/providers/auth_provider.dart';
 import 'package:delivery_app/features/delivery/providers/shift_provider.dart';
+import 'package:delivery_app/features/delivery/providers/settings_provider.dart';
 import 'package:delivery_app/features/delivery/providers/tab_provider.dart';
-import 'package:delivery_app/features/delivery/ui/widgets/metrics_grid.dart';
-import 'package:delivery_app/features/delivery/ui/widgets/start_shift_button.dart';
 import 'package:delivery_app/features/delivery/ui/tabs/orders_tab.dart';
 import 'package:delivery_app/features/delivery/ui/tabs/analytics_tab.dart';
 import 'package:delivery_app/features/delivery/ui/tabs/directories_tab.dart';
@@ -17,7 +17,9 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
+  Timer? _ticker;
+
   final List<GlobalKey<NavigatorState>> _navigatorKeys = [
     GlobalKey<NavigatorState>(),
     GlobalKey<NavigatorState>(),
@@ -43,10 +45,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _startTicker();
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startTicker();
+    } else if (state == AppLifecycleState.paused) {
+      _ticker?.cancel();
+    }
+  }
+
+  void _startTicker() {
+    _ticker?.cancel();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (timer) {
+      ref.read(shiftProvider.notifier).tick();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final shiftState = ref.watch(shiftProvider);
     final selectedTab = ref.watch(selectedTabProvider);
+    final settings = ref.watch(settingsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -76,7 +109,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       body: IndexedStack(
         index: selectedTab,
         children: [
-          _buildHomeTab(shiftState),
+          _buildHomeTab(shiftState, settings),
           Navigator(
             key: _navigatorKeys[1],
             onGenerateRoute: (settings) => MaterialPageRoute(
@@ -128,33 +161,45 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildHomeTab(ShiftState shiftState) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      physics: const BouncingScrollPhysics(),
+  Widget _buildHomeTab(ShiftState shiftState, SettingsState settings) {
+    final fuelCostPerKm = (settings.fuelConsumption / 100) * settings.fuelPrice;
+    final now = DateTime.now();
+
+    return Container(
+      padding: const EdgeInsets.all(12),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Дата и статус смены
           Row(
             children: [
               const Icon(Icons.calendar_today, size: 14, color: Color(0xFF888888)),
               const SizedBox(width: 6),
-              Text(_getTodayDate(), style: const TextStyle(fontSize: 13, color: Color(0xFF888888))),
+              Text(_getTodayDate(), style: const TextStyle(fontSize: 12, color: Color(0xFF888888))),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: shiftState.isActive ? Colors.green.withOpacity(0.15) : Colors.grey.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
-                    Container(width: 5, height: 5, decoration: BoxDecoration(color: shiftState.isActive ? Colors.green : Colors.grey, shape: BoxShape.circle)),
+                    Container(
+                      width: 5,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: shiftState.isActive ? Colors.green : Colors.grey,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       shiftState.isActive ? 'Смена активна' : 'Смена не начата',
-                      style: TextStyle(fontSize: 11, color: shiftState.isActive ? Colors.green : Colors.grey),
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: shiftState.isActive ? Colors.green : Colors.grey,
+                      ),
                     ),
                   ],
                 ),
@@ -163,29 +208,222 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
           const SizedBox(height: 8),
 
-          // Заголовок
-          const Row(
+          // Верхняя строка: Время работы и Стоимость пробега
+          Row(
             children: [
-              Text('📊 Основные показатели', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-              Spacer(),
-              Text('За сутки', style: TextStyle(fontSize: 12, color: Color(0xFF888888))),
+              _buildTimeCard(
+                icon: Icons.timer,
+                value: _formatDuration(shiftState.workTime),
+                label: 'Время работы',
+                color: Colors.indigo,
+              ),
+              const SizedBox(width: 8),
+              _buildTimeCard(
+                icon: Icons.attach_money,
+                value: '${fuelCostPerKm.toStringAsFixed(2)} руб',
+                label: 'Стоимость пробега (1 км)',
+                color: Colors.orange,
+              ),
             ],
           ),
           const SizedBox(height: 8),
 
-          // Metrics Grid
-          const MetricsGrid(),
-          const SizedBox(height: 12),
-
-          // Кнопка начала смены
-          SizedBox(
-            height: 46,
-            child: StartShiftButton(),
+          // Основные показатели (3 колонки)
+          Row(
+            children: [
+              _buildMetricCard(
+                value: '${shiftState.netProfit.toStringAsFixed(0)} ₽',
+                label: 'Доход',
+                color: Colors.green,
+              ),
+              const SizedBox(width: 6),
+              _buildMetricCard(
+                value: shiftState.ordersCount.toString(),
+                label: 'Заказы',
+                color: Colors.blue,
+              ),
+              const SizedBox(width: 6),
+              _buildMetricCard(
+                value: '${shiftState.avgDistancePerOrder.toStringAsFixed(2)} км',
+                label: 'Ср. пробег/заказ',
+                color: Colors.orange,
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              _buildMetricCard(
+                value: '${shiftState.avgTimePerOrder.toStringAsFixed(0)} мин',
+                label: 'Ср. время/заказ',
+                color: Colors.purple,
+              ),
+              const SizedBox(width: 6),
+              _buildMetricCard(
+                value: '${shiftState.avgCheck.toStringAsFixed(0)} ₽',
+                label: 'Ср. чек',
+                color: Colors.teal,
+              ),
+              const SizedBox(width: 6),
+              _buildMetricCard(
+                value: '${shiftState.totalDistanceAll.toStringAsFixed(1)} км',
+                label: 'Пробег (всего)',
+                color: Colors.cyan,
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              _buildMetricCard(
+                value: '${shiftState.idleDistance.toStringAsFixed(1)} км',
+                label: 'Холостой пробег',
+                color: Colors.red,
+              ),
+              const SizedBox(width: 6),
+              _buildMetricCard(
+                value: _formatDuration(shiftState.getIdleTime(now)),
+                label: 'Время простоя',
+                color: Colors.red.shade300,
+              ),
+              const Spacer(),
+            ],
+          ),
+          const Spacer(),
+
+          // Кнопка начала/остановки смены
+          SizedBox(
+            height: 48,
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                final notifier = ref.read(shiftProvider.notifier);
+                if (shiftState.isActive) {
+                  notifier.stopShift();
+                } else {
+                  notifier.startShift();
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: shiftState.isActive ? Colors.red : const Color(0xFF6C63FF),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: Text(
+                shiftState.isActive ? 'Остановить работу' : 'Начать работу',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
         ],
       ),
     );
+  }
+
+  Widget _buildTimeCard({
+    required IconData icon,
+    required String value,
+    required String label,
+    required Color color,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E1E),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFF2C2C2C)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 9,
+                      color: Color(0xFF888888),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetricCard({
+    required String value,
+    required String label,
+    required Color color,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E1E),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFF2C2C2C)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 9,
+                color: Color(0xFF888888),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDuration(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
   String _getTodayDate() {
