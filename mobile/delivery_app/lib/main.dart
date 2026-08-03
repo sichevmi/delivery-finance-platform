@@ -32,7 +32,6 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
   Future<void> _initializeApp() async {
     print('🔐 DeliveryApp: инициализация...');
     
-    // 1. Проверяем разрешение на геолокацию
     final hasPermission = await PermissionService.requestLocationPermission(context);
     print('🔐 DeliveryApp: разрешение на геолокацию = $hasPermission');
     
@@ -44,7 +43,6 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
       return;
     }
 
-    // 2. Проверяем авторизацию
     try {
       final authNotifier = ref.read(authProvider.notifier);
       final isAuthenticated = await authNotifier.autoLogin();
@@ -56,7 +54,7 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
         _isLoading = false;
       });
     } catch (e) {
-      print('🔐 DeliveryApp: ошибка при проверке авторизации: $e');
+      print('🔐 DeliveryApp: ошибка: $e');
       setState(() {
         _hasPermission = true;
         _isAuthenticated = false;
