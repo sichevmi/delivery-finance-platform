@@ -132,7 +132,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
   state = state.copyWith(isLoading: true);
   
   try {
-    print('🔄 Проверяем hasTokens...');
     final hasTokens = await storage.hasTokens();
     print('🔄 hasTokens: $hasTokens');
     
@@ -142,7 +141,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return false;
     }
 
-    print('🔄 Получаем refresh token...');
     final refreshToken = await storage.getRefreshToken();
     print('🔄 Refresh token: ${refreshToken != null ? refreshToken.substring(0, 20) + "..." : "null"}');
     
@@ -163,7 +161,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await storage.updateAccessToken(newAccessToken);
       print('🔄 Токен обновлён успешно');
       
-      print('🔄 Получаем пользователя...');
       final userResponse = await dio.get('/api/v1/auth/hello');
       final user = User.fromJson(userResponse.data);
       await storage.saveUserId(user.id.toString());

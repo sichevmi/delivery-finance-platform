@@ -12,32 +12,98 @@ class LoginScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingObserver {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscure = true;
   bool _isLoading = false;
+  bool _isCheckingAuth = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _checkAuth();
+  }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) {
-    final authState = ref.watch(authProvider);
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      print('🔐 LoginScreen: приложение возобновлено, проверяем авторизацию...');
+      _checkAuth();
+    }
+  }
 
+  Future<void> _checkAuth() async {
+    print('🔐 LoginScreen: проверка авторизации...');
+    final authState = ref.read(authProvider);
+    
     // Если уже авторизован – переходим на главную
     if (authState.isAuthenticated && authState.user != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      print('🔐 LoginScreen: уже авторизован');
+      if (mounted) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
+        return;
+      }
+    }
+
+    // Пробуем автологин
+    print('🔐 LoginScreen: пробуем autoLogin...');
+    final authNotifier = ref.read(authProvider.notifier);
+    final isAuthenticated = await authNotifier.autoLogin();
+    print('🔐 LoginScreen: isAuthenticated = $isAuthenticated');
+    
+    if (mounted && isAuthenticated) {
+      print('🔐 LoginScreen: автологин успешен');
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
+    } else {
+      setState(() {
+        _isCheckingAuth = false;
       });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+
+    // Если проверка ещё идёт – показываем загрузку
+    if (_isCheckingAuth) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF121212),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: Color(0xFF6C63FF)),
+              SizedBox(height: 20),
+              Text(
+                'Проверка авторизации...',
+                style: TextStyle(color: Color(0xFF888888)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Если уже авторизован – показываем главную (но этот случай уже обработан выше)
+    if (authState.isAuthenticated && authState.user != null) {
       return const SizedBox.shrink();
     }
 
