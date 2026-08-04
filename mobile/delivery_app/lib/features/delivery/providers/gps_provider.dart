@@ -2,14 +2,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:delivery_app/features/delivery/services/gps_service.dart';
 import 'package:delivery_app/features/delivery/providers/shift_provider.dart';
 
-// Создаём синглтон через провайдер
-final gpsServiceProvider = Provider<GpsService>((ref) {
-  return GpsService();
-});
-
 // Провайдер для инициализации GPS
 final gpsInitProvider = Provider((ref) {
-  final gpsService = ref.watch(gpsServiceProvider);
+  print('🟢 gpsInitProvider: создаём/получаем GpsService');
+  
+  // Создаём/получаем синглтон
+  final gpsService = GpsService();
+  
   final shiftNotifier = ref.watch(shiftProvider.notifier);
   
   print('🟢 gpsInitProvider: настройка колбэка');
@@ -32,4 +31,11 @@ final gpsInitProvider = Provider((ref) {
   });
   
   return gpsService;
+});
+
+// Провайдер для получения экземпляра GpsService
+final gpsServiceProvider = Provider<GpsService>((ref) {
+  // Инициализируем GPS, если ещё не инициализирован
+  ref.watch(gpsInitProvider);
+  return GpsService();
 });

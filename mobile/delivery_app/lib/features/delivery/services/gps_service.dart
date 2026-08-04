@@ -1,4 +1,3 @@
-// gps_service.dart – с правильной передачей приращений
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -8,8 +7,16 @@ import 'package:path_provider/path_provider.dart';
 typedef DistanceUpdateCallback = void Function(double deltaDistance, bool isPaid);
 
 class GpsService {
-  GpsService(){
+  // ---- СИНГЛТОН ----
+  static GpsService? _instance;
+  
+  GpsService._internal() {
     print('🟢 GpsService: создан экземпляр ${hashCode}');
+  }
+  
+  factory GpsService() {
+    _instance ??= GpsService._internal();
+    return _instance!;
   }
 
   // ---- Внутреннее состояние ----
@@ -38,6 +45,7 @@ class GpsService {
   Stream<double> get distanceStream => _distanceStreamController.stream;
 
   void setOnDistanceUpdate(DistanceUpdateCallback callback) {
+    print('🟢 GpsService.setOnDistanceUpdate: колбэк установлен');
     _onDistanceUpdate = callback;
   }
 
@@ -98,7 +106,7 @@ class GpsService {
   }
 
   // ---- Основные методы GPS ----
-    void startTracking() {
+  void startTracking() {
     print('🟢 GPS: startTracking() called on instance ${hashCode}');
     if (_isTracking) {
       print('🟡 GPS: already tracking');
@@ -126,9 +134,9 @@ class GpsService {
   }
 
   void _onPositionUpdate(Position position) {
-    print('📍 GPS: обновление позиции на instance ${hashCode}');
     if (!_isTracking || _isPaused) return;
 
+    print('📍 GPS: обновление позиции на instance ${hashCode}');
     print('📍 GPS: lat: ${position.latitude}, lon: ${position.longitude}, acc: ${position.accuracy}m');
 
     if (position.accuracy > _maxAccuracy) {
@@ -160,6 +168,7 @@ class GpsService {
       return;
     }
 
+    // Преобразуем в километры
     final deltaKm = distance / 1000;
     _totalDistance += deltaKm;
     
@@ -167,6 +176,7 @@ class GpsService {
     _distanceStreamController.add(_totalDistance);
     _lastPosition = position;
 
+    // Вызываем колбэк с ПРИРАЩЕНИЕМ
     if (_onDistanceUpdate != null) {
       print('🔄 Вызываем колбэк с deltaKm=$deltaKm');
       _onDistanceUpdate?.call(deltaKm, true);
@@ -176,18 +186,17 @@ class GpsService {
   }
 
   void pauseTracking() {
-    _log('⏸️ Pause');
+    print('⏸️ GPS: pauseTracking()');
     _isPaused = true;
   }
 
   void resumeTracking() {
-    _log('▶️ Resume');
+    print('▶️ GPS: resumeTracking()');
     _isPaused = false;
   }
 
   void stopTracking() {
-    _log('🛑 Stop');
-    print('🔴 stopTracking() called from: ${StackTrace.current}');
+    print('🛑 GPS: stopTracking() on instance ${hashCode}');
     _isTracking = false;
     _isPaused = false;
     _positionSubscription?.cancel();
@@ -203,7 +212,7 @@ class GpsService {
   double getTotalDistance() => _totalDistance;
 
   void resetDistance() {
-    _log('🔄 Reset');
+    print('🔄 GPS: resetDistance()');
     _totalDistance = 0.0;
     _lastPosition = null;
     _distanceStreamController.add(0.0);

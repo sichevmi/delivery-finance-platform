@@ -50,7 +50,9 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
       print('🔐 DeliveryApp: isAuthenticated = $isAuthenticated');
       
       // Инициализируем GPS один раз при старте приложения
+      // Это создаст синглтон GpsService и настроит колбэк
       ref.read(gpsInitProvider);
+      print('🟢 GPS инициализирован');
       
       setState(() {
         _hasPermission = true;

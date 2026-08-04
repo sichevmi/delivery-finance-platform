@@ -182,7 +182,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   void init({required double coefficient, required int segmentIndex}) {
     print('🟢 OrderRouteNotifier.init(): coefficient=$coefficient, segmentIndex=$segmentIndex');
     
-    // Используем существующий экземпляр GpsService из провайдера
+    // Получаем синглтон GpsService
     _gpsService = ref.read(gpsServiceProvider);
     print('🟢 OrderRouteNotifier: получили GpsService instance ${_gpsService.hashCode}');
     
@@ -289,7 +289,6 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
       }
     }
     state = state.copyWith(segmentEndTime: end);
-    // Не останавливаем GPS при завершении сегмента
   }
 
   void saveCurrentSegmentData() {
