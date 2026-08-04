@@ -1,5 +1,5 @@
 // lib/features/delivery/providers/shift_provider.dart
-import 'package:flutter/material.dart'; // <-- ДОБАВЛЕНО
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
@@ -151,23 +151,6 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
 
   ShiftNotifier(this._ref) : super(const ShiftState()) {
     _loadState();
-    // Инициализируем GPS после загрузки состояния
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initGpsService();
-    });
-  }
-
-  void _initGpsService() {
-    try {
-      _gpsService = _ref.read(gpsServiceProvider);
-      print('🟢 ShiftNotifier: GPS сервис получен');
-      if (state.isActive) {
-        _gpsService!.startTracking();
-        print('🟢 ShiftNotifier: GPS запущен (смена активна)');
-      }
-    } catch (e) {
-      print('⚠️ ShiftNotifier: GPS сервис ещё не готов: $e');
-    }
   }
 
   // ===== ЗАГРУЗКА И СОХРАНЕНИЕ =====
@@ -202,6 +185,13 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
 
     if (state.isActive && !state.isOnOrder && state.idleStartTime == null) {
       state = state.copyWith(idleStartTime: DateTime.now());
+    }
+    
+    // Если смена активна - запускаем GPS после загрузки
+    if (state.isActive) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _initGpsAndStartTracking();
+      });
     }
   }
 
@@ -256,6 +246,19 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   DateTime? _fromMillis(int? ms) => ms != null ? DateTime.fromMillisecondsSinceEpoch(ms) : null;
 
   // ===== УПРАВЛЕНИЕ GPS =====
+
+  void _initGpsAndStartTracking() {
+    try {
+      _gpsService = _ref.read(gpsServiceProvider);
+      print('🟢 ShiftNotifier: GPS сервис получен');
+      if (state.isActive) {
+        _gpsService!.startTracking();
+        print('🟢 ShiftNotifier: GPS запущен (смена активна)');
+      }
+    } catch (e) {
+      print('⚠️ ShiftNotifier: GPS сервис ещё не готов: $e');
+    }
+  }
 
   void _startGpsTracking() {
     if (_gpsService == null) {

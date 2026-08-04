@@ -49,10 +49,9 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
       final isAuthenticated = await authNotifier.autoLogin();
       print('🔐 DeliveryApp: isAuthenticated = $isAuthenticated');
       
-      // ВАЖНО: Инициализируем GPS ДО ВСЕГО
-      print('🟢 Инициализация GPS...');
+      // Просто инициализируем GPS провайдер
       ref.read(gpsInitProvider);
-      print('🟢 GPS инициализирован');
+      print('🟢 GPS провайдер инициализирован');
       
       setState(() {
         _hasPermission = true;
