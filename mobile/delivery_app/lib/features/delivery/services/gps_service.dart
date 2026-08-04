@@ -8,7 +8,9 @@ import 'package:path_provider/path_provider.dart';
 typedef DistanceUpdateCallback = void Function(double deltaDistance, bool isPaid);
 
 class GpsService {
-  GpsService();
+  GpsService(){
+    print('🟢 GpsService: создан экземпляр ${hashCode}');
+  }
 
   // ---- Внутреннее состояние ----
   StreamSubscription<Position>? _positionSubscription;
@@ -96,10 +98,10 @@ class GpsService {
   }
 
   // ---- Основные методы GPS ----
-  void startTracking() {
-    _log('🟢 GPS: startTracking()');
+    void startTracking() {
+    print('🟢 GPS: startTracking() called on instance ${hashCode}');
     if (_isTracking) {
-      _log('🟡 GPS: already tracking');
+      print('🟡 GPS: already tracking');
       return;
     }
     _isTracking = true;
@@ -112,29 +114,31 @@ class GpsService {
       distanceFilter: 0,
     );
 
+    print('🟢 GPS: подписываемся на поток позиции');
     _positionSubscription = Geolocator.getPositionStream(
       locationSettings: settings,
     ).listen(
       (Position position) => _onPositionUpdate(position),
-      onError: (error) => _log('🔴 GPS error: $error'),
+      onError: (error) => print('🔴 GPS error: $error'),
       cancelOnError: false,
     );
-    _log('🟢 GPS: stream started');
+    print('🟢 GPS: поток запущен');
   }
 
   void _onPositionUpdate(Position position) {
+    print('📍 GPS: обновление позиции на instance ${hashCode}');
     if (!_isTracking || _isPaused) return;
 
-    _log('📍 GPS: lat: ${position.latitude}, lon: ${position.longitude}, acc: ${position.accuracy}m');
+    print('📍 GPS: lat: ${position.latitude}, lon: ${position.longitude}, acc: ${position.accuracy}m');
 
     if (position.accuracy > _maxAccuracy) {
-      _log('⚠️ Accuracy too poor (${position.accuracy}m), ignoring');
+      print('⚠️ Accuracy too poor (${position.accuracy}m), ignoring');
       return;
     }
 
     if (_lastPosition == null) {
       _lastPosition = position;
-      _log('🟢 First position stored');
+      print('🟢 First position stored');
       return;
     }
 
@@ -144,28 +148,31 @@ class GpsService {
       position.latitude,
       position.longitude,
     );
-    _log('📏 Raw distance: ${distance.toStringAsFixed(2)}m');
+    print('📏 Raw distance: ${distance.toStringAsFixed(2)}m');
 
     if (distance < _minDistance) {
-      _log('📏 Too small (< ${_minDistance}m), ignoring');
+      print('📏 Too small (< ${_minDistance}m), ignoring');
       return;
     }
 
     if (distance > _maxJump) {
-      _log('⚠️ Jump > ${_maxJump}m (${distance.toStringAsFixed(2)}m), ignoring');
+      print('⚠️ Jump > ${_maxJump}m (${distance.toStringAsFixed(2)}m), ignoring');
       return;
     }
 
-    // Преобразуем в километры
     final deltaKm = distance / 1000;
     _totalDistance += deltaKm;
     
-    _log('✅ ACCEPTED ${distance.toStringAsFixed(2)}m (${deltaKm.toStringAsFixed(4)} km), total: ${_totalDistance.toStringAsFixed(4)} km');
+    print('✅ ACCEPTED ${distance.toStringAsFixed(2)}m (${deltaKm.toStringAsFixed(4)} km), total: ${_totalDistance.toStringAsFixed(4)} km');
     _distanceStreamController.add(_totalDistance);
     _lastPosition = position;
 
-    // Вызываем колбэк с ПРИРАЩЕНИЕМ
-    _onDistanceUpdate?.call(deltaKm, true); // true = paid distance (будет разделено в shift_provider)
+    if (_onDistanceUpdate != null) {
+      print('🔄 Вызываем колбэк с deltaKm=$deltaKm');
+      _onDistanceUpdate?.call(deltaKm, true);
+    } else {
+      print('⚠️ _onDistanceUpdate == null, колбэк не вызван');
+    }
   }
 
   void pauseTracking() {

@@ -2,31 +2,34 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:delivery_app/features/delivery/services/gps_service.dart';
 import 'package:delivery_app/features/delivery/providers/shift_provider.dart';
 
+// Создаём синглтон через провайдер
 final gpsServiceProvider = Provider<GpsService>((ref) {
   return GpsService();
 });
 
-// Провайдер для инициализации GPS – настраивает колбэк один раз
+// Провайдер для инициализации GPS
 final gpsInitProvider = Provider((ref) {
   final gpsService = ref.watch(gpsServiceProvider);
   final shiftNotifier = ref.watch(shiftProvider.notifier);
   
-  // Настраиваем колбэк один раз при инициализации
+  print('🟢 gpsInitProvider: настройка колбэка');
+  
   gpsService.setOnDistanceUpdate((deltaKm, isPaid) {
     final shiftState = ref.read(shiftProvider);
+    print('📍 GPS колбэк вызван: deltaKm=$deltaKm, isPaid=$isPaid, isActive=${shiftState.isActive}, isOnOrder=${shiftState.isOnOrder}');
     
-    // Добавляем расстояние только если смена активна
     if (shiftState.isActive) {
       if (shiftState.isOnOrder) {
-        // Если на заказе - платный пробег
         shiftNotifier.updatePaidDistance(deltaKm);
+        print('✅ Добавлено к платному пробегу: $deltaKm км');
       } else {
-        // Если не на заказе - холостой
         shiftNotifier.addIdleDistance(deltaKm);
+        print('✅ Добавлено к холостому пробегу: $deltaKm км');
       }
+    } else {
+      print('⚠️ Смена не активна, пробег не добавлен');
     }
   });
   
-  // Возвращаем сервис для использования в других местах
   return gpsService;
 });

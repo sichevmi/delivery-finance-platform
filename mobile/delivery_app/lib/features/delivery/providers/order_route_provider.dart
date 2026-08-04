@@ -191,9 +191,11 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   }
 
   void _initGps() {
+    print('🟢 OrderRouteNotifier._initGps()');
     _gpsSubscription?.cancel();
     _gpsSubscription = null;
     _gpsSubscription = _gpsService.distanceStream.listen((distance) {
+      print('📍 OrderRoute GPS distance: $distance');
       if (mounted) {
         state = state.copyWith(distance: distance);
       }
@@ -201,6 +203,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   }
 
   void _startSegment() {
+    print('🟢 OrderRouteNotifier._startSegment() segment: ${state.currentSegment}');
     state = state.copyWith(
       segmentStartTime: DateTime.now(),
       segmentEndTime: null,
@@ -214,7 +217,10 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     state = state.copyWith(distance: 0.0);
     state = state.copyWith(manualDistance: 0.0);
     if (state.useGps && state.currentSegment != 1) {
+      print('🟢 Запускаем GPS трекинг для сегмента ${state.currentSegment}');
       _gpsService.startTracking();
+    } else {
+      print('⚠️ GPS не запущен: useGps=${state.useGps}, currentSegment=${state.currentSegment}');
     }
   }
 
