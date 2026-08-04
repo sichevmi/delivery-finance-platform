@@ -189,6 +189,11 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     _isGpsInitialized = true;
     state = OrderRouteState.initial(coefficient: coefficient, segmentIndex: segmentIndex);
     _initGps();
+    
+    // ЗАПУСКАЕМ GPS СРАЗУ для сегмента 0
+    _startGpsTracking();
+    
+    // Теперь запускаем сегмент
     _startSegment();
   }
 
@@ -209,6 +214,20 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     print('🟢 OrderRouteNotifier._initGps() - подписка создана');
   }
 
+  void _startGpsTracking() {
+    print('🟢 OrderRouteNotifier._startGpsTracking()');
+    _gpsService.resetDistance();
+    state = state.copyWith(distance: 0.0);
+    state = state.copyWith(manualDistance: 0.0);
+    
+    if (state.useGps) {
+      print('🟢 ЗАПУСКАЕМ GPS трекинг для сегмента ${state.currentSegment}');
+      _gpsService.startTracking();
+    } else {
+      print('⚠️ GPS НЕ запущен: useGps=${state.useGps}');
+    }
+  }
+
   void _startSegment() {
     print('🟢 OrderRouteNotifier._startSegment() segment: ${state.currentSegment}');
     state = state.copyWith(
@@ -220,19 +239,6 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
       showSummary: false,
       shouldNavigateToHome: false,
     );
-    
-    print('🟢 Сброс расстояния GPS');
-    _gpsService.resetDistance();
-    state = state.copyWith(distance: 0.0);
-    state = state.copyWith(manualDistance: 0.0);
-    
-    // Запускаем GPS на ВСЕХ сегментах
-    if (state.useGps) {
-      print('🟢 ЗАПУСКАЕМ GPS трекинг для сегмента ${state.currentSegment}');
-      _gpsService.startTracking();
-    } else {
-      print('⚠️ GPS НЕ запущен: useGps=${state.useGps}');
-    }
   }
 
   void togglePause() {
@@ -327,6 +333,11 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
         state = state.copyWith(shopAddress: addr ?? 'Адрес не определён');
         state = state.copyWith(currentSegment: 1);
         _startSegment();
+        // Продолжаем GPS трекинг для сегмента 1
+        if (state.useGps) {
+          print('🟢 GPS продолжает трекинг для сегмента 1');
+          // Не перезапускаем GPS, просто продолжаем
+        }
         break;
       case 1:
         if (state.weight == null || state.weight! <= 0) return;
@@ -335,6 +346,10 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
           currentSegment: 2,
         );
         _startSegment();
+        // Продолжаем GPS трекинг для сегмента 2
+        if (state.useGps) {
+          print('🟢 GPS продолжает трекинг для сегмента 2');
+        }
         break;
       case 2:
         final pos = await _getCurrentPosition();
@@ -346,6 +361,9 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
         state = state.copyWith(clientAddress: addr ?? 'Адрес не определён');
         state = state.copyWith(currentSegment: 3);
         _startSegment();
+        if (state.useGps) {
+          print('🟢 GPS продолжает трекинг для сегмента 3');
+        }
         break;
       case 3:
         await _completeDelivery();
@@ -434,6 +452,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
       showSummary: false,
       manualDistance: 0.0,
     );
+    _startGpsTracking();
     _startSegment();
   }
 
