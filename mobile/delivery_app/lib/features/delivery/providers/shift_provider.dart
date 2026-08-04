@@ -2,6 +2,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
+import 'package:delivery_app/features/delivery/services/gps_service.dart';
 
 class ShiftState {
   final bool isActive;
@@ -144,10 +145,28 @@ class ShiftState {
 }
 
 class ShiftNotifier extends StateNotifier<ShiftState> {
-  final Ref? _ref;
+  final Ref _ref;
+  GpsService? _gpsService;
 
   ShiftNotifier(this._ref) : super(const ShiftState()) {
     _loadState();
+    // Инициализируем GPS после загрузки состояния
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initGpsService();
+    });
+  }
+
+  void _initGpsService() {
+    try {
+      _gpsService = _ref.read(gpsServiceProvider);
+      print('🟢 ShiftNotifier: GPS сервис получен');
+      if (state.isActive) {
+        _gpsService!.startTracking();
+        print('🟢 ShiftNotifier: GPS запущен (смена активна)');
+      }
+    } catch (e) {
+      print('⚠️ ShiftNotifier: GPS сервис ещё не готов: $e');
+    }
   }
 
   // ===== ЗАГРУЗКА И СОХРАНЕНИЕ =====
@@ -182,11 +201,6 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
 
     if (state.isActive && !state.isOnOrder && state.idleStartTime == null) {
       state = state.copyWith(idleStartTime: DateTime.now());
-    }
-    
-    // Если смена активна при загрузке - запускаем GPS
-    if (state.isActive) {
-      _startGpsTracking();
     }
   }
 
@@ -243,28 +257,26 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   // ===== УПРАВЛЕНИЕ GPS =====
 
   void _startGpsTracking() {
-    try {
-      final gpsService = _ref?.read(gpsServiceProvider);
-      if (gpsService != null) {
-        print('🟢 Запускаем GPS трекинг (смена активна)');
-        gpsService.startTracking();
-      } else {
-        print('⚠️ GpsService не найден');
+    if (_gpsService == null) {
+      try {
+        _gpsService = _ref.read(gpsServiceProvider);
+      } catch (e) {
+        print('⚠️ Не удалось получить GPS сервис: $e');
+        return;
       }
-    } catch (e) {
-      print('❌ Ошибка запуска GPS: $e');
+    }
+    if (_gpsService != null) {
+      print('🟢 Запускаем GPS трекинг (смена активна)');
+      _gpsService!.startTracking();
+    } else {
+      print('⚠️ GpsService не найден');
     }
   }
 
   void _stopGpsTracking() {
-    try {
-      final gpsService = _ref?.read(gpsServiceProvider);
-      if (gpsService != null) {
-        print('🛑 Останавливаем GPS трекинг (смена не активна)');
-        gpsService.stopTracking();
-      }
-    } catch (e) {
-      print('❌ Ошибка остановки GPS: $e');
+    if (_gpsService != null) {
+      print('🛑 Останавливаем GPS трекинг (смена не активна)');
+      _gpsService!.stopTracking();
     }
   }
 

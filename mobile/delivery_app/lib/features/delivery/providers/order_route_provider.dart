@@ -183,8 +183,16 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   void init({required double coefficient, required int segmentIndex}) {
     print('🟢 OrderRouteNotifier.init(): coefficient=$coefficient, segmentIndex=$segmentIndex');
     
-    _gpsService = ref.read(gpsServiceProvider);
-    print('🟢 OrderRouteNotifier: получили GpsService instance ${_gpsService.hashCode}');
+    try {
+      _gpsService = ref.read(gpsServiceProvider);
+      print('🟢 OrderRouteNotifier: получили GpsService instance ${_gpsService.hashCode}');
+    } catch (e) {
+      print('⚠️ Ошибка получения GpsService: $e');
+      // Инициализируем GPS
+      ref.read(gpsInitProvider);
+      _gpsService = ref.read(gpsServiceProvider);
+      print('🟢 OrderRouteNotifier: GpsService создан после инициализации');
+    }
     
     _isGpsInitialized = true;
     state = OrderRouteState.initial(coefficient: coefficient, segmentIndex: segmentIndex);

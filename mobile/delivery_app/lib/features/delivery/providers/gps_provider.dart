@@ -7,13 +7,15 @@ final gpsServiceInstanceProvider = StateProvider<GpsService?>((ref) => null);
 
 // Инициализация GPS
 final gpsInitProvider = Provider((ref) {
-  print('🟢 gpsInitProvider: создаём/получаем GpsService');
+  print('🟢 gpsInitProvider: создаём GpsService');
   
   final gpsService = GpsService();
   
-  // Сохраняем ссылку
+  // Сохраняем ссылку в StateProvider
   ref.read(gpsServiceInstanceProvider.notifier).state = gpsService;
+  print('🟢 GpsService сохранён в провайдере');
   
+  // Получаем shiftNotifier через watch
   final shiftNotifier = ref.watch(shiftProvider.notifier);
   
   print('🟢 gpsInitProvider: настройка колбэка');
@@ -36,6 +38,7 @@ final gpsInitProvider = Provider((ref) {
     }
   });
   
+  print('🟢 gpsInitProvider: колбэк настроен');
   return gpsService;
 });
 
@@ -43,7 +46,14 @@ final gpsInitProvider = Provider((ref) {
 final gpsServiceProvider = Provider<GpsService>((ref) {
   final instance = ref.watch(gpsServiceInstanceProvider);
   if (instance == null) {
-    throw StateError('GpsService не инициализирован. Сначала вызовите gpsInitProvider.');
+    // Если ещё не инициализирован - инициализируем
+    print('⚠️ GpsService не инициализирован, инициализируем...');
+    ref.read(gpsInitProvider);
+    final newInstance = ref.watch(gpsServiceInstanceProvider);
+    if (newInstance == null) {
+      throw StateError('GpsService не инициализирован');
+    }
+    return newInstance;
   }
   return instance;
 });

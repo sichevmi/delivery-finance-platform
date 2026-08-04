@@ -49,8 +49,8 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
       final isAuthenticated = await authNotifier.autoLogin();
       print('🔐 DeliveryApp: isAuthenticated = $isAuthenticated');
       
-      // Инициализируем GPS один раз при старте приложения
-      // Это создаст синглтон GpsService и настроит колбэк
+      // ВАЖНО: Инициализируем GPS ДО ВСЕГО
+      print('🟢 Инициализация GPS...');
       ref.read(gpsInitProvider);
       print('🟢 GPS инициализирован');
       
