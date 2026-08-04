@@ -1,6 +1,8 @@
 // lib/features/delivery/providers/shift_provider.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
+import 'package:delivery_app/features/delivery/services/gps_service.dart';
 
 class ShiftState {
   final bool isActive;
@@ -13,7 +15,7 @@ class ShiftState {
 
   final bool isOnOrder;
   final DateTime? orderStartTime;
-  final Duration totalOrderTime;  // <-- НОВОЕ ПОЛЕ
+  final Duration totalOrderTime;
 
   final double totalPaidDistance;
   final double totalIdleDistance;
@@ -34,7 +36,7 @@ class ShiftState {
     this.idleStartTime,
     this.isOnOrder = false,
     this.orderStartTime,
-    this.totalOrderTime = Duration.zero,  // <-- НОВОЕ
+    this.totalOrderTime = Duration.zero,
     this.totalPaidDistance = 0.0,
     this.totalIdleDistance = 0.0,
     this.ordersCount = 0,
@@ -53,7 +55,7 @@ class ShiftState {
     DateTime? idleStartTime,
     bool? isOnOrder,
     DateTime? orderStartTime,
-    Duration? totalOrderTime,  // <-- НОВОЕ
+    Duration? totalOrderTime,
     double? totalPaidDistance,
     double? totalIdleDistance,
     int? ordersCount,
@@ -71,7 +73,7 @@ class ShiftState {
       idleStartTime: idleStartTime ?? this.idleStartTime,
       isOnOrder: isOnOrder ?? this.isOnOrder,
       orderStartTime: orderStartTime ?? this.orderStartTime,
-      totalOrderTime: totalOrderTime ?? this.totalOrderTime,  // <-- НОВОЕ
+      totalOrderTime: totalOrderTime ?? this.totalOrderTime,
       totalPaidDistance: totalPaidDistance ?? this.totalPaidDistance,
       totalIdleDistance: totalIdleDistance ?? this.totalIdleDistance,
       ordersCount: ordersCount ?? this.ordersCount,
@@ -100,16 +102,13 @@ class ShiftState {
 
   Duration get totalIdleTimeDisplay => totalIdleTime + currentIdlePeriod;
 
-  // НОВЫЙ ГЕТТЕР - текущее время на заказе
   Duration get currentOrderTime {
     if (!isOnOrder || orderStartTime == null) return Duration.zero;
     return DateTime.now().difference(orderStartTime!);
   }
 
-  // НОВЫЙ ГЕТТЕР - общее время на заказах с учётом текущего
   Duration get totalOrderTimeDisplay => totalOrderTime + currentOrderTime;
 
-  // НОВЫЙ ГЕТТЕР - среднее время на заказ
   Duration get avgTimePerOrder {
     if (ordersCount == 0) return Duration.zero;
     return Duration(
@@ -146,8 +145,19 @@ class ShiftState {
 }
 
 class ShiftNotifier extends StateNotifier<ShiftState> {
-  ShiftNotifier() : super(const ShiftState()) {
+  final Ref _ref;
+  GpsService? _gpsService;
+
+  ShiftNotifier(this._ref) : super(const ShiftState()) {
     _loadState();
+    // Получаем GpsService через gpsServiceInstanceProvider после инициализации
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _gpsService = _ref.read(gpsServiceInstanceProvider);
+      if (_gpsService != null && state.isActive) {
+        print('🟢 ShiftNotifier: GPS сервис получен, смена активна');
+        _gpsService!.startTracking();
+      }
+    });
   }
 
   // ===== ЗАГРУЗКА И СОХРАНЕНИЕ =====
@@ -171,7 +181,7 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
       idleStartTime: _fromMillis(prefs.getInt('shift_idle_start')),
       isOnOrder: prefs.getBool('shift_on_order') ?? false,
       orderStartTime: _fromMillis(prefs.getInt('shift_order_start')),
-      totalOrderTime: Duration(seconds: prefs.getInt('shift_total_order_time') ?? 0),  // <-- НОВОЕ
+      totalOrderTime: Duration(seconds: prefs.getInt('shift_total_order_time') ?? 0),
       totalPaidDistance: prefs.getDouble('shift_paid_distance') ?? 0.0,
       totalIdleDistance: prefs.getDouble('shift_idle_distance') ?? 0.0,
       ordersCount: prefs.getInt('shift_orders') ?? 0,
@@ -213,7 +223,7 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     } else {
       await prefs.remove('shift_order_start');
     }
-    await prefs.setInt('shift_total_order_time', state.totalOrderTime.inSeconds);  // <-- НОВОЕ
+    await prefs.setInt('shift_total_order_time', state.totalOrderTime.inSeconds);
     await prefs.setDouble('shift_paid_distance', state.totalPaidDistance);
     await prefs.setDouble('shift_idle_distance', state.totalIdleDistance);
     await prefs.setInt('shift_orders', state.ordersCount);
@@ -225,6 +235,7 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   Future<void> _resetDay() async {
     state = const ShiftState();
     await _saveState();
+    _stopGpsTracking();
   }
 
   String _getTodayKey() {
@@ -233,6 +244,27 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   }
 
   DateTime? _fromMillis(int? ms) => ms != null ? DateTime.fromMillisecondsSinceEpoch(ms) : null;
+
+  // ===== УПРАВЛЕНИЕ GPS =====
+
+  void _startGpsTracking() {
+    if (_gpsService == null) {
+      _gpsService = _ref.read(gpsServiceInstanceProvider);
+    }
+    if (_gpsService != null) {
+      print('🟢 Запускаем GPS трекинг (смена активна)');
+      _gpsService!.startTracking();
+    } else {
+      print('⚠️ GpsService не найден');
+    }
+  }
+
+  void _stopGpsTracking() {
+    if (_gpsService != null) {
+      print('🛑 Останавливаем GPS трекинг (смена не активна)');
+      _gpsService!.stopTracking();
+    }
+  }
 
   // ===== ОСНОВНЫЕ МЕТОДЫ =====
 
@@ -246,6 +278,7 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
       idleStartTime: now,
     );
     _saveState();
+    _startGpsTracking();
   }
 
   void stopShift() {
@@ -254,7 +287,6 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     final addedWork = now.difference(state.shiftStartTime!);
     final idleDuration = state.currentIdlePeriod;
     
-    // Если был активный заказ - добавляем его время
     Duration addedOrderTime = Duration.zero;
     if (state.isOnOrder && state.orderStartTime != null) {
       addedOrderTime = now.difference(state.orderStartTime!);
@@ -269,9 +301,10 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
       idleStartTime: null,
       isOnOrder: false,
       orderStartTime: null,
-      totalOrderTime: state.totalOrderTime + addedOrderTime,  // <-- НОВОЕ
+      totalOrderTime: state.totalOrderTime + addedOrderTime,
     );
     _saveState();
+    _stopGpsTracking();
   }
 
   void startOrder() {
@@ -307,14 +340,12 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   }) {
     if (!state.isOnOrder) return;
     final now = DateTime.now();
-    
-    // Добавляем время этого заказа
     final orderTime = now.difference(state.orderStartTime!);
 
     state = state.copyWith(
       isOnOrder: false,
       orderStartTime: null,
-      totalOrderTime: state.totalOrderTime + orderTime,  // <-- НОВОЕ
+      totalOrderTime: state.totalOrderTime + orderTime,
       totalPaidDistance: state.totalPaidDistance + paidDistance,
       ordersCount: state.ordersCount + 1,
       totalIncome: state.totalIncome + income,
@@ -352,5 +383,5 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
 }
 
 final shiftProvider = StateNotifierProvider<ShiftNotifier, ShiftState>((ref) {
-  return ShiftNotifier();
+  return ShiftNotifier(ref);
 });

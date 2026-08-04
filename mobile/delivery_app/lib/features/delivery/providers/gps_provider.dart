@@ -2,10 +2,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:delivery_app/features/delivery/services/gps_service.dart';
 import 'package:delivery_app/features/delivery/providers/shift_provider.dart';
 
+// Храним ссылку на GpsService
+final gpsServiceInstanceProvider = StateProvider<GpsService?>((ref) => null);
+
+// Инициализация GPS
 final gpsInitProvider = Provider((ref) {
   print('🟢 gpsInitProvider: создаём/получаем GpsService');
   
   final gpsService = GpsService();
+  
+  // Сохраняем ссылку
+  ref.read(gpsServiceInstanceProvider.notifier).state = gpsService;
+  
   final shiftNotifier = ref.watch(shiftProvider.notifier);
   
   print('🟢 gpsInitProvider: настройка колбэка');
@@ -31,7 +39,11 @@ final gpsInitProvider = Provider((ref) {
   return gpsService;
 });
 
+// Провайдер для получения GpsService
 final gpsServiceProvider = Provider<GpsService>((ref) {
-  ref.watch(gpsInitProvider);
-  return GpsService();
+  final instance = ref.watch(gpsServiceInstanceProvider);
+  if (instance == null) {
+    throw StateError('GpsService не инициализирован. Сначала вызовите gpsInitProvider.');
+  }
+  return instance;
 });
