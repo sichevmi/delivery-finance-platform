@@ -213,7 +213,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             children: [
               _buildTimeCard(
                 icon: Icons.timer,
-                value: _formatDuration(shiftState.workTime),
+                value: shiftState.formattedWorkTime,
                 label: 'Время работы',
                 color: Colors.indigo,
               ),
@@ -254,7 +254,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           Row(
             children: [
               _buildMetricCard(
-                value: '${shiftState.avgTimePerOrder.toStringAsFixed(0)} мин',
+                value: shiftState.formattedAvgTimePerOrder,  // <-- ИСПОЛЬЗУЕМ НОВЫЙ ГЕТТЕР
                 label: 'Ср. время/заказ',
                 color: Colors.purple,
               ),
@@ -266,7 +266,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
               ),
               const SizedBox(width: 6),
               _buildMetricCard(
-                value: '${shiftState.totalDistanceAll.toStringAsFixed(1)} км',
+                value: '${shiftState.totalDistance.toStringAsFixed(1)} км',
                 label: 'Пробег (всего)',
                 color: Colors.cyan,
               ),
@@ -276,13 +276,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           Row(
             children: [
               _buildMetricCard(
-                value: '${shiftState.idleDistance.toStringAsFixed(1)} км',
+                value: '${shiftState.totalIdleDistance.toStringAsFixed(1)} км',
                 label: 'Холостой пробег',
                 color: Colors.red,
               ),
               const SizedBox(width: 6),
               _buildMetricCard(
-                value: _formatDuration(shiftState.getIdleTime(now)),
+                value: shiftState.formattedIdleTime,
                 label: 'Время простоя',
                 color: Colors.red.shade300,
               ),
@@ -417,13 +417,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         ),
       ),
     );
-  }
-
-  String _formatDuration(Duration duration) {
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60);
-    final seconds = duration.inSeconds.remainder(60);
-    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
   String _getTodayDate() {

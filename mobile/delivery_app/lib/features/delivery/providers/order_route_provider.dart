@@ -7,6 +7,7 @@ import 'package:delivery_app/features/delivery/services/geocoder_service.dart';
 import 'package:delivery_app/features/delivery/providers/pricing_provider.dart';
 import 'package:delivery_app/features/delivery/providers/tab_provider.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
+import 'package:delivery_app/features/delivery/providers/shift_provider.dart';
 
 final orderRouteProvider = StateNotifierProvider<OrderRouteNotifier, OrderRouteState>((ref) {
   return OrderRouteNotifier(ref);
@@ -168,23 +169,23 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   final Ref ref;
   late GpsService _gpsService;
   StreamSubscription<double>? _gpsSubscription;
+  bool _isGpsInitialized = false;
 
   OrderRouteNotifier(this.ref) : super(OrderRouteState.initial(coefficient: 1.0, segmentIndex: 0));
 
   void resetNavigationFlag() {
-    if (!mounted) return;
     state = state.copyWith(shouldNavigateToHome: false);
   }
 
   void init({required double coefficient, required int segmentIndex}) {
     _gpsService = GpsService();
+    _isGpsInitialized = true;
     state = OrderRouteState.initial(coefficient: coefficient, segmentIndex: segmentIndex);
     _initGps();
     _startSegment();
   }
 
   void updateManualDistance(double distance) {
-    if (!mounted) return;
     state = state.copyWith(manualDistance: distance);
   }
 
@@ -199,7 +200,6 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   }
 
   void _startSegment() {
-    if (!mounted) return;
     state = state.copyWith(
       segmentStartTime: DateTime.now(),
       segmentEndTime: null,
@@ -218,7 +218,6 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   }
 
   void togglePause() {
-    if (!mounted) return;
     if (state.isPaused) {
       final now = DateTime.now();
       if (state.pauseStartTime != null) {
@@ -260,7 +259,6 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   }
 
   void finishSegment() {
-    if (!mounted) return;
     final end = DateTime.now();
     if (state.isPaused) {
       if (state.pauseStartTime != null) {
@@ -279,7 +277,6 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   }
 
   void saveCurrentSegmentData() {
-    if (!mounted) return;
     final time = getSegmentTime();
     final distance = getDistance();
     switch (state.currentSegment) {
@@ -299,7 +296,6 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   }
 
   Future<void> handleMainAction() async {
-    if (!mounted) return;
     finishSegment();
     saveCurrentSegmentData();
 
@@ -311,14 +307,12 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
         if (pos != null) {
           addr = await GeocoderService.reverseGeocode(pos.latitude, pos.longitude, onLog: _gpsService.addLog);
         }
-        if (!mounted) return;
         state = state.copyWith(shopAddress: addr ?? 'Адрес не определён');
         state = state.copyWith(currentSegment: 1);
         _startSegment();
         break;
       case 1:
         if (state.weight == null || state.weight! <= 0) return;
-        if (!mounted) return;
         state = state.copyWith(
           clientAddress: 'Адрес клиента будет определён позже',
           currentSegment: 2,
@@ -332,7 +326,6 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
         if (pos != null) {
           addr = await GeocoderService.reverseGeocode(pos.latitude, pos.longitude, onLog: _gpsService.addLog);
         }
-        if (!mounted) return;
         state = state.copyWith(clientAddress: addr ?? 'Адрес не определён');
         state = state.copyWith(currentSegment: 3);
         _startSegment();
@@ -345,6 +338,14 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
 
   Future<Position?> _getCurrentPosition() async {
     try {
+      // Если GPS не инициализирован – создаём
+      if (!_isGpsInitialized || _gpsService == null) {
+        print('⚠️ GpsService не инициализирован, создаём...');
+        _gpsService = GpsService();
+        _isGpsInitialized = true;
+        _initGps();
+      }
+      
       final lastPosition = await Geolocator.getLastKnownPosition();
       if (lastPosition != null) {
         return lastPosition;
@@ -360,11 +361,11 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
       );
     } on TimeoutException catch (e) {
       print('⏰ Таймаут: $e');
-      _gpsService.addLog('⏰ Таймаут получения позиции');
+      _gpsService?.addLog('⏰ Таймаут получения позиции');
       return null;
     } catch (e) {
       print('❌ Ошибка получения позиции: $e');
-      _gpsService.addLog('❌ Ошибка получения позиции: $e');
+      _gpsService?.addLog('❌ Ошибка получения позиции: $e');
       return null;
     }
   }
@@ -441,6 +442,11 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
 
   void cancelOrder() {
     if (!mounted) return;
+    
+    // Отменяем заказ в ShiftProvider
+    final shiftNotifier = ref.read(shiftProvider.notifier);
+    shiftNotifier.cancelOrder();
+    
     _gpsService.stopTracking();
     _gpsSubscription?.cancel();
     _gpsSubscription = null;

@@ -5,12 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:path_provider/path_provider.dart';
 
+typedef DistanceUpdateCallback = void Function(double totalDistance, double paidDistance);
+
 class GpsService {
-  // УБИРАЕМ СИНГЛТОН:
-  // static final GpsService _instance = GpsService._internal();
-  // factory GpsService() => _instance;
-  
-  // Оставляем обычный конструктор
   GpsService();
 
   // ---- Внутреннее состояние ----
@@ -19,6 +16,9 @@ class GpsService {
   double _totalDistance = 0.0;
   Position? _lastPosition;
   bool _isPaused = false;
+
+  // ---- Колбэк для обновления пробега в ShiftProvider ----
+  DistanceUpdateCallback? _onDistanceUpdate;
 
   // ---- Константы ----
   static const double _maxAccuracy = 50.0;
@@ -34,6 +34,10 @@ class GpsService {
   double get currentDistance => _totalDistance;
   final _distanceStreamController = StreamController<double>.broadcast();
   Stream<double> get distanceStream => _distanceStreamController.stream;
+
+  void setOnDistanceUpdate(DistanceUpdateCallback callback) {
+    _onDistanceUpdate = callback;
+  }
 
   // ---- Публичные методы логирования ----
   Future<void> startLogging() async {
@@ -156,6 +160,9 @@ class GpsService {
     _log('✅ ACCEPTED ${distance.toStringAsFixed(2)}m, total: ${_totalDistance.toStringAsFixed(4)} km');
     _distanceStreamController.add(_totalDistance);
     _lastPosition = position;
+
+    // Вызываем колбэк для обновления пробега в ShiftProvider
+    _onDistanceUpdate?.call(_totalDistance, _totalDistance);
   }
 
   void pauseTracking() {

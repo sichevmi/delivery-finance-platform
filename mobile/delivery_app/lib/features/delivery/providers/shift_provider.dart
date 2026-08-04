@@ -6,100 +6,143 @@ class ShiftState {
   final bool isActive;
   final DateTime? shiftStartTime;
   final DateTime? shiftEndTime;
-  final Duration totalOrdersTime;         // суммарное время всех заказов
-  final Duration currentOrderTime;        // время текущего заказа (если в процессе)
-  final DateTime? currentOrderStartTime;  // время начала текущего заказа
-  final double totalDistance;
-  final double paidDistance;
-  final double idleDistance;
+  final Duration totalWorkTime;
+
+  final Duration totalIdleTime;
+  final DateTime? idleStartTime;
+
+  final bool isOnOrder;
+  final DateTime? orderStartTime;
+  final Duration totalOrderTime;  // <-- НОВОЕ ПОЛЕ
+
+  final double totalPaidDistance;
+  final double totalIdleDistance;
+
   final int ordersCount;
   final double totalIncome;
   final double totalExpenses;
   final double netProfit;
-  final bool isOnOrder;
+
+  final int lastTick;
 
   const ShiftState({
     this.isActive = false,
     this.shiftStartTime,
     this.shiftEndTime,
-    this.totalOrdersTime = Duration.zero,
-    this.currentOrderTime = Duration.zero,
-    this.currentOrderStartTime,
-    this.totalDistance = 0.0,
-    this.paidDistance = 0.0,
-    this.idleDistance = 0.0,
+    this.totalWorkTime = Duration.zero,
+    this.totalIdleTime = Duration.zero,
+    this.idleStartTime,
+    this.isOnOrder = false,
+    this.orderStartTime,
+    this.totalOrderTime = Duration.zero,  // <-- НОВОЕ
+    this.totalPaidDistance = 0.0,
+    this.totalIdleDistance = 0.0,
     this.ordersCount = 0,
     this.totalIncome = 0.0,
     this.totalExpenses = 0.0,
     this.netProfit = 0.0,
-    this.isOnOrder = false,
+    this.lastTick = 0,
   });
 
   ShiftState copyWith({
     bool? isActive,
     DateTime? shiftStartTime,
     DateTime? shiftEndTime,
-    Duration? totalOrdersTime,
-    Duration? currentOrderTime,
-    DateTime? currentOrderStartTime,
-    double? totalDistance,
-    double? paidDistance,
-    double? idleDistance,
+    Duration? totalWorkTime,
+    Duration? totalIdleTime,
+    DateTime? idleStartTime,
+    bool? isOnOrder,
+    DateTime? orderStartTime,
+    Duration? totalOrderTime,  // <-- НОВОЕ
+    double? totalPaidDistance,
+    double? totalIdleDistance,
     int? ordersCount,
     double? totalIncome,
     double? totalExpenses,
     double? netProfit,
-    bool? isOnOrder,
+    int? lastTick,
   }) {
     return ShiftState(
       isActive: isActive ?? this.isActive,
       shiftStartTime: shiftStartTime ?? this.shiftStartTime,
       shiftEndTime: shiftEndTime ?? this.shiftEndTime,
-      totalOrdersTime: totalOrdersTime ?? this.totalOrdersTime,
-      currentOrderTime: currentOrderTime ?? this.currentOrderTime,
-      currentOrderStartTime: currentOrderStartTime ?? this.currentOrderStartTime,
-      totalDistance: totalDistance ?? this.totalDistance,
-      paidDistance: paidDistance ?? this.paidDistance,
-      idleDistance: idleDistance ?? this.idleDistance,
+      totalWorkTime: totalWorkTime ?? this.totalWorkTime,
+      totalIdleTime: totalIdleTime ?? this.totalIdleTime,
+      idleStartTime: idleStartTime ?? this.idleStartTime,
+      isOnOrder: isOnOrder ?? this.isOnOrder,
+      orderStartTime: orderStartTime ?? this.orderStartTime,
+      totalOrderTime: totalOrderTime ?? this.totalOrderTime,  // <-- НОВОЕ
+      totalPaidDistance: totalPaidDistance ?? this.totalPaidDistance,
+      totalIdleDistance: totalIdleDistance ?? this.totalIdleDistance,
       ordersCount: ordersCount ?? this.ordersCount,
       totalIncome: totalIncome ?? this.totalIncome,
       totalExpenses: totalExpenses ?? this.totalExpenses,
       netProfit: netProfit ?? this.netProfit,
-      isOnOrder: isOnOrder ?? this.isOnOrder,
+      lastTick: lastTick ?? this.lastTick,
     );
   }
 
-  // Время работы = сумма времени всех заказов + текущий заказ (если есть)
-  Duration get workTime => totalOrdersTime + currentOrderTime;
+  // ===== ВЫЧИСЛЯЕМЫЕ ПОЛЯ =====
 
-  // Время простоя = общее время смены - время работы
-  Duration getIdleTime(DateTime now) {
-    if (!isActive || shiftStartTime == null) return Duration.zero;
-    final totalShiftTime = now.difference(shiftStartTime!);
-    final result = totalShiftTime - workTime;
-    return result > Duration.zero ? result : Duration.zero;
+  Duration get workTime {
+    if (!isActive || shiftStartTime == null) {
+      return totalWorkTime;
+    }
+    return totalWorkTime + DateTime.now().difference(shiftStartTime!);
   }
 
-  String get formattedWorkTime {
-    final total = workTime;
-    final hours = total.inHours;
-    final minutes = total.inMinutes.remainder(60);
-    final seconds = total.inSeconds.remainder(60);
-    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  Duration get currentIdlePeriod {
+    if (!isActive) return Duration.zero;
+    if (isOnOrder) return Duration.zero;
+    if (idleStartTime == null) return Duration.zero;
+    return DateTime.now().difference(idleStartTime!);
   }
 
-  String formattedIdleTime(DateTime now) {
-    final total = getIdleTime(now);
-    final hours = total.inHours;
-    final minutes = total.inMinutes.remainder(60);
-    final seconds = total.inSeconds.remainder(60);
-    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  Duration get totalIdleTimeDisplay => totalIdleTime + currentIdlePeriod;
+
+  // НОВЫЙ ГЕТТЕР - текущее время на заказе
+  Duration get currentOrderTime {
+    if (!isOnOrder || orderStartTime == null) return Duration.zero;
+    return DateTime.now().difference(orderStartTime!);
   }
 
-  double get avgDistancePerOrder => ordersCount > 0 ? paidDistance / ordersCount : 0.0;
-  double get avgTimePerOrder => ordersCount > 0 ? totalOrdersTime.inSeconds / ordersCount / 60 : 0.0;
+  // НОВЫЙ ГЕТТЕР - общее время на заказах с учётом текущего
+  Duration get totalOrderTimeDisplay => totalOrderTime + currentOrderTime;
+
+  // НОВЫЙ ГЕТТЕР - среднее время на заказ
+  Duration get avgTimePerOrder {
+    if (ordersCount == 0) return Duration.zero;
+    return Duration(
+      milliseconds: (totalOrderTimeDisplay.inMilliseconds / ordersCount).round()
+    );
+  }
+
+  String get formattedAvgTimePerOrder {
+    final d = avgTimePerOrder;
+    final minutes = d.inMinutes;
+    final seconds = d.inSeconds.remainder(60);
+    if (minutes > 0 && seconds > 0) {
+      return '$minutes мин $seconds сек';
+    } else if (minutes > 0) {
+      return '$minutes мин';
+    } else {
+      return '$seconds сек';
+    }
+  }
+
+  double get totalDistance => totalPaidDistance + totalIdleDistance;
+  double get avgDistancePerOrder => ordersCount > 0 ? totalPaidDistance / ordersCount : 0.0;
   double get avgCheck => ordersCount > 0 ? totalIncome / ordersCount : 0.0;
-  double get totalDistanceAll => paidDistance + idleDistance;
+
+  String formatDuration(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  String get formattedWorkTime => formatDuration(workTime);
+  String get formattedIdleTime => formatDuration(totalIdleTimeDisplay);
 }
 
 class ShiftNotifier extends StateNotifier<ShiftState> {
@@ -107,138 +150,204 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     _loadState();
   }
 
+  // ===== ЗАГРУЗКА И СОХРАНЕНИЕ =====
+
   Future<void> _loadState() async {
     final prefs = await SharedPreferences.getInstance();
-    final isActive = prefs.getBool('shift_active') ?? false;
-    final shiftStart = prefs.getInt('shift_start');
-    final ordersTime = prefs.getInt('shift_orders_time') ?? 0;
-    final totalDist = prefs.getDouble('shift_total_distance') ?? 0.0;
-    final paidDist = prefs.getDouble('shift_paid_distance') ?? 0.0;
-    final idleDist = prefs.getDouble('shift_idle_distance') ?? 0.0;
-    final orders = prefs.getInt('shift_orders') ?? 0;
-    final income = prefs.getDouble('shift_income') ?? 0.0;
-    final expenses = prefs.getDouble('shift_expenses') ?? 0.0;
+    final lastDate = prefs.getString('shift_last_date');
+    final today = _getTodayKey();
+
+    if (lastDate != today) {
+      await _resetDay();
+      return;
+    }
 
     state = state.copyWith(
-      isActive: isActive,
-      shiftStartTime: shiftStart != null ? DateTime.fromMillisecondsSinceEpoch(shiftStart) : null,
-      totalOrdersTime: Duration(seconds: ordersTime),
-      totalDistance: totalDist,
-      paidDistance: paidDist,
-      idleDistance: idleDist,
-      ordersCount: orders,
-      totalIncome: income,
-      totalExpenses: expenses,
-      netProfit: income - expenses,
+      isActive: prefs.getBool('shift_active') ?? false,
+      shiftStartTime: _fromMillis(prefs.getInt('shift_start_time')),
+      shiftEndTime: _fromMillis(prefs.getInt('shift_end_time')),
+      totalWorkTime: Duration(seconds: prefs.getInt('shift_total_work_time') ?? 0),
+      totalIdleTime: Duration(seconds: prefs.getInt('shift_idle_time') ?? 0),
+      idleStartTime: _fromMillis(prefs.getInt('shift_idle_start')),
+      isOnOrder: prefs.getBool('shift_on_order') ?? false,
+      orderStartTime: _fromMillis(prefs.getInt('shift_order_start')),
+      totalOrderTime: Duration(seconds: prefs.getInt('shift_total_order_time') ?? 0),  // <-- НОВОЕ
+      totalPaidDistance: prefs.getDouble('shift_paid_distance') ?? 0.0,
+      totalIdleDistance: prefs.getDouble('shift_idle_distance') ?? 0.0,
+      ordersCount: prefs.getInt('shift_orders') ?? 0,
+      totalIncome: prefs.getDouble('shift_income') ?? 0.0,
+      totalExpenses: prefs.getDouble('shift_expenses') ?? 0.0,
+      netProfit: prefs.getDouble('shift_net_profit') ?? 0.0,
     );
+
+    if (state.isActive && !state.isOnOrder && state.idleStartTime == null) {
+      state = state.copyWith(idleStartTime: DateTime.now());
+    }
   }
 
   Future<void> _saveState() async {
     final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('shift_last_date', _getTodayKey());
     await prefs.setBool('shift_active', state.isActive);
+    
     if (state.shiftStartTime != null) {
-      await prefs.setInt('shift_start', state.shiftStartTime!.millisecondsSinceEpoch);
+      await prefs.setInt('shift_start_time', state.shiftStartTime!.millisecondsSinceEpoch);
+    } else {
+      await prefs.remove('shift_start_time');
     }
-    await prefs.setInt('shift_orders_time', state.totalOrdersTime.inSeconds);
-    await prefs.setDouble('shift_total_distance', state.totalDistance);
-    await prefs.setDouble('shift_paid_distance', state.paidDistance);
-    await prefs.setDouble('shift_idle_distance', state.idleDistance);
+    if (state.shiftEndTime != null) {
+      await prefs.setInt('shift_end_time', state.shiftEndTime!.millisecondsSinceEpoch);
+    } else {
+      await prefs.remove('shift_end_time');
+    }
+    await prefs.setInt('shift_total_work_time', state.totalWorkTime.inSeconds);
+    await prefs.setInt('shift_idle_time', state.totalIdleTime.inSeconds);
+    if (state.idleStartTime != null) {
+      await prefs.setInt('shift_idle_start', state.idleStartTime!.millisecondsSinceEpoch);
+    } else {
+      await prefs.remove('shift_idle_start');
+    }
+    await prefs.setBool('shift_on_order', state.isOnOrder);
+    if (state.orderStartTime != null) {
+      await prefs.setInt('shift_order_start', state.orderStartTime!.millisecondsSinceEpoch);
+    } else {
+      await prefs.remove('shift_order_start');
+    }
+    await prefs.setInt('shift_total_order_time', state.totalOrderTime.inSeconds);  // <-- НОВОЕ
+    await prefs.setDouble('shift_paid_distance', state.totalPaidDistance);
+    await prefs.setDouble('shift_idle_distance', state.totalIdleDistance);
     await prefs.setInt('shift_orders', state.ordersCount);
     await prefs.setDouble('shift_income', state.totalIncome);
     await prefs.setDouble('shift_expenses', state.totalExpenses);
+    await prefs.setDouble('shift_net_profit', state.netProfit);
   }
 
+  Future<void> _resetDay() async {
+    state = const ShiftState();
+    await _saveState();
+  }
+
+  String _getTodayKey() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month}-${now.day}';
+  }
+
+  DateTime? _fromMillis(int? ms) => ms != null ? DateTime.fromMillisecondsSinceEpoch(ms) : null;
+
+  // ===== ОСНОВНЫЕ МЕТОДЫ =====
+
   void startShift() {
+    if (state.isActive) return;
     final now = DateTime.now();
     state = state.copyWith(
       isActive: true,
-      shiftStartTime: state.shiftStartTime ?? now,
-      totalOrdersTime: Duration.zero,
-      currentOrderTime: Duration.zero,
+      shiftStartTime: now,
+      shiftEndTime: null,
+      idleStartTime: now,
     );
     _saveState();
   }
 
   void stopShift() {
+    if (!state.isActive) return;
+    final now = DateTime.now();
+    final addedWork = now.difference(state.shiftStartTime!);
+    final idleDuration = state.currentIdlePeriod;
+    
+    // Если был активный заказ - добавляем его время
+    Duration addedOrderTime = Duration.zero;
+    if (state.isOnOrder && state.orderStartTime != null) {
+      addedOrderTime = now.difference(state.orderStartTime!);
+    }
+
     state = state.copyWith(
       isActive: false,
-      shiftEndTime: DateTime.now(),
+      shiftStartTime: null,
+      shiftEndTime: now,
+      totalWorkTime: state.totalWorkTime + addedWork,
+      totalIdleTime: state.totalIdleTime + idleDuration,
+      idleStartTime: null,
+      isOnOrder: false,
+      orderStartTime: null,
+      totalOrderTime: state.totalOrderTime + addedOrderTime,  // <-- НОВОЕ
     );
     _saveState();
   }
 
   void startOrder() {
+    if (!state.isActive || state.isOnOrder) return;
+    final now = DateTime.now();
+    final idleDuration = state.currentIdlePeriod;
+
     state = state.copyWith(
       isOnOrder: true,
-      currentOrderStartTime: DateTime.now(),
-      currentOrderTime: Duration.zero,
+      orderStartTime: now,
+      totalIdleTime: state.totalIdleTime + idleDuration,
+      idleStartTime: null,
     );
     _saveState();
   }
 
-  void finishOrder(double orderDistance, double orderIncome, double orderExpenses, Duration orderDuration) {
-    final newPaidDistance = state.paidDistance + orderDistance;
-    final newOrders = state.ordersCount + 1;
-    final newIncome = state.totalIncome + orderIncome;
-    final newExpenses = state.totalExpenses + orderExpenses;
-    final newOrdersTime = state.totalOrdersTime + orderDuration;
+  void cancelOrder() {
+    if (!state.isOnOrder) return;
+    final now = DateTime.now();
+    state = state.copyWith(
+      isOnOrder: false,
+      orderStartTime: null,
+      idleStartTime: now,
+    );
+    _saveState();
+  }
+
+  void finishOrder({
+    required double paidDistance,
+    required double income,
+    required double expenses,
+    required Duration orderDuration,
+  }) {
+    if (!state.isOnOrder) return;
+    final now = DateTime.now();
+    
+    // Добавляем время этого заказа
+    final orderTime = now.difference(state.orderStartTime!);
 
     state = state.copyWith(
       isOnOrder: false,
-      currentOrderStartTime: null,
-      currentOrderTime: Duration.zero,
-      paidDistance: newPaidDistance,
-      ordersCount: newOrders,
-      totalIncome: newIncome,
-      totalExpenses: newExpenses,
-      netProfit: newIncome - newExpenses,
-      totalOrdersTime: newOrdersTime,
+      orderStartTime: null,
+      totalOrderTime: state.totalOrderTime + orderTime,  // <-- НОВОЕ
+      totalPaidDistance: state.totalPaidDistance + paidDistance,
+      ordersCount: state.ordersCount + 1,
+      totalIncome: state.totalIncome + income,
+      totalExpenses: state.totalExpenses + expenses,
+      netProfit: state.totalIncome + income - (state.totalExpenses + expenses),
+      idleStartTime: now,
     );
     _saveState();
   }
 
   void addIdleDistance(double distance) {
-    if (!state.isActive || state.isOnOrder) return;
+    if (!state.isActive || state.isOnOrder || distance <= 0) return;
     state = state.copyWith(
-      idleDistance: state.idleDistance + distance,
+      totalIdleDistance: state.totalIdleDistance + distance,
     );
     _saveState();
   }
 
-  void updateTotalDistance(double newDistance) {
-    if (!state.isActive) return;
-    final delta = newDistance - state.totalDistance;
-    if (delta <= 0) return;
-    
-    if (state.isOnOrder) {
-      state = state.copyWith(
-        totalDistance: state.totalDistance + delta,
-        paidDistance: state.paidDistance + delta,
-      );
-    } else {
-      state = state.copyWith(
-        totalDistance: state.totalDistance + delta,
-        idleDistance: state.idleDistance + delta,
-      );
-    }
+  void updatePaidDistance(double distance) {
+    if (!state.isActive || !state.isOnOrder || distance <= 0) return;
+    state = state.copyWith(
+      totalPaidDistance: state.totalPaidDistance + distance,
+    );
     _saveState();
   }
 
   void tick() {
     if (!state.isActive) return;
-    
-    // Если в заказе – обновляем время текущего заказа
-    if (state.isOnOrder && state.currentOrderStartTime != null) {
-      final now = DateTime.now();
-      final duration = now.difference(state.currentOrderStartTime!);
-      state = state.copyWith(
-        currentOrderTime: duration,
-      );
-    }
+    state = state.copyWith(lastTick: DateTime.now().millisecondsSinceEpoch);
   }
 
-  void resetDailyStats() {
-    // Не сбрасываем полностью
+  void resetDay() {
+    _resetDay();
   }
 }
 
