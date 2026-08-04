@@ -183,18 +183,13 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   void init({required double coefficient, required int segmentIndex}) {
     print('🟢 OrderRouteNotifier.init(): coefficient=$coefficient, segmentIndex=$segmentIndex');
     
-    // Получаем синглтон GpsService
     _gpsService = ref.read(gpsServiceProvider);
     print('🟢 OrderRouteNotifier: получили GpsService instance ${_gpsService.hashCode}');
     
     _isGpsInitialized = true;
     state = OrderRouteState.initial(coefficient: coefficient, segmentIndex: segmentIndex);
     _initGps();
-    
-    // ЗАПУСКАЕМ GPS СРАЗУ для сегмента 0
     _startGpsTracking();
-    
-    // Теперь запускаем сегмент
     _startSegment();
   }
 
@@ -232,6 +227,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
 
   void _startSegment() {
     print('🟢 OrderRouteNotifier._startSegment() segment: ${state.currentSegment}');
+    
     state = state.copyWith(
       segmentStartTime: DateTime.now(),
       segmentEndTime: null,
@@ -241,6 +237,13 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
       showSummary: false,
       shouldNavigateToHome: false,
     );
+    
+    // Сбрасываем расстояние для нового сегмента
+    // НО не останавливаем GPS!
+    print('🟢 Сброс расстояния для нового сегмента ${state.currentSegment}');
+    _gpsService.resetDistance();
+    state = state.copyWith(distance: 0.0);
+    state = state.copyWith(manualDistance: 0.0);
   }
 
   void togglePause() {
@@ -335,7 +338,6 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
         state = state.copyWith(shopAddress: addr ?? 'Адрес не определён');
         state = state.copyWith(currentSegment: 1);
         _startSegment();
-        // GPS уже работает, продолжаем трекинг
         break;
       case 1:
         if (state.weight == null || state.weight! <= 0) return;
@@ -443,7 +445,6 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
       showSummary: false,
       manualDistance: 0.0,
     );
-    // Для новой доставки сбрасываем и перезапускаем GPS
     _startGpsTracking();
     _startSegment();
   }
