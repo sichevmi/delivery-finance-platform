@@ -170,6 +170,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   late GpsService _gpsService;
   StreamSubscription<double>? _gpsSubscription;
   bool _isGpsInitialized = false;
+  bool _gpsTrackingStarted = false;
 
   OrderRouteNotifier(this.ref) : super(OrderRouteState.initial(coefficient: 1.0, segmentIndex: 0)) {
     print('🟢 OrderRouteNotifier: создан');
@@ -216,6 +217,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
 
   void _startGpsTracking() {
     print('🟢 OrderRouteNotifier._startGpsTracking()');
+    _gpsTrackingStarted = true;
     _gpsService.resetDistance();
     state = state.copyWith(distance: 0.0);
     state = state.copyWith(manualDistance: 0.0);
@@ -333,11 +335,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
         state = state.copyWith(shopAddress: addr ?? 'Адрес не определён');
         state = state.copyWith(currentSegment: 1);
         _startSegment();
-        // Продолжаем GPS трекинг для сегмента 1
-        if (state.useGps) {
-          print('🟢 GPS продолжает трекинг для сегмента 1');
-          // Не перезапускаем GPS, просто продолжаем
-        }
+        // GPS уже работает, продолжаем трекинг
         break;
       case 1:
         if (state.weight == null || state.weight! <= 0) return;
@@ -346,10 +344,6 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
           currentSegment: 2,
         );
         _startSegment();
-        // Продолжаем GPS трекинг для сегмента 2
-        if (state.useGps) {
-          print('🟢 GPS продолжает трекинг для сегмента 2');
-        }
         break;
       case 2:
         final pos = await _getCurrentPosition();
@@ -361,9 +355,6 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
         state = state.copyWith(clientAddress: addr ?? 'Адрес не определён');
         state = state.copyWith(currentSegment: 3);
         _startSegment();
-        if (state.useGps) {
-          print('🟢 GPS продолжает трекинг для сегмента 3');
-        }
         break;
       case 3:
         await _completeDelivery();
@@ -452,6 +443,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
       showSummary: false,
       manualDistance: 0.0,
     );
+    // Для новой доставки сбрасываем и перезапускаем GPS
     _startGpsTracking();
     _startSegment();
   }
@@ -462,6 +454,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     _gpsService.stopTracking();
     _gpsSubscription?.cancel();
     _gpsSubscription = null;
+    _gpsTrackingStarted = false;
     state = OrderRouteState.initial(coefficient: state.coefficient, segmentIndex: 0);
   }
 
@@ -470,6 +463,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     _gpsService.stopTracking();
     _gpsSubscription?.cancel();
     _gpsSubscription = null;
+    _gpsTrackingStarted = false;
     state = OrderRouteState.initial(
       coefficient: state.coefficient,
       segmentIndex: 0,
@@ -485,6 +479,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     _gpsService.stopTracking();
     _gpsSubscription?.cancel();
     _gpsSubscription = null;
+    _gpsTrackingStarted = false;
     state = OrderRouteState.initial(
       coefficient: state.coefficient,
       segmentIndex: 0,

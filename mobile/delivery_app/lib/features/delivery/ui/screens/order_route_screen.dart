@@ -32,20 +32,22 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   bool _isSummaryShown = false;
   bool _isInitialized = false;
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_isInitialized) {
-        _isInitialized = true;
-        final notifier = ref.read(orderRouteProvider.notifier);
-        notifier.init(
-          coefficient: widget.coefficient,
-          segmentIndex: widget.segmentIndex,
-        );
-      }
-    });
-  }
+  // OrderRouteScreen
+@override
+void initState() {
+  super.initState();
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!_isInitialized) {
+      _isInitialized = true;
+      final notifier = ref.read(orderRouteProvider.notifier);
+      print('🟢 OrderRouteScreen: вызов init с segmentIndex=${widget.segmentIndex}');
+      notifier.init(
+        coefficient: widget.coefficient,
+        segmentIndex: widget.segmentIndex, // ДОЛЖНО БЫТЬ 0
+      );
+    }
+  });
+}
 
   @override
   void dispose() {
