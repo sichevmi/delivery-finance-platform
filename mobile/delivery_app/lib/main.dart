@@ -5,6 +5,7 @@ import 'package:delivery_app/features/auth/ui/screens/login_screen.dart';
 import 'package:delivery_app/features/delivery/ui/screens/home_screen.dart';
 import 'package:delivery_app/features/delivery/services/permission_service.dart';
 import 'package:delivery_app/features/auth/providers/auth_provider.dart';
+import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,6 +48,9 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
       final authNotifier = ref.read(authProvider.notifier);
       final isAuthenticated = await authNotifier.autoLogin();
       print('🔐 DeliveryApp: isAuthenticated = $isAuthenticated');
+      
+      // Инициализируем GPS один раз при старте приложения
+      ref.read(gpsInitProvider);
       
       setState(() {
         _hasPermission = true;

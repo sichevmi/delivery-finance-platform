@@ -10,7 +10,6 @@ import 'order_summary_screen.dart';
 import 'package:delivery_app/features/delivery/providers/pricing_provider.dart';
 import 'package:delivery_app/features/delivery/providers/settings_provider.dart';
 import 'package:delivery_app/features/delivery/providers/shift_provider.dart';
-import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 import 'package:delivery_app/features/delivery/models/pricing_config.dart';
 
 class OrderRouteScreen extends ConsumerStatefulWidget {
@@ -32,7 +31,6 @@ class OrderRouteScreen extends ConsumerStatefulWidget {
 class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   bool _isSummaryShown = false;
   bool _isInitialized = false;
-  double _lastGpsDistance = 0.0;
 
   @override
   void initState() {
@@ -45,29 +43,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
           coefficient: widget.coefficient,
           segmentIndex: widget.segmentIndex,
         );
-        
-        _setupGpsCallback();
       }
-    });
-  }
-
-  void _setupGpsCallback() {
-    final gpsService = ref.read(gpsServiceProvider);
-    final shiftNotifier = ref.read(shiftProvider.notifier);
-    
-    gpsService.setOnDistanceUpdate((totalDistance, paidDistance) {
-      // Вычисляем дельту с последнего вызова
-      final delta = totalDistance - _lastGpsDistance;
-      if (delta > 0.001) { // игнорируем очень маленькие изменения
-        // Если в заказе – добавляем к платному пробегу
-        if (shiftNotifier.state.isOnOrder) {
-          shiftNotifier.updatePaidDistance(delta);
-        } else {
-          // Если не в заказе – добавляем к холостому
-          shiftNotifier.addIdleDistance(delta);
-        }
-      }
-      _lastGpsDistance = totalDistance;
     });
   }
 

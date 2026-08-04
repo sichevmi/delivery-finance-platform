@@ -178,7 +178,8 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   }
 
   void init({required double coefficient, required int segmentIndex}) {
-    _gpsService = GpsService();
+    // Используем существующий экземпляр GpsService из провайдера
+    _gpsService = ref.read(gpsServiceProvider);
     _isGpsInitialized = true;
     state = OrderRouteState.initial(coefficient: coefficient, segmentIndex: segmentIndex);
     _initGps();
@@ -341,7 +342,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
       // Если GPS не инициализирован – создаём
       if (!_isGpsInitialized || _gpsService == null) {
         print('⚠️ GpsService не инициализирован, создаём...');
-        _gpsService = GpsService();
+        _gpsService = ref.read(gpsServiceProvider);
         _isGpsInitialized = true;
         _initGps();
       }

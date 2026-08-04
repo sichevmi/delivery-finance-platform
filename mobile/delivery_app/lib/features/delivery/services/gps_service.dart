@@ -1,11 +1,11 @@
-// gps_service.dart – финальная версия (БЕЗ СИНГЛТОНА)
+// gps_service.dart – с правильной передачей приращений
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:path_provider/path_provider.dart';
 
-typedef DistanceUpdateCallback = void Function(double totalDistance, double paidDistance);
+typedef DistanceUpdateCallback = void Function(double deltaDistance, bool isPaid);
 
 class GpsService {
   GpsService();
@@ -156,13 +156,16 @@ class GpsService {
       return;
     }
 
-    _totalDistance += distance / 1000;
-    _log('✅ ACCEPTED ${distance.toStringAsFixed(2)}m, total: ${_totalDistance.toStringAsFixed(4)} km');
+    // Преобразуем в километры
+    final deltaKm = distance / 1000;
+    _totalDistance += deltaKm;
+    
+    _log('✅ ACCEPTED ${distance.toStringAsFixed(2)}m (${deltaKm.toStringAsFixed(4)} km), total: ${_totalDistance.toStringAsFixed(4)} km');
     _distanceStreamController.add(_totalDistance);
     _lastPosition = position;
 
-    // Вызываем колбэк для обновления пробега в ShiftProvider
-    _onDistanceUpdate?.call(_totalDistance, _totalDistance);
+    // Вызываем колбэк с ПРИРАЩЕНИЕМ
+    _onDistanceUpdate?.call(deltaKm, true); // true = paid distance (будет разделено в shift_provider)
   }
 
   void pauseTracking() {
