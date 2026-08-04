@@ -171,15 +171,21 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   StreamSubscription<double>? _gpsSubscription;
   bool _isGpsInitialized = false;
 
-  OrderRouteNotifier(this.ref) : super(OrderRouteState.initial(coefficient: 1.0, segmentIndex: 0));
+  OrderRouteNotifier(this.ref) : super(OrderRouteState.initial(coefficient: 1.0, segmentIndex: 0)) {
+    print('🟢 OrderRouteNotifier: создан');
+  }
 
   void resetNavigationFlag() {
     state = state.copyWith(shouldNavigateToHome: false);
   }
 
   void init({required double coefficient, required int segmentIndex}) {
+    print('🟢 OrderRouteNotifier.init(): coefficient=$coefficient, segmentIndex=$segmentIndex');
+    
     // Используем существующий экземпляр GpsService из провайдера
     _gpsService = ref.read(gpsServiceProvider);
+    print('🟢 OrderRouteNotifier: получили GpsService instance ${_gpsService.hashCode}');
+    
     _isGpsInitialized = true;
     state = OrderRouteState.initial(coefficient: coefficient, segmentIndex: segmentIndex);
     _initGps();
@@ -195,11 +201,12 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     _gpsSubscription?.cancel();
     _gpsSubscription = null;
     _gpsSubscription = _gpsService.distanceStream.listen((distance) {
-      print('📍 OrderRoute GPS distance: $distance');
+      print('📍 OrderRoute GPS distance обновление: $distance');
       if (mounted) {
         state = state.copyWith(distance: distance);
       }
     });
+    print('🟢 OrderRouteNotifier._initGps() - подписка создана');
   }
 
   void _startSegment() {
@@ -213,14 +220,18 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
       showSummary: false,
       shouldNavigateToHome: false,
     );
+    
+    print('🟢 Сброс расстояния GPS');
     _gpsService.resetDistance();
     state = state.copyWith(distance: 0.0);
     state = state.copyWith(manualDistance: 0.0);
-    if (state.useGps && state.currentSegment != 1) {
-      print('🟢 Запускаем GPS трекинг для сегмента ${state.currentSegment}');
+    
+    // Запускаем GPS на ВСЕХ сегментах
+    if (state.useGps) {
+      print('🟢 ЗАПУСКАЕМ GPS трекинг для сегмента ${state.currentSegment}');
       _gpsService.startTracking();
     } else {
-      print('⚠️ GPS не запущен: useGps=${state.useGps}, currentSegment=${state.currentSegment}');
+      print('⚠️ GPS НЕ запущен: useGps=${state.useGps}');
     }
   }
 
@@ -235,7 +246,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
           isPaused: false,
         );
       }
-      if (state.useGps && state.currentSegment != 1) {
+      if (state.useGps) {
         _gpsService.resumeTracking();
       }
     } else {
@@ -243,7 +254,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
         pauseStartTime: DateTime.now(),
         isPaused: true,
       );
-      if (state.useGps && state.currentSegment != 1) {
+      if (state.useGps) {
         _gpsService.pauseTracking();
       }
     }
@@ -278,14 +289,13 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
       }
     }
     state = state.copyWith(segmentEndTime: end);
-    if (state.useGps && state.currentSegment == 1) {
-      _gpsService.stopTracking();
-    }
+    // Не останавливаем GPS при завершении сегмента
   }
 
   void saveCurrentSegmentData() {
     final time = getSegmentTime();
     final distance = getDistance();
+    print('📊 Сохраняем сегмент ${state.currentSegment}: time=$time сек, distance=$distance км');
     switch (state.currentSegment) {
       case 0:
         state = state.copyWith(timeToShop: time, distanceToShop: distance);
@@ -303,6 +313,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   }
 
   Future<void> handleMainAction() async {
+    print('🟢 handleMainAction() сегмент ${state.currentSegment}');
     finishSegment();
     saveCurrentSegmentData();
 
@@ -345,7 +356,6 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
 
   Future<Position?> _getCurrentPosition() async {
     try {
-      // Если GPS не инициализирован – создаём
       if (!_isGpsInitialized || _gpsService == null) {
         print('⚠️ GpsService не инициализирован, создаём...');
         _gpsService = ref.read(gpsServiceProvider);
@@ -430,6 +440,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
 
   void finishOrder() {
     if (!mounted) return;
+    print('🛑 finishOrder() - останавливаем GPS');
     _gpsService.stopTracking();
     _gpsSubscription?.cancel();
     _gpsSubscription = null;
@@ -450,7 +461,6 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   void cancelOrder() {
     if (!mounted) return;
     
-    // Отменяем заказ в ShiftProvider
     final shiftNotifier = ref.read(shiftProvider.notifier);
     shiftNotifier.cancelOrder();
     
@@ -466,6 +476,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
 
   @override
   void dispose() {
+    print('🛑 OrderRouteNotifier.dispose()');
     _gpsSubscription?.cancel();
     _gpsService.stopTracking();
     super.dispose();
