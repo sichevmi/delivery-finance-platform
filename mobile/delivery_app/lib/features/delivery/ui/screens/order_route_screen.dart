@@ -21,7 +21,7 @@ class OrderRouteScreen extends ConsumerStatefulWidget {
     super.key,
     required this.serviceName,
     required this.coefficient,
-    required this.segmentIndex,
+    this.segmentIndex = 0,
   });
 
   @override
@@ -30,24 +30,27 @@ class OrderRouteScreen extends ConsumerStatefulWidget {
 
 class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   bool _isSummaryShown = false;
-  bool _isInitialized = false;
 
-  // OrderRouteScreen
-@override
-void initState() {
-  super.initState();
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (!_isInitialized) {
-      _isInitialized = true;
-      final notifier = ref.read(orderRouteProvider.notifier);
-      print('🟢 OrderRouteScreen: вызов init с segmentIndex=${widget.segmentIndex}');
-      notifier.init(
-        coefficient: widget.coefficient,
-        segmentIndex: widget.segmentIndex, // ДОЛЖНО БЫТЬ 0
-      );
-    }
-  });
-}
+  @override
+  void initState() {
+    super.initState();
+    print('🟢 OrderRouteScreen.initState()');
+    // Инициализируем сразу, без addPostFrameCallback
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initOrderRoute();
+    });
+  }
+
+  void _initOrderRoute() {
+    print('🟢 OrderRouteScreen._initOrderRoute()');
+    final notifier = ref.read(orderRouteProvider.notifier);
+    notifier.init(
+      coefficient: widget.coefficient,
+      segmentIndex: widget.segmentIndex,
+    );
+    // Запускаем заказ
+    ref.read(shiftProvider.notifier).startOrder();
+  }
 
   @override
   void dispose() {
@@ -59,14 +62,7 @@ void initState() {
     final state = ref.watch(orderRouteProvider);
     final notifier = ref.read(orderRouteProvider.notifier);
 
-    // При создании заказа уведомляем ShiftProvider
-    if (state.currentSegment == 0 && !_isInitialized) {
-      _isInitialized = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(shiftProvider.notifier).startOrder();
-      });
-    }
-
+    // Если заказ завершён — переходим на главный экран
     if (state.shouldNavigateToHome) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         notifier.resetNavigationFlag();
@@ -74,6 +70,7 @@ void initState() {
       });
     }
 
+    // Если нужно показать итоги
     if (state.showSummary && !_isSummaryShown) {
       _isSummaryShown = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -170,7 +167,6 @@ void initState() {
       if (result == true) {
         notifier.resetAfterSummary();
       } else {
-        // Завершение заказа – обновляем статистику смены
         final shiftNotifier = ref.read(shiftProvider.notifier);
         final orderDuration = Duration(seconds: _calculateTotalTime(state));
         shiftNotifier.finishOrder(
