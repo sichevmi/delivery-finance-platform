@@ -1,4 +1,5 @@
 // lib/features/delivery/providers/shift_provider.dart
+import 'package:flutter/material.dart'; // <-- ДОБАВЛЕНО
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
