@@ -15,24 +15,27 @@ class LoggerService {
   final List<String> _buffer = [];
   static const int _maxBufferSize = 100;
   
-  // Для веба - храним логи в памяти
+  // Для веба - храним логи в памяти (для отображения)
   final List<String> _webLogs = [];
+  static const int _maxWebLogs = 1000;
 
   Future<void> init() async {
     if (_isInitialized) return;
     
-    try {
-      if (kIsWeb) {
-        _isInitialized = true;
-        _webLogs.add('=' * 80);
-        _webLogs.add('📱 Логи приложения FinFlow Delivery (Web)');
-        _webLogs.add('🕐 Время старта: ${DateTime.now()}');
-        _webLogs.add('=' * 80);
-        _webLogs.add('');
-        print('📁 Логи хранятся в памяти (веб-версия)');
-        return;
-      }
+    // Для веба - просто создаём буфер в памяти
+    if (kIsWeb) {
+      _isInitialized = true;
+      _webLogs.add('=' * 80);
+      _webLogs.add('📱 Логи приложения FinFlow Delivery (Web)');
+      _webLogs.add('🕐 Время старта: ${DateTime.now()}');
+      _webLogs.add('=' * 80);
+      _webLogs.add('');
+      print('📁 Логи хранятся в памяти (веб-версия)');
+      return;
+    }
 
+    // Для мобильных устройств - создаём файл
+    try {
       final directory = await getApplicationDocumentsDirectory();
       final logDir = Directory('${directory.path}/logs');
       if (!await logDir.exists()) {
@@ -56,28 +59,30 @@ class LoggerService {
       _flushBuffer();
     } catch (e) {
       print('❌ Ошибка инициализации логгера: $e');
-      _isInitialized = true;
+      _isInitialized = true; // чтобы не блокировать приложение
     }
   }
 
-  // Метод для логирования
+  // Главный метод логирования
   void log(dynamic message) {
-    // Выводим в консоль
+    // Всегда выводим в консоль
     print(message);
     
-    // Сохраняем
     if (kIsWeb) {
+      // На вебе сохраняем в память
       _webLogs.add('[${DateTime.now().toIso8601String()}] $message');
-      if (_webLogs.length > 10000) {
+      if (_webLogs.length > _maxWebLogs) {
         _webLogs.removeAt(0);
       }
     } else {
+      // На мобильных пишем в файл
       _writeToFile('$message');
     }
   }
 
   void _writeToFile(String message) {
     if (!_isInitialized || _sink == null) {
+      // Если ещё не инициализирован, сохраняем в буфер
       _buffer.add(message);
       if (_buffer.length > _maxBufferSize) {
         _buffer.removeAt(0);
@@ -102,12 +107,9 @@ class LoggerService {
     _buffer.clear();
   }
 
-  Future<String?> getLogFilePath() async {
-    if (kIsWeb) return null;
-    if (_logFile == null) return null;
-    return _logFile!.path;
-  }
+  // ===== МЕТОДЫ ДЛЯ РАБОТЫ С ЛОГАМИ =====
 
+  // Получить содержимое логов (для отображения)
   Future<String> readLogs() async {
     if (kIsWeb) {
       return _webLogs.join('\n');
@@ -122,6 +124,14 @@ class LoggerService {
     }
   }
 
+  // Получить путь к текущему файлу логов (только для мобильных)
+  Future<String?> getLogFilePath() async {
+    if (kIsWeb) return null;
+    if (_logFile == null) return null;
+    return _logFile!.path;
+  }
+
+  // Получить список всех файлов логов (только для мобильных)
   Future<List<File>> getLogFiles() async {
     if (kIsWeb) return [];
     try {
@@ -138,6 +148,7 @@ class LoggerService {
     }
   }
 
+  // Очистить старые логи (оставить последние N файлов)
   Future<void> cleanOldLogs({int keepCount = 10}) async {
     if (kIsWeb) return;
     try {

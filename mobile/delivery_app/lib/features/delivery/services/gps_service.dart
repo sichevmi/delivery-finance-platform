@@ -53,6 +53,8 @@ class GpsService {
     _onDistanceUpdate = callback;
   }
 
+  // ===== МЕТОДЫ ЛОГИРОВАНИЯ =====
+
   Future<void> startLogging() async {
     if (kIsWeb) {
       logMessage('📁 GPS логирование на вебе (в памяти)');
@@ -124,6 +126,8 @@ class GpsService {
       return 'Error reading log: $e';
     }
   }
+
+  // ===== ОСНОВНЫЕ МЕТОДЫ GPS =====
 
   void startTracking() {
     logMessage('🟢 GPS: startTracking() called on instance ${hashCode}');
