@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:delivery_app/logger.dart';
+import 'package:delivery_app/features/delivery/services/logger.dart';
 import 'package:delivery_app/features/auth/providers/auth_provider.dart';
 import 'package:delivery_app/features/auth/ui/screens/login_screen.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
