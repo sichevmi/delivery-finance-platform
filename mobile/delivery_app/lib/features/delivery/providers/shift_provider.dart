@@ -147,7 +147,6 @@ class ShiftState {
 
 class ShiftNotifier extends StateNotifier<ShiftState> {
   final Ref _ref;
-  GpsService? _gpsService;
 
   ShiftNotifier(this._ref) : super(const ShiftState()) {
     _loadState();
@@ -185,13 +184,6 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
 
     if (state.isActive && !state.isOnOrder && state.idleStartTime == null) {
       state = state.copyWith(idleStartTime: DateTime.now());
-    }
-    
-    // Если смена активна - запускаем GPS после загрузки
-    if (state.isActive) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _initGpsAndStartTracking();
-      });
     }
   }
 
@@ -247,40 +239,30 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
 
   // ===== УПРАВЛЕНИЕ GPS =====
 
-  void _initGpsAndStartTracking() {
+  GpsService? _getGpsService() {
     try {
-      _gpsService = _ref.read(gpsServiceProvider);
-      print('🟢 ShiftNotifier: GPS сервис получен');
-      if (state.isActive) {
-        _gpsService!.startTracking();
-        print('🟢 ShiftNotifier: GPS запущен (смена активна)');
-      }
+      return _ref.read(gpsServiceProvider);
     } catch (e) {
-      print('⚠️ ShiftNotifier: GPS сервис ещё не готов: $e');
+      print('⚠️ Не удалось получить GPS сервис: $e');
+      return null;
     }
   }
 
   void _startGpsTracking() {
-    if (_gpsService == null) {
-      try {
-        _gpsService = _ref.read(gpsServiceProvider);
-      } catch (e) {
-        print('⚠️ Не удалось получить GPS сервис: $e');
-        return;
-      }
-    }
-    if (_gpsService != null) {
-      print('🟢 Запускаем GPS трекинг (смена активна)');
-      _gpsService!.startTracking();
+    final gpsService = _getGpsService();
+    if (gpsService != null) {
+      print('🟢 Запускаем GPS трекинг (смена активна, isOnOrder=${state.isOnOrder})');
+      gpsService.startTracking();
     } else {
       print('⚠️ GpsService не найден');
     }
   }
 
   void _stopGpsTracking() {
-    if (_gpsService != null) {
+    final gpsService = _getGpsService();
+    if (gpsService != null) {
       print('🛑 Останавливаем GPS трекинг (смена не активна)');
-      _gpsService!.stopTracking();
+      gpsService.stopTracking();
     }
   }
 
@@ -375,6 +357,7 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   }
 
   void addIdleDistance(double distance) {
+    print('📊 addIdleDistance вызван: distance=$distance, isActive=${state.isActive}, isOnOrder=${state.isOnOrder}');
     if (!state.isActive || state.isOnOrder || distance <= 0) return;
     state = state.copyWith(
       totalIdleDistance: state.totalIdleDistance + distance,

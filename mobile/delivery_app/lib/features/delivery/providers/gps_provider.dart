@@ -2,14 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:delivery_app/features/delivery/services/gps_service.dart';
 import 'package:delivery_app/features/delivery/providers/shift_provider.dart';
 
-// Просто создаём синглтон через провайдер
 final gpsServiceProvider = Provider<GpsService>((ref) {
   print('🟢 gpsServiceProvider: создаём GpsService');
   final gpsService = GpsService();
   
-  // Настраиваем колбэк сразу здесь
-  final shiftNotifier = ref.watch(shiftProvider.notifier);
-  
+  // Настраиваем колбэк
   gpsService.setOnDistanceUpdate((deltaKm, isPaid) {
     final shiftState = ref.read(shiftProvider);
     print('📍 GPS колбэк: deltaKm=$deltaKm, isActive=${shiftState.isActive}, isOnOrder=${shiftState.isOnOrder}');
@@ -18,6 +15,8 @@ final gpsServiceProvider = Provider<GpsService>((ref) {
       print('⚠️ Смена не активна, пробег не добавлен');
       return;
     }
+    
+    final shiftNotifier = ref.read(shiftProvider.notifier);
     
     if (shiftState.isOnOrder) {
       shiftNotifier.updatePaidDistance(deltaKm);
@@ -31,7 +30,7 @@ final gpsServiceProvider = Provider<GpsService>((ref) {
   return gpsService;
 });
 
-// Просто для совместимости
+// Провайдер для инициализации
 final gpsInitProvider = Provider((ref) {
   return ref.watch(gpsServiceProvider);
 });
