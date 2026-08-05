@@ -6,9 +6,14 @@ import 'package:delivery_app/features/delivery/ui/screens/home_screen.dart';
 import 'package:delivery_app/features/delivery/services/permission_service.dart';
 import 'package:delivery_app/features/auth/providers/auth_provider.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
+import 'package:delivery_app/features/delivery/services/logger_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  final logger = LoggerService();
+  await logger.init();
+  
   runApp(const ProviderScope(child: DeliveryApp()));
 }
 
@@ -31,10 +36,11 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
   }
 
   Future<void> _initializeApp() async {
-    print('🔐 DeliveryApp: инициализация...');
+    final logger = LoggerService();
+    logger.log('🔐 DeliveryApp: инициализация...');
     
     final hasPermission = await PermissionService.requestLocationPermission(context);
-    print('🔐 DeliveryApp: разрешение на геолокацию = $hasPermission');
+    logger.log('🔐 DeliveryApp: разрешение на геолокацию = $hasPermission');
     
     if (!hasPermission) {
       setState(() {
@@ -47,11 +53,10 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
     try {
       final authNotifier = ref.read(authProvider.notifier);
       final isAuthenticated = await authNotifier.autoLogin();
-      print('🔐 DeliveryApp: isAuthenticated = $isAuthenticated');
+      logger.log('🔐 DeliveryApp: isAuthenticated = $isAuthenticated');
       
-      // Просто инициализируем GPS провайдер
       ref.read(gpsInitProvider);
-      print('🟢 GPS провайдер инициализирован');
+      logger.log('🟢 GPS провайдер инициализирован');
       
       setState(() {
         _hasPermission = true;
@@ -59,7 +64,7 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
         _isLoading = false;
       });
     } catch (e) {
-      print('🔐 DeliveryApp: ошибка: $e');
+      logger.log('🔐 DeliveryApp: ошибка: $e');
       setState(() {
         _hasPermission = true;
         _isAuthenticated = false;

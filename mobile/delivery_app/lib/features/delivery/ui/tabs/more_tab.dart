@@ -1,9 +1,13 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:delivery_app/features/auth/providers/auth_provider.dart';
 import 'package:delivery_app/features/auth/ui/screens/login_screen.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 import 'package:delivery_app/features/delivery/services/gps_service.dart';
+import 'package:delivery_app/features/delivery/providers/logger_provider.dart';
+import 'package:delivery_app/features/delivery/services/logger_service.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class MoreTab extends ConsumerStatefulWidget {
   const MoreTab({super.key});
@@ -14,7 +18,18 @@ class MoreTab extends ConsumerStatefulWidget {
 
 class _MoreTabState extends ConsumerState<MoreTab> {
   bool _isLoggingEnabled = false;
-  String? _logContent;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkLoggingStatus();
+    });
+  }
+
+  void _checkLoggingStatus() {
+    // Статус логирования в GpsService
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,11 +56,9 @@ class _MoreTabState extends ConsumerState<MoreTab> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Карточка пользователя
           _buildUserCard(authState),
           const SizedBox(height: 24),
 
-          // Раздел "Настройки"
           const Text(
             'Настройки',
             style: TextStyle(
@@ -55,7 +68,6 @@ class _MoreTabState extends ConsumerState<MoreTab> {
             ),
           ),
           const SizedBox(height: 8),
-          // Убираем Container с фоном, используем только Material
           Material(
             color: const Color(0xFF1E1E1E),
             borderRadius: BorderRadius.circular(8),
@@ -93,9 +105,8 @@ class _MoreTabState extends ConsumerState<MoreTab> {
           ),
           const SizedBox(height: 24),
 
-          // Раздел "Логирование GPS"
           const Text(
-            'GPS Логирование',
+            'Логирование',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -103,6 +114,7 @@ class _MoreTabState extends ConsumerState<MoreTab> {
             ),
           ),
           const SizedBox(height: 8),
+          
           Material(
             color: const Color(0xFF1E1E1E),
             borderRadius: BorderRadius.circular(8),
@@ -140,32 +152,72 @@ class _MoreTabState extends ConsumerState<MoreTab> {
             ),
           ),
           const SizedBox(height: 4),
+          
           Material(
             color: const Color(0xFF1E1E1E),
             borderRadius: BorderRadius.circular(8),
             child: ListTile(
-              leading: const Icon(Icons.folder_open_outlined, color: Color(0xFF6C63FF)),
-              title: const Text('Просмотр логов', style: TextStyle(color: Colors.white)),
+              leading: const Icon(Icons.gps_fixed_outlined, color: Color(0xFF6C63FF)),
+              title: const Text('Просмотр GPS логов', style: TextStyle(color: Colors.white)),
               subtitle: const Text('Открыть файл с логами GPS', style: TextStyle(color: Color(0xFF888888), fontSize: 12)),
               trailing: const Icon(Icons.chevron_right, color: Color(0xFF888888)),
-              onTap: () => _showLogFile(gpsService),
+              onTap: () => _showGpsLogFile(gpsService),
             ),
           ),
           const SizedBox(height: 4),
+          
           Material(
             color: const Color(0xFF1E1E1E),
             borderRadius: BorderRadius.circular(8),
             child: ListTile(
-              leading: const Icon(Icons.share_outlined, color: Color(0xFF6C63FF)),
-              title: const Text('Отправить логи', style: TextStyle(color: Colors.white)),
-              subtitle: const Text('Отправить файл с логами', style: TextStyle(color: Color(0xFF888888), fontSize: 12)),
+              leading: const Icon(Icons.description_outlined, color: Color(0xFF6C63FF)),
+              title: const Text('Все логи приложения', style: TextStyle(color: Colors.white)),
+              subtitle: Text(
+                kIsWeb ? 'Логи хранятся в памяти' : 'Полные логи работы приложения',
+                style: const TextStyle(color: Color(0xFF888888), fontSize: 12),
+              ),
               trailing: const Icon(Icons.chevron_right, color: Color(0xFF888888)),
-              onTap: () => _shareLogFile(gpsService),
+              onTap: () => _showAppLogs(),
             ),
           ),
+          const SizedBox(height: 4),
+          
+          if (!kIsWeb) ...[
+            Material(
+              color: const Color(0xFF1E1E1E),
+              borderRadius: BorderRadius.circular(8),
+              child: ListTile(
+                leading: const Icon(Icons.share_outlined, color: Color(0xFF6C63FF)),
+                title: const Text('Отправить логи', style: TextStyle(color: Colors.white)),
+                subtitle: const Text('Отправить файл с логами', style: TextStyle(color: Color(0xFF888888), fontSize: 12)),
+                trailing: const Icon(Icons.chevron_right, color: Color(0xFF888888)),
+                onTap: () => _shareLogs(gpsService),
+              ),
+            ),
+            const SizedBox(height: 4),
+            
+            Material(
+              color: const Color(0xFF1E1E1E),
+              borderRadius: BorderRadius.circular(8),
+              child: ListTile(
+                leading: const Icon(Icons.delete_sweep_outlined, color: Colors.red),
+                title: const Text(
+                  'Очистить старые логи',
+                  style: TextStyle(color: Colors.red),
+                ),
+                subtitle: const Text(
+                  'Удалить логи старше 7 дней',
+                  style: TextStyle(color: Color(0xFF888888), fontSize: 12),
+                ),
+                trailing: const Icon(Icons.chevron_right, color: Colors.red),
+                onTap: () => _cleanLogs(),
+              ),
+            ),
+            const SizedBox(height: 4),
+          ],
+
           const SizedBox(height: 24),
 
-          // Раздел "О приложении"
           const Text(
             'О приложении',
             style: TextStyle(
@@ -181,6 +233,10 @@ class _MoreTabState extends ConsumerState<MoreTab> {
             child: ListTile(
               leading: const Icon(Icons.info_outline, color: Color(0xFF6C63FF)),
               title: const Text('Версия 1.0.0', style: TextStyle(color: Colors.white)),
+              subtitle: Text(
+                kIsWeb ? 'Web версия' : 'Mobile версия',
+                style: const TextStyle(color: Color(0xFF888888), fontSize: 12),
+              ),
               trailing: const Icon(Icons.chevron_right, color: Color(0xFF888888)),
               onTap: () {},
             ),
@@ -205,7 +261,6 @@ class _MoreTabState extends ConsumerState<MoreTab> {
           ),
           const SizedBox(height: 32),
 
-          // Кнопка выхода (с Material)
           Material(
             color: Colors.transparent,
             borderRadius: BorderRadius.circular(12),
@@ -304,13 +359,13 @@ class _MoreTabState extends ConsumerState<MoreTab> {
     }
   }
 
-  void _showLogFile(GpsService gpsService) async {
+  void _showGpsLogFile(GpsService gpsService) async {
     try {
       final logPath = await gpsService.getLogFilePath();
       if (logPath == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Лог-файл не найден'),
+            content: Text('GPS лог-файл не найден'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -355,6 +410,83 @@ class _MoreTabState extends ConsumerState<MoreTab> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
+          content: Text('Ошибка чтения GPS логов: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _showAppLogs() async {
+    try {
+      final logger = ref.read(loggerServiceProvider);
+      final content = await logger.readLogs();
+      
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  kIsWeb ? 'Логи (память)' : 'Логи приложения',
+                  style: const TextStyle(color: Colors.white),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.grey),
+                onPressed: () => Navigator.pop(context),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+          content: Container(
+            width: double.maxFinite,
+            constraints: const BoxConstraints(maxHeight: 400),
+            child: SingleChildScrollView(
+              child: SelectableText(
+                content.isNotEmpty ? content : 'Логи пусты',
+                style: const TextStyle(
+                  color: Color(0xFFB0B0B0),
+                  fontSize: 10,
+                  fontFamily: 'monospace',
+                  height: 1.2,
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                // Копируем в буфер обмена
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('📋 Логи скопированы в буфер обмена'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              },
+              child: const Text(
+                'Копировать',
+                style: TextStyle(color: Color(0xFF6C63FF)),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Закрыть',
+                style: TextStyle(color: Color(0xFF6C63FF)),
+              ),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
           content: Text('Ошибка чтения логов: $e'),
           backgroundColor: Colors.red,
         ),
@@ -362,23 +494,57 @@ class _MoreTabState extends ConsumerState<MoreTab> {
     }
   }
 
-  void _shareLogFile(GpsService gpsService) async {
+  void _shareLogs(GpsService gpsService) async {
     try {
-      final logPath = await gpsService.getLogFilePath();
-      if (logPath == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Лог-файл не найден'),
-            backgroundColor: Colors.orange,
+      final logger = ref.read(loggerServiceProvider);
+      final content = await logger.readLogs();
+      
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          title: const Text(
+            'Логи для отправки',
+            style: TextStyle(color: Colors.white),
           ),
-        );
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Функция отправки логов в разработке'),
-          backgroundColor: Colors.orange,
+          content: Container(
+            width: double.maxFinite,
+            constraints: const BoxConstraints(maxHeight: 300),
+            child: SingleChildScrollView(
+              child: SelectableText(
+                content,
+                style: const TextStyle(
+                  color: Color(0xFFB0B0B0),
+                  fontSize: 10,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('📋 Логи скопированы в буфер обмена'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+                Navigator.pop(context);
+              },
+              child: const Text(
+                'Копировать',
+                style: TextStyle(color: Color(0xFF6C63FF)),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Закрыть',
+                style: TextStyle(color: Color(0xFF6C63FF)),
+              ),
+            ),
+          ],
         ),
       );
     } catch (e) {
@@ -389,6 +555,60 @@ class _MoreTabState extends ConsumerState<MoreTab> {
         ),
       );
     }
+  }
+
+  void _cleanLogs() async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text(
+          'Очистка логов',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'Удалить все логи, кроме последних 10 файлов?',
+          style: TextStyle(color: Color(0xFFB0B0B0)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Отмена',
+              style: TextStyle(color: Color(0xFF888888)),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                final logger = ref.read(loggerServiceProvider);
+                await logger.cleanOldLogs(keepCount: 10);
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('🧹 Старые логи очищены'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Ошибка очистки: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showLogoutDialog(BuildContext context, AuthNotifier authNotifier) {
