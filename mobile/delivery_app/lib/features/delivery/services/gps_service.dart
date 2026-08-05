@@ -90,10 +90,11 @@ class GpsService {
   }
 
   void _log(String message) {
-    final timestamp = DateTime.now().toIso8601String();
-    _logBuffer += '[$timestamp] $message\n';
-    print(message);
-  }
+  final timestamp = DateTime.now().toIso8601String();
+  _logBuffer += '[$timestamp] $message\n';
+  // также дублируем в общий лог, чтобы видеть в консоли
+  logMessage(message);
+}
 
   Future<void> _saveLogToFile() async {
     if (kIsWeb) return; // На вебе не сохраняем в файл

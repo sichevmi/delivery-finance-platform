@@ -45,12 +45,18 @@ class LoggerService {
       final fileName = 'app_log_${DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19)}.txt';
       _logFile = File('${logDir.path}/$fileName');
       
+      // Проверяем, можно ли писать в файл
+      if (!await _logFile!.exists()) {
+        await _logFile!.create(recursive: true);
+      }
+      
       _sink = _logFile!.openWrite(mode: FileMode.append);
       _isInitialized = true;
       
       _writeToFile('=' * 80);
       _writeToFile('📱 Логи приложения FinFlow Delivery');
       _writeToFile('🕐 Время старта: ${DateTime.now()}');
+      _writeToFile('🔄 Версия: 1.0.0');
       _writeToFile('=' * 80);
       _writeToFile('');
       
@@ -96,6 +102,7 @@ class LoggerService {
       _sink!.flush();
     } catch (e) {
       // Игнорируем ошибки записи
+      print('⚠️ Ошибка записи в лог: $e');
     }
   }
 
@@ -115,12 +122,16 @@ class LoggerService {
       return _webLogs.join('\n');
     }
     if (_logFile == null || !await _logFile!.exists()) {
-      return 'Файл логов не найден';
+      return '📁 Файл логов не найден. Попробуйте перезапустить приложение.';
     }
     try {
-      return await _logFile!.readAsString();
+      final content = await _logFile!.readAsString();
+      if (content.isEmpty) {
+        return '📁 Лог-файл пуст.';
+      }
+      return content;
     } catch (e) {
-      return 'Ошибка чтения логов: $e';
+      return '❌ Ошибка чтения логов: $e';
     }
   }
 

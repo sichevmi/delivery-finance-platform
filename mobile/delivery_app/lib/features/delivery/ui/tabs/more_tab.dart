@@ -1,7 +1,6 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:delivery_app/features/delivery/services/logger.dart';
+import 'package:delivery_app/logger.dart';
 import 'package:delivery_app/features/auth/providers/auth_provider.dart';
 import 'package:delivery_app/features/auth/ui/screens/login_screen.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
@@ -409,6 +408,7 @@ class _MoreTabState extends ConsumerState<MoreTab> {
   void _showAppLogs() async {
     try {
       final logger = ref.read(loggerServiceProvider);
+      final path = await logger.getLogFilePath();
       final content = await logger.readLogs();
       
       showDialog(
@@ -435,22 +435,35 @@ class _MoreTabState extends ConsumerState<MoreTab> {
           content: Container(
             width: double.maxFinite,
             constraints: const BoxConstraints(maxHeight: 400),
-            child: SingleChildScrollView(
-              child: SelectableText(
-                content.isNotEmpty ? content : 'Логи пусты',
-                style: const TextStyle(
-                  color: Color(0xFFB0B0B0),
-                  fontSize: 10,
-                  fontFamily: 'monospace',
-                  height: 1.2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (path != null) ...[
+                  Text(
+                    '📁 $path',
+                    style: const TextStyle(color: Colors.grey, fontSize: 10),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: SelectableText(
+                      content.isNotEmpty ? content : 'Логи пусты',
+                      style: const TextStyle(
+                        color: Color(0xFFB0B0B0),
+                        fontSize: 10,
+                        fontFamily: 'monospace',
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
           actions: [
             TextButton(
               onPressed: () {
-                // Копируем в буфер обмена
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('📋 Логи скопированы в буфер обмена'),
