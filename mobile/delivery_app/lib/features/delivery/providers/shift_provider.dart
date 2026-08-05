@@ -1,8 +1,8 @@
 // lib/features/delivery/providers/shift_provider.dart
 import 'package:flutter/material.dart';
-import 'package:delivery_app/features/delivery/services/logger.dart';
+import 'package:delivery_app/logger.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:delivery_app/features/delivery/services/logger.dart';
+import 'package:delivery_app/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 import 'package:delivery_app/features/delivery/services/gps_service.dart';
@@ -284,6 +284,7 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   }
 
   void stopShift() {
+    logMessage('🛑 stopShift() вызван из: ${StackTrace.current}');
     if (!state.isActive) return;
     final now = DateTime.now();
     final addedWork = now.difference(state.shiftStartTime!);

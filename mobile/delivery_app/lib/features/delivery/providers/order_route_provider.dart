@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:delivery_app/features/delivery/services/logger.dart';
+import 'package:delivery_app/logger.dart';
 import 'package:delivery_app/features/delivery/models/delivery.dart';
 import 'package:delivery_app/features/delivery/services/gps_service.dart';
 import 'package:delivery_app/features/delivery/services/geocoder_service.dart';

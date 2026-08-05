@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:delivery_app/features/delivery/services/logger.dart';
+import 'package:delivery_app/logger.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:html' as html;

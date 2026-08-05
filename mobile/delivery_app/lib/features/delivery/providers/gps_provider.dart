@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:delivery_app/features/delivery/services/logger.dart';
+import 'package:delivery_app/logger.dart';  // <-- ИСПРАВЛЕННЫЙ ИМПОРТ
 import 'package:delivery_app/features/delivery/services/gps_service.dart';
 import 'package:delivery_app/features/delivery/providers/shift_provider.dart';
 

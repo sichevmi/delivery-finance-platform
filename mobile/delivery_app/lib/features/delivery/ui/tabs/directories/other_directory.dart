@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:delivery_app/features/delivery/services/logger.dart';
+import 'package:delivery_app/logger.dart';
 import 'package:delivery_app/features/delivery/models/parameter_model.dart';
 import 'package:delivery_app/features/delivery/ui/widgets/editable_parameter_card.dart';
 

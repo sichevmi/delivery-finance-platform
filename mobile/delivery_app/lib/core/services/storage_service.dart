@@ -1,6 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:delivery_app/features/delivery/services/logger.dart'; // <-- добавить
+import 'package:delivery_app/logger.dart'; // <-- добавить
 
 class StorageService {
   static const String _accessTokenKey = 'access_token';

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:delivery_app/features/delivery/services/logger.dart';
+import 'package:delivery_app/logger.dart';
 import 'package:delivery_app/features/analytics/models/analytics_models.dart';
 import 'package:delivery_app/features/analytics/models/analytics_enums.dart';
 import 'package:delivery_app/features/analytics/services/mock_analytics_repository.dart';

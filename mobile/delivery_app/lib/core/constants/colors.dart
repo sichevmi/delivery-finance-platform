@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:delivery_app/features/delivery/services/logger.dart';
+import 'package:delivery_app/logger.dart';
 
 class AppColors {
   static const Color primary = Color(0xFF6C63FF);

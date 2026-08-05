@@ -1,20 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:delivery_app/features/delivery/services/logger.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:delivery_app/features/delivery/services/logger.dart';
 import 'package:delivery_app/core/theme/app_theme.dart';
 import 'package:delivery_app/features/auth/ui/screens/login_screen.dart';
 import 'package:delivery_app/features/delivery/ui/screens/home_screen.dart';
 import 'package:delivery_app/features/delivery/services/permission_service.dart';
 import 'package:delivery_app/features/auth/providers/auth_provider.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
-import 'package:delivery_app/features/delivery/services/logger.dart';
+import 'package:delivery_app/logger.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   // Инициализируем логгер
-  await initLogger();
+  await LoggerService().init();
   logMessage('🚀 Приложение запущено');
   
   runApp(const ProviderScope(child: DeliveryApp()));
