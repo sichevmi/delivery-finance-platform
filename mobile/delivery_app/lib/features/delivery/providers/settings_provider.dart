@@ -124,6 +124,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       final existingSettings = await db.settingsDao.getActiveSettings();
       final existingPricing = await db.pricingDao.getActivePricing();
 
+      // Создаём Companion для настроек
       final settingsCompanion = SettingsTableCompanion(
         fuelConsumption: Value(state.fuelConsumption),
         fuelPrice: Value(state.fuelPrice),
@@ -134,7 +135,10 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
         isActive: Value(true),
         isSynced: Value(false),
         updatedAt: Value(DateTime.now()),
-        createdAt: Value(existingSettings?.createdAt ?? DateTime.now()),
+        // Если есть существующая запись, берём её createdAt, иначе создаём новый
+        createdAt: existingSettings != null 
+            ? Value(existingSettings.createdAt) 
+            : Value(DateTime.now()),
       );
 
       if (state.settingsId != null) {
@@ -147,6 +151,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
         logMessage('✅ Настройки вставлены, id=$id', category: 'SETTINGS');
       }
 
+      // Создаём Companion для тарифов
       final pricingCompanion = PricingTableCompanion(
         receivingFee: Value(state.receivingFee),
         deliveryFee: Value(state.deliveryFee),
@@ -158,7 +163,10 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
         isActive: Value(true),
         isSynced: Value(false),
         updatedAt: Value(DateTime.now()),
-        createdAt: Value(existingPricing?.createdAt ?? DateTime.now()),
+        // Если есть существующая запись, берём её createdAt, иначе создаём новый
+        createdAt: existingPricing != null 
+            ? Value(existingPricing.createdAt) 
+            : Value(DateTime.now()),
       );
 
       if (state.pricingId != null) {
