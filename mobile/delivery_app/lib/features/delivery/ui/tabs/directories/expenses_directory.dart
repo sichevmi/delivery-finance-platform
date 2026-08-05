@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:delivery_app/logger.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:delivery_app/logger.dart';
 import 'package:delivery_app/features/delivery/providers/settings_provider.dart';
+import 'package:delivery_app/logger.dart';
 
 class ExpensesDirectory extends ConsumerStatefulWidget {
   const ExpensesDirectory({super.key});
@@ -15,10 +14,12 @@ class _ExpensesDirectoryState extends ConsumerState<ExpensesDirectory> {
   late TextEditingController _fuelPriceController;
   late TextEditingController _fuelConsumptionController;
   late TextEditingController _repairCostController;
-  
+  late TextEditingController _additionalCostsController;
+
   late FocusNode _fuelPriceFocusNode;
   late FocusNode _fuelConsumptionFocusNode;
   late FocusNode _repairCostFocusNode;
+  late FocusNode _additionalCostsFocusNode;
 
   bool _isSaving = false;
 
@@ -28,10 +29,12 @@ class _ExpensesDirectoryState extends ConsumerState<ExpensesDirectory> {
     _fuelPriceController = TextEditingController();
     _fuelConsumptionController = TextEditingController();
     _repairCostController = TextEditingController();
-    
+    _additionalCostsController = TextEditingController();
+
     _fuelPriceFocusNode = FocusNode();
     _fuelConsumptionFocusNode = FocusNode();
     _repairCostFocusNode = FocusNode();
+    _additionalCostsFocusNode = FocusNode();
   }
 
   @override
@@ -39,9 +42,11 @@ class _ExpensesDirectoryState extends ConsumerState<ExpensesDirectory> {
     _fuelPriceController.dispose();
     _fuelConsumptionController.dispose();
     _repairCostController.dispose();
+    _additionalCostsController.dispose();
     _fuelPriceFocusNode.dispose();
     _fuelConsumptionFocusNode.dispose();
     _repairCostFocusNode.dispose();
+    _additionalCostsFocusNode.dispose();
     super.dispose();
   }
 
@@ -51,24 +56,10 @@ class _ExpensesDirectoryState extends ConsumerState<ExpensesDirectory> {
     final notifier = ref.read(settingsProvider.notifier);
 
     // Обновляем текст только если контроллер не в фокусе
-    if (!_fuelPriceFocusNode.hasFocus) {
-      final newText = settings.fuelPrice.toStringAsFixed(2);
-      if (_fuelPriceController.text != newText) {
-        _fuelPriceController.text = newText;
-      }
-    }
-    if (!_fuelConsumptionFocusNode.hasFocus) {
-      final newText = settings.fuelConsumption.toStringAsFixed(1);
-      if (_fuelConsumptionController.text != newText) {
-        _fuelConsumptionController.text = newText;
-      }
-    }
-    if (!_repairCostFocusNode.hasFocus) {
-      final newText = settings.repairCost.toStringAsFixed(2);
-      if (_repairCostController.text != newText) {
-        _repairCostController.text = newText;
-      }
-    }
+    _updateControllerIfNeeded(_fuelPriceController, _fuelPriceFocusNode, settings.fuelPrice.toStringAsFixed(2));
+    _updateControllerIfNeeded(_fuelConsumptionController, _fuelConsumptionFocusNode, settings.fuelConsumption.toStringAsFixed(1));
+    _updateControllerIfNeeded(_repairCostController, _repairCostFocusNode, settings.repairCost.toStringAsFixed(2));
+    _updateControllerIfNeeded(_additionalCostsController, _additionalCostsFocusNode, settings.additionalCosts.toStringAsFixed(2));
 
     // Вычисляемые значения
     final consumptionPerKm = settings.fuelConsumption / 100;
@@ -86,7 +77,8 @@ class _ExpensesDirectoryState extends ConsumerState<ExpensesDirectory> {
         onSaved: (value) async {
           final parsed = double.tryParse(value.replaceAll(',', '.'));
           if (parsed != null && parsed > 0) {
-            await notifier.saveFuelPrice(parsed);
+            notifier.updateFuelPrice(parsed);
+            await notifier.saveSettings();
             return true;
           }
           return false;
@@ -103,7 +95,8 @@ class _ExpensesDirectoryState extends ConsumerState<ExpensesDirectory> {
         onSaved: (value) async {
           final parsed = double.tryParse(value.replaceAll(',', '.'));
           if (parsed != null && parsed > 0) {
-            await notifier.saveFuelConsumption(parsed);
+            notifier.updateFuelConsumption(parsed);
+            await notifier.saveSettings();
             return true;
           }
           return false;
@@ -120,7 +113,26 @@ class _ExpensesDirectoryState extends ConsumerState<ExpensesDirectory> {
         onSaved: (value) async {
           final parsed = double.tryParse(value.replaceAll(',', '.'));
           if (parsed != null && parsed > 0) {
-            await notifier.saveRepairCost(parsed);
+            notifier.updateRepairCost(parsed);
+            await notifier.saveSettings();
+            return true;
+          }
+          return false;
+        },
+      ),
+      ExpenseParameter(
+        id: 'additionalCosts',
+        name: 'Дополнительные расходы',
+        description: 'Прочие расходы на заказ',
+        controller: _additionalCostsController,
+        focusNode: _additionalCostsFocusNode,
+        unit: 'руб',
+        value: settings.additionalCosts,
+        onSaved: (value) async {
+          final parsed = double.tryParse(value.replaceAll(',', '.'));
+          if (parsed != null && parsed >= 0) {
+            notifier.updateAdditionalCosts(parsed);
+            await notifier.saveSettings();
             return true;
           }
           return false;
@@ -146,17 +158,34 @@ class _ExpensesDirectoryState extends ConsumerState<ExpensesDirectory> {
                 ),
               ),
             ),
+          IconButton(
+            icon: const Icon(Icons.cloud_sync),
+            onPressed: () async {
+              setState(() => _isSaving = true);
+              await notifier.saveSettings();
+              setState(() => _isSaving = false);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('✅ Данные сохранены в БД'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            },
+            tooltip: 'Сохранить все',
+          ),
         ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           ...parameters.map((param) => _buildEditableField(param, notifier)),
-          
+
           const SizedBox(height: 16),
           const Divider(color: Color(0xFF2C2C2C)),
           const SizedBox(height: 16),
-          
+
           _buildReadOnlyField(
             label: 'Расход на 1 км',
             value: consumptionPerKm.toStringAsFixed(4),
@@ -168,9 +197,50 @@ class _ExpensesDirectoryState extends ConsumerState<ExpensesDirectory> {
             value: fuelCostPerKm.toStringAsFixed(4),
             unit: 'руб',
           ),
+
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A1A),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFF2C2C2C)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  settings.isSynced ? Icons.cloud_done : Icons.cloud_off,
+                  color: settings.isSynced ? Colors.green : Colors.orange,
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  settings.isSynced ? 'Синхронизировано' : 'Не синхронизировано',
+                  style: TextStyle(
+                    color: settings.isSynced ? Colors.green : Colors.orange,
+                    fontSize: 11,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  'ID: ${settings.settingsId ?? '—'}',
+                  style: const TextStyle(
+                    color: Color(0xFF666666),
+                    fontSize: 10,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  void _updateControllerIfNeeded(TextEditingController controller, FocusNode focusNode, String newText) {
+    if (!focusNode.hasFocus && controller.text != newText) {
+      controller.text = newText;
+    }
   }
 
   Widget _buildEditableField(ExpenseParameter param, SettingsNotifier notifier) {
@@ -196,7 +266,6 @@ class _ExpensesDirectoryState extends ConsumerState<ExpensesDirectory> {
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              // Кнопка сохранения
               IconButton(
                 icon: const Icon(
                   Icons.save,
@@ -210,7 +279,7 @@ class _ExpensesDirectoryState extends ConsumerState<ExpensesDirectory> {
                   if (success && mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Сохранено'),
+                        content: Text('✅ Сохранено в БД'),
                         duration: Duration(seconds: 1),
                         backgroundColor: Colors.green,
                       ),
@@ -244,7 +313,7 @@ class _ExpensesDirectoryState extends ConsumerState<ExpensesDirectory> {
                     if (success && mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Сохранено'),
+                          content: Text('✅ Сохранено в БД'),
                           duration: Duration(seconds: 1),
                           backgroundColor: Colors.green,
                         ),

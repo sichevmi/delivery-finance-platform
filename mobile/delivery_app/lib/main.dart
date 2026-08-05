@@ -7,6 +7,7 @@ import 'package:delivery_app/features/delivery/services/permission_service.dart'
 import 'package:delivery_app/features/auth/providers/auth_provider.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 import 'package:delivery_app/logger.dart';
+import 'package:delivery_app/core/database/database_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,7 +16,23 @@ void main() async {
   await LoggerService().init();
   logMessage('🚀 Приложение запущено');
   
-  runApp(const ProviderScope(child: DeliveryApp()));
+  // Создаём контейнер для провайдеров
+  final container = ProviderContainer();
+  
+  // Инициализируем базу данных
+  try {
+    final db = container.read(appDatabaseProvider);
+    logMessage('📁 База данных инициализирована', category: 'DATABASE');
+  } catch (e) {
+    logMessage('⚠️ Ошибка инициализации БД: $e', category: 'DATABASE', level: LogLevel.error);
+  }
+  
+  runApp(
+    UncontrolledProviderScope(
+      container: container,
+      child: const DeliveryApp(),
+    ),
+  );
 }
 
 class DeliveryApp extends ConsumerStatefulWidget {
@@ -55,6 +72,7 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
       final isAuthenticated = await authNotifier.autoLogin();
       logMessage('🔐 DeliveryApp: isAuthenticated = $isAuthenticated');
       
+      // Инициализируем GPS
       ref.read(gpsInitProvider);
       logMessage('🟢 GPS провайдер инициализирован');
       
