@@ -130,120 +130,123 @@ class GpsService {
 
   // ===== ОСНОВНЫЕ МЕТОДЫ GPS =====
 
-  void startTracking() {
-    logMessage('🟢 GPS: startTracking() called on instance ${hashCode}');
-    if (_isTracking) {
-      logMessage('🟡 GPS: already tracking');
-      return;
-    }
-    _isTracking = true;
-    _isPaused = false;
-    _totalDistance = 0.0;
-    _lastPosition = null;
+  // Везде, где нужно писать в GPS-лог, используем _log() вместо logMessage()
 
-    const settings = LocationSettings(
-      accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 0,
-    );
+void startTracking() {
+  _log('🟢 GPS: startTracking() called on instance ${hashCode}');
+  if (_isTracking) {
+    _log('🟡 GPS: already tracking');
+    return;
+  }
+  _isTracking = true;
+  _isPaused = false;
+  _totalDistance = 0.0;
+  _lastPosition = null;
 
-    logMessage('🟢 GPS: подписываемся на поток позиции');
-    _positionSubscription = Geolocator.getPositionStream(
-      locationSettings: settings,
-    ).listen(
-      (Position position) => _onPositionUpdate(position),
-      onError: (error) => logMessage('🔴 GPS error: $error'),
-      cancelOnError: false,
-    );
-    logMessage('🟢 GPS: поток запущен');
+  const settings = LocationSettings(
+    accuracy: LocationAccuracy.bestForNavigation,
+    distanceFilter: 0,
+  );
+
+  _log('🟢 GPS: подписываемся на поток позиции');
+  _positionSubscription = Geolocator.getPositionStream(
+    locationSettings: settings,
+  ).listen(
+    (Position position) => _onPositionUpdate(position),
+    onError: (error) => _log('🔴 GPS error: $error'),
+    cancelOnError: false,
+  );
+  _log('🟢 GPS: поток запущен');
+}
+
+void _onPositionUpdate(Position position) {
+  if (!_isTracking || _isPaused) return;
+
+  final now = DateTime.now();
+  if (now.difference(position.timestamp).inSeconds > 30) {
+    _log('⚠️ Position too old (${now.difference(position.timestamp).inSeconds}s), ignoring');
+    return;
   }
 
-  void _onPositionUpdate(Position position) {
-    if (!_isTracking || _isPaused) return;
+  _log('📍 GPS: обновление позиции на instance ${hashCode}');
+  _log('📍 GPS: lat: ${position.latitude}, lon: ${position.longitude}, acc: ${position.accuracy}m');
 
-    // Проверяем свежесть данных
-    final now = DateTime.now();
-    if (now.difference(position.timestamp).inSeconds > 30) {
-      logMessage('⚠️ Position too old (${now.difference(position.timestamp).inSeconds}s), ignoring');
-      return;
-    }
+  if (position.accuracy > _maxAccuracy) {
+    _log('⚠️ Accuracy too poor (${position.accuracy}m), ignoring');
+    return;
+  }
 
-    logMessage('📍 GPS: обновление позиции на instance ${hashCode}');
-    logMessage('📍 GPS: lat: ${position.latitude}, lon: ${position.longitude}, acc: ${position.accuracy}m');
-
-    if (position.accuracy > _maxAccuracy) {
-      logMessage('⚠️ Accuracy too poor (${position.accuracy}m), ignoring');
-      return;
-    }
-
-    if (_lastPosition == null) {
-      _lastPosition = position;
-      logMessage('🟢 First position stored');
-      return;
-    }
-
-    double distance = Geolocator.distanceBetween(
-      _lastPosition!.latitude,
-      _lastPosition!.longitude,
-      position.latitude,
-      position.longitude,
-    );
-    logMessage('📏 Raw distance: ${distance.toStringAsFixed(2)}m');
-
-    if (distance < _minDistance) {
-      logMessage('📏 Too small (< ${_minDistance}m), ignoring');
-      return;
-    }
-
-    if (distance > _maxJump) {
-      logMessage('⚠️ Jump > ${_maxJump}m (${distance.toStringAsFixed(2)}m), ignoring');
-      return;
-    }
-
-    final deltaKm = distance / 1000;
-    _totalDistance += deltaKm;
-    
-    logMessage('✅ ACCEPTED ${distance.toStringAsFixed(2)}m (${deltaKm.toStringAsFixed(4)} km), total: ${_totalDistance.toStringAsFixed(4)} km');
-    _distanceStreamController.add(_totalDistance);
+  if (_lastPosition == null) {
     _lastPosition = position;
-
-    if (_onDistanceUpdate != null) {
-      logMessage('🔄 Вызываем колбэк с deltaKm=$deltaKm');
-      _onDistanceUpdate?.call(deltaKm, true);
-    } else {
-      logMessage('⚠️ _onDistanceUpdate == null, колбэк не вызван');
-    }
+    _log('🟢 First position stored');
+    return;
   }
 
-  void pauseTracking() {
-    logMessage('⏸️ GPS: pauseTracking()');
-    _isPaused = true;
+  double distance = Geolocator.distanceBetween(
+    _lastPosition!.latitude,
+    _lastPosition!.longitude,
+    position.latitude,
+    position.longitude,
+  );
+  _log('📏 Raw distance: ${distance.toStringAsFixed(2)}m');
+
+  if (distance < _minDistance) {
+    _log('📏 Too small (< ${_minDistance}m), ignoring');
+    return;
   }
 
-  void resumeTracking() {
-    logMessage('▶️ GPS: resumeTracking()');
-    _isPaused = false;
+  if (distance > _maxJump) {
+    _log('⚠️ Jump > ${_maxJump}m (${distance.toStringAsFixed(2)}m), ignoring');
+    return;
   }
 
-  void stopTracking() {
-    logMessage('🛑 GPS: stopTracking() on instance ${hashCode}');
-    _isTracking = false;
-    _isPaused = false;
-    _positionSubscription?.cancel();
-    _positionSubscription = null;
-    _lastPosition = null;
-    _totalDistance = 0.0;
-    _distanceStreamController.add(0.0);
-    if (_isLoggingEnabled && !kIsWeb) _saveLogToFile();
+  final deltaKm = distance / 1000;
+  _totalDistance += deltaKm;
+  
+  _log('✅ ACCEPTED ${distance.toStringAsFixed(2)}m (${deltaKm.toStringAsFixed(4)} km), total: ${_totalDistance.toStringAsFixed(4)} km');
+  _distanceStreamController.add(_totalDistance);
+  _lastPosition = position;
+
+  if (_onDistanceUpdate != null) {
+    _log('🔄 Вызываем колбэк с deltaKm=$deltaKm');
+    _onDistanceUpdate?.call(deltaKm, true);
+  } else {
+    _log('⚠️ _onDistanceUpdate == null, колбэк не вызван');
   }
+}
+
+void pauseTracking() {
+  _log('⏸️ GPS: pauseTracking()');
+  _isPaused = true;
+}
+
+void resumeTracking() {
+  _log('▶️ GPS: resumeTracking()');
+  _isPaused = false;
+}
+
+void stopTracking() {
+  _log('🛑 GPS: stopTracking() on instance ${hashCode}');
+  _isTracking = false;
+  _isPaused = false;
+  _positionSubscription?.cancel();
+  _positionSubscription = null;
+  _lastPosition = null;
+  _totalDistance = 0.0;
+  _distanceStreamController.add(0.0);
+  if (_isLoggingEnabled && !kIsWeb) _saveLogToFile();
+}
+
+
 
   void forceRefresh() => logMessage('🔄 ForceRefresh (no-op)');
 
   double getTotalDistance() => _totalDistance;
 
-  void resetDistance() {
-    logMessage('🔄 GPS: resetDistance()');
-    _totalDistance = 0.0;
-    _lastPosition = null;
-    _distanceStreamController.add(0.0);
-  }
+void resetDistance() {
+  _log('🔄 GPS: resetDistance()');
+  _totalDistance = 0.0;
+  _lastPosition = null;
+  _distanceStreamController.add(0.0);
+}
 }

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:delivery_app/features/delivery/services/logger.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:delivery_app/features/delivery/services/logger.dart';
 import 'package:delivery_app/features/delivery/providers/tab_provider.dart';
@@ -52,16 +51,9 @@ class OrderSummaryScreen extends ConsumerWidget {
     final totalAllDistance = shopDistance + totalPaidDistance;
 
     // ===== РАСЧЁТ РАСХОДОВ (из справочника) =====
-    // Стоимость бензина на 1 км = (расход на 100 км / 100) * цена за литр
     final fuelCostPerKm = (settings.fuelConsumption / 100) * settings.fuelPrice;
-    
-    // Расход на бензин = общий пробег * стоимость бензина на 1 км
     final totalFuelCost = totalAllDistance * fuelCostPerKm;
-    
-    // Расход на ремонт = общий пробег * стоимость ремонта на 1 км
     final totalRepairCost = totalAllDistance * settings.repairCost;
-    
-    // Общие расходы = бензин + ремонт
     final totalExpenses = totalFuelCost + totalRepairCost;
 
     // Рассчитываем стоимость каждой доставки
@@ -73,6 +65,12 @@ class OrderSummaryScreen extends ConsumerWidget {
 
     final totalCostFinal = shopCost + totalDeliveriesCost;
     final netProfit = totalCostFinal - totalExpenses;
+
+    logMessage('🟢 OrderSummaryScreen: отображение сводки');
+    logMessage('   totalAllDistance: $totalAllDistance');
+    logMessage('   totalExpenses: $totalExpenses');
+    logMessage('   totalCostFinal: $totalCostFinal');
+    logMessage('   netProfit: $netProfit');
 
     return Scaffold(
       appBar: AppBar(
@@ -299,6 +297,7 @@ class OrderSummaryScreen extends ConsumerWidget {
                     Expanded(
                       child: OutlinedButton(
                         onPressed: () {
+                          logMessage('🟢 Нажата кнопка "Добавить ещё доставку"');
                           Navigator.pop(context, true);
                         },
                         style: OutlinedButton.styleFrom(
@@ -322,6 +321,7 @@ class OrderSummaryScreen extends ConsumerWidget {
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
+                          logMessage('🟢 Нажата кнопка "Завершить заказ"');
                           Navigator.pop(context, false);
                         },
                         style: ElevatedButton.styleFrom(

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:delivery_app/features/delivery/services/logger.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:delivery_app/features/delivery/services/logger.dart';
 import 'package:delivery_app/features/delivery/providers/order_route_provider.dart';
@@ -37,7 +36,6 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   void initState() {
     super.initState();
     logMessage('🟢 OrderRouteScreen.initState()');
-    // Инициализируем сразу, без addPostFrameCallback
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initOrderRoute();
     });
@@ -152,6 +150,11 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
     final totalRepairCost = totalAllDistance * settings.repairCost;
     final totalExpenses = totalFuelCost + totalRepairCost;
 
+    logMessage('🟢 _showSummary: завершение заказа');
+    logMessage('   paidDistance: $totalAllDistance');
+    logMessage('   income: $totalCost');
+    logMessage('   expenses: $totalExpenses');
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -167,17 +170,25 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
     ).then((result) {
       _isSummaryShown = false;
       if (result == true) {
+        logMessage('🟢 Добавление ещё доставки');
         notifier.resetAfterSummary();
       } else {
+        logMessage('🟢 Завершение заказа');
         final shiftNotifier = ref.read(shiftProvider.notifier);
         final orderDuration = Duration(seconds: _calculateTotalTime(state));
+        
+        logMessage('   Вызов shiftNotifier.finishOrder()');
         shiftNotifier.finishOrder(
           paidDistance: totalAllDistance,
           income: totalCost,
           expenses: totalExpenses,
           orderDuration: orderDuration,
         );
+        
+        logMessage('   Вызов notifier.finishOrder()');
         notifier.finishOrder();
+        
+        logMessage('🟢 Возврат на главный экран');
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
     });
