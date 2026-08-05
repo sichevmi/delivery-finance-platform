@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:delivery_app/features/delivery/services/logger.dart';
 import 'package:dio/dio.dart';
 import 'package:delivery_app/core/services/storage_service.dart';
 import 'package:delivery_app/features/auth/models/user.dart';
@@ -72,15 +73,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
         '/api/v1/auth/login',
         data: {'email': email, 'password': password},
       );
-      print('🔐 Login response status: ${response.statusCode}');
-      print('🔐 Login response data: ${response.data}');
+      logMessage('🔐 Login response status: ${response.statusCode}');
+      logMessage('🔐 Login response data: ${response.data}');
 
       final access = response.data['access_token'];
       final refresh = response.data['refresh_token'];
       await storage.saveTokens(access, refresh);
 
       final userResponse = await dio.get('/api/v1/auth/hello');
-      print('👤 User response: ${userResponse.data}');
+      logMessage('👤 User response: ${userResponse.data}');
       
       dynamic userData;
       if (userResponse.data is Map && userResponse.data.containsKey('user')) {
@@ -99,7 +100,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         error: null,
       );
     } on DioException catch (e) {
-      print('❌ DioException: ${e.response?.statusCode} - ${e.response?.data}');
+      logMessage('❌ DioException: ${e.response?.statusCode} - ${e.response?.data}');
       final errorMsg = e.response?.data['detail'] ?? 
                        e.response?.data['message'] ?? 
                        'Ошибка входа';
@@ -110,7 +111,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       rethrow;
     } catch (e) {
-      print('❌ Unexpected error: $e');
+      logMessage('❌ Unexpected error: $e');
       state = state.copyWith(
         isLoading: false,
         isAuthenticated: false,
@@ -121,29 +122,29 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<bool> autoLogin() async {
-    print('🔄 autoLogin() started');
+    logMessage('🔄 autoLogin() started');
     state = state.copyWith(isLoading: true);
     
     try {
       final hasTokens = await storage.hasTokens();
-      print('🔄 hasTokens: $hasTokens');
+      logMessage('🔄 hasTokens: $hasTokens');
       
       if (!hasTokens) {
-        print('🔄 No tokens found');
+        logMessage('🔄 No tokens found');
         state = state.copyWith(isLoading: false, isAuthenticated: false);
         return false;
       }
 
       final refreshToken = await storage.getRefreshToken();
-      print('🔄 Refresh token: ${refreshToken != null ? refreshToken.substring(0, 20) + "..." : "null"}');
+      logMessage('🔄 Refresh token: ${refreshToken != null ? refreshToken.substring(0, 20) + "..." : "null"}');
       
       if (refreshToken == null || refreshToken.isEmpty) {
-        print('🔄 Refresh token is empty');
+        logMessage('🔄 Refresh token is empty');
         state = state.copyWith(isLoading: false, isAuthenticated: false);
         return false;
       }
 
-      print('🔄 Trying to refresh token...');
+      logMessage('🔄 Trying to refresh token...');
       try {
         final refreshResponse = await dio.post(
           '/api/v1/auth/refresh',
@@ -152,7 +153,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         
         final newAccessToken = refreshResponse.data['access_token'];
         await storage.updateAccessToken(newAccessToken);
-        print('🔄 Token refreshed successfully');
+        logMessage('🔄 Token refreshed successfully');
         
         final userResponse = await dio.get('/api/v1/auth/hello');
         dynamic userData;
@@ -171,10 +172,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
           isAuthenticated: true,
           error: null,
         );
-        print('🔄 Auto-login successful! User: ${user.email}');
+        logMessage('🔄 Auto-login successful! User: ${user.email}');
         return true;
       } on DioException catch (e) {
-        print('🔄 Refresh failed: ${e.response?.statusCode} - ${e.response?.data}');
+        logMessage('🔄 Refresh failed: ${e.response?.statusCode} - ${e.response?.data}');
         if (e.response?.statusCode == 401) {
           await storage.clearTokens();
           state = state.copyWith(
@@ -192,7 +193,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         return false;
       }
     } catch (e) {
-      print('🔄 Unexpected error in autoLogin: $e');
+      logMessage('🔄 Unexpected error in autoLogin: $e');
       state = state.copyWith(
         isLoading: false,
         isAuthenticated: false,
@@ -233,9 +234,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         '/api/v1/auth/logout',
         data: {'refresh_token': refreshToken},
       );
-      print('🔐 Logout успешно на сервере');
+      logMessage('🔐 Logout успешно на сервере');
     } catch (e) {
-      print('⚠️ Ошибка при выходе на сервере: $e');
+      logMessage('⚠️ Ошибка при выходе на сервере: $e');
     }
     // В любом случае очищаем локальные токены
     await storage.clearTokens();

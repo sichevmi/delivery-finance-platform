@@ -10,7 +10,7 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
-    print("❌ DATABASE_URL не задан")
+    logMessage("❌ DATABASE_URL не задан")
     sys.exit(1)
 
 # Очищаем
@@ -18,7 +18,7 @@ DATABASE_URL = DATABASE_URL.strip()
 if DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+pg8000://")
 
-print(f"🔗 Подключение: {DATABASE_URL}")
+logMessage(f"🔗 Подключение: {DATABASE_URL}")
 
 engine = create_engine(DATABASE_URL)
 
@@ -26,15 +26,15 @@ engine = create_engine(DATABASE_URL)
 try:
     with engine.connect() as conn:
         conn.execute(text("SELECT 1"))
-    print("✅ Подключение успешно")
+    logMessage("✅ Подключение успешно")
 except Exception as e:
-    print(f"❌ Ошибка подключения: {e}")
+    logMessage(f"❌ Ошибка подключения: {e}")
     sys.exit(1)
 
 # Создаём таблицы
-print("📦 Создание таблиц...")
+logMessage("📦 Создание таблиц...")
 Base.metadata.create_all(bind=engine)
-print("✅ Таблицы созданы (или уже существуют)")
+logMessage("✅ Таблицы созданы (или уже существуют)")
 
 # Показываем список таблиц
 with engine.connect() as conn:
@@ -42,4 +42,4 @@ with engine.connect() as conn:
         text("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
     )
     tables = [row[0] for row in result]
-    print(f"📋 Таблицы: {', '.join(tables)}")
+    logMessage(f"📋 Таблицы: {', '.join(tables)}")

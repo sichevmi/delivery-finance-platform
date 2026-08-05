@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:delivery_app/features/delivery/services/logger.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:delivery_app/features/delivery/services/logger.dart';
 import 'package:delivery_app/features/auth/providers/auth_provider.dart';
 import 'package:delivery_app/features/auth/ui/screens/register_screen.dart';
 import 'package:delivery_app/features/delivery/ui/screens/home_screen.dart';
@@ -41,24 +43,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && !_isAuthChecked) {
-      print('🔐 LoginScreen: приложение возобновлено, проверяем авторизацию...');
+      logMessage('🔐 LoginScreen: приложение возобновлено, проверяем авторизацию...');
       _checkAuth();
     }
   }
 
   Future<void> _checkAuth() async {
     if (_isAuthChecked) {
-      print('🔐 LoginScreen: проверка уже выполнена, пропускаем');
+      logMessage('🔐 LoginScreen: проверка уже выполнена, пропускаем');
       return;
     }
 
     _isAuthChecked = true;
     
-    print('🔐 LoginScreen: проверка авторизации...');
+    logMessage('🔐 LoginScreen: проверка авторизации...');
     final authState = ref.read(authProvider);
     
     if (authState.isAuthenticated && authState.user != null) {
-      print('🔐 LoginScreen: уже авторизован');
+      logMessage('🔐 LoginScreen: уже авторизован');
       if (mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           Navigator.pushReplacement(
@@ -70,14 +72,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
       return;
     }
 
-    print('🔐 LoginScreen: пробуем autoLogin...');
+    logMessage('🔐 LoginScreen: пробуем autoLogin...');
     try {
       final authNotifier = ref.read(authProvider.notifier);
       final isAuthenticated = await authNotifier.autoLogin();
-      print('🔐 LoginScreen: isAuthenticated = $isAuthenticated');
+      logMessage('🔐 LoginScreen: isAuthenticated = $isAuthenticated');
       
       if (mounted && isAuthenticated) {
-        print('🔐 LoginScreen: автологин успешен');
+        logMessage('🔐 LoginScreen: автологин успешен');
         WidgetsBinding.instance.addPostFrameCallback((_) {
           Navigator.pushReplacement(
             context,
@@ -87,7 +89,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
         return;
       }
     } catch (e) {
-      print('🔐 LoginScreen: ошибка: $e');
+      logMessage('🔐 LoginScreen: ошибка: $e');
     }
 
     if (mounted) {
@@ -269,7 +271,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                                   }
                                 }
                               } catch (e) {
-                                print('❌ Login error: $e');
+                                logMessage('❌ Login error: $e');
                               } finally {
                                 if (mounted) setState(() => _isLoading = false);
                               }

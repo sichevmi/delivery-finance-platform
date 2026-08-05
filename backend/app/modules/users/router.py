@@ -11,10 +11,10 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/register", response_model=schemas.UserInDB)
 def register(user_data: schemas.UserCreate, db: Session = Depends(get_db)):
     # Проверяем, существует ли пользователь
-    print(f"📩 Register called with: {user_data.email}")
+    logMessage(f"📩 Register called with: {user_data.email}")
     existing = services.get_user_by_email(db, user_data.email)
     if existing:
-        print(f"❌ User found: {existing.email}")
+        logMessage(f"❌ User found: {existing.email}")
         raise HTTPException(status_code=400, detail="Email already registered")
     user = services.create_user(db, user_data)
     return user

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:delivery_app/features/delivery/services/logger.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:delivery_app/features/delivery/models/delivery.dart';
 import 'package:delivery_app/features/delivery/services/gps_service.dart';
@@ -173,7 +174,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   bool _gpsTrackingStarted = false;
 
   OrderRouteNotifier(this.ref) : super(OrderRouteState.initial(coefficient: 1.0, segmentIndex: 0)) {
-    print('🟢 OrderRouteNotifier: создан');
+    logMessage('🟢 OrderRouteNotifier: создан');
   }
 
   void resetNavigationFlag() {
@@ -181,17 +182,17 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   }
 
   void init({required double coefficient, required int segmentIndex}) {
-    print('🟢 OrderRouteNotifier.init(): coefficient=$coefficient, segmentIndex=$segmentIndex');
+    logMessage('🟢 OrderRouteNotifier.init(): coefficient=$coefficient, segmentIndex=$segmentIndex');
     
     try {
       _gpsService = ref.read(gpsServiceProvider);
-      print('🟢 OrderRouteNotifier: получили GpsService instance ${_gpsService.hashCode}');
+      logMessage('🟢 OrderRouteNotifier: получили GpsService instance ${_gpsService.hashCode}');
     } catch (e) {
-      print('⚠️ Ошибка получения GpsService: $e');
+      logMessage('⚠️ Ошибка получения GpsService: $e');
       // Инициализируем GPS
       ref.read(gpsInitProvider);
       _gpsService = ref.read(gpsServiceProvider);
-      print('🟢 OrderRouteNotifier: GpsService создан после инициализации');
+      logMessage('🟢 OrderRouteNotifier: GpsService создан после инициализации');
     }
     
     _isGpsInitialized = true;
@@ -206,35 +207,35 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   }
 
   void _initGps() {
-    print('🟢 OrderRouteNotifier._initGps()');
+    logMessage('🟢 OrderRouteNotifier._initGps()');
     _gpsSubscription?.cancel();
     _gpsSubscription = null;
     _gpsSubscription = _gpsService.distanceStream.listen((distance) {
-      print('📍 OrderRoute GPS distance обновление: $distance');
+      logMessage('📍 OrderRoute GPS distance обновление: $distance');
       if (mounted) {
         state = state.copyWith(distance: distance);
       }
     });
-    print('🟢 OrderRouteNotifier._initGps() - подписка создана');
+    logMessage('🟢 OrderRouteNotifier._initGps() - подписка создана');
   }
 
   void _startGpsTracking() {
-    print('🟢 OrderRouteNotifier._startGpsTracking()');
+    logMessage('🟢 OrderRouteNotifier._startGpsTracking()');
     _gpsTrackingStarted = true;
     _gpsService.resetDistance();
     state = state.copyWith(distance: 0.0);
     state = state.copyWith(manualDistance: 0.0);
     
     if (state.useGps) {
-      print('🟢 ЗАПУСКАЕМ GPS трекинг для сегмента ${state.currentSegment}');
+      logMessage('🟢 ЗАПУСКАЕМ GPS трекинг для сегмента ${state.currentSegment}');
       _gpsService.startTracking();
     } else {
-      print('⚠️ GPS НЕ запущен: useGps=${state.useGps}');
+      logMessage('⚠️ GPS НЕ запущен: useGps=${state.useGps}');
     }
   }
 
   void _startSegment() {
-    print('🟢 OrderRouteNotifier._startSegment() segment: ${state.currentSegment}');
+    logMessage('🟢 OrderRouteNotifier._startSegment() segment: ${state.currentSegment}');
     
     state = state.copyWith(
       segmentStartTime: DateTime.now(),
@@ -248,7 +249,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     
     // Сбрасываем расстояние для нового сегмента
     // НО не останавливаем GPS!
-    print('🟢 Сброс расстояния для нового сегмента ${state.currentSegment}');
+    logMessage('🟢 Сброс расстояния для нового сегмента ${state.currentSegment}');
     _gpsService.resetDistance();
     state = state.copyWith(distance: 0.0);
     state = state.copyWith(manualDistance: 0.0);
@@ -313,7 +314,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   void saveCurrentSegmentData() {
     final time = getSegmentTime();
     final distance = getDistance();
-    print('📊 Сохраняем сегмент ${state.currentSegment}: time=$time сек, distance=$distance км');
+    logMessage('📊 Сохраняем сегмент ${state.currentSegment}: time=$time сек, distance=$distance км');
     switch (state.currentSegment) {
       case 0:
         state = state.copyWith(timeToShop: time, distanceToShop: distance);
@@ -331,7 +332,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   }
 
   Future<void> handleMainAction() async {
-    print('🟢 handleMainAction() сегмент ${state.currentSegment}');
+    logMessage('🟢 handleMainAction() сегмент ${state.currentSegment}');
     finishSegment();
     saveCurrentSegmentData();
 
@@ -375,7 +376,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   Future<Position?> _getCurrentPosition() async {
     try {
       if (!_isGpsInitialized || _gpsService == null) {
-        print('⚠️ GpsService не инициализирован, создаём...');
+        logMessage('⚠️ GpsService не инициализирован, создаём...');
         _gpsService = ref.read(gpsServiceProvider);
         _isGpsInitialized = true;
         _initGps();
@@ -390,16 +391,16 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
       ).timeout(
         const Duration(seconds: 15),
         onTimeout: () {
-          print('⏰ Таймаут получения позиции');
+          logMessage('⏰ Таймаут получения позиции');
           throw TimeoutException('Превышено время ожидания позиции');
         },
       );
     } on TimeoutException catch (e) {
-      print('⏰ Таймаут: $e');
+      logMessage('⏰ Таймаут: $e');
       _gpsService?.addLog('⏰ Таймаут получения позиции');
       return null;
     } catch (e) {
-      print('❌ Ошибка получения позиции: $e');
+      logMessage('❌ Ошибка получения позиции: $e');
       _gpsService?.addLog('❌ Ошибка получения позиции: $e');
       return null;
     }
@@ -459,7 +460,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
 
   void finishOrder() {
     if (!mounted) return;
-    print('🛑 finishOrder() - останавливаем GPS');
+    logMessage('🛑 finishOrder() - останавливаем GPS');
     _gpsService.stopTracking();
     _gpsSubscription?.cancel();
     _gpsSubscription = null;
@@ -498,7 +499,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
 
   @override
   void dispose() {
-    print('🛑 OrderRouteNotifier.dispose()');
+    logMessage('🛑 OrderRouteNotifier.dispose()');
     _gpsSubscription?.cancel();
     _gpsService.stopTracking();
     super.dispose();

@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 url = os.getenv("DATABASE_URL")
-print("Connecting to:", url)
+logMessage("Connecting to:", url)
 
 # Попробуем подключиться вручную
 try:
@@ -16,7 +16,7 @@ try:
         password="postgres",
         database="delivery",
     )
-    print("✅ Подключение успешно!")
+    logMessage("✅ Подключение успешно!")
     conn.close()
 except Exception as e:
-    print("❌ Ошибка:", e)
+    logMessage("❌ Ошибка:", e)

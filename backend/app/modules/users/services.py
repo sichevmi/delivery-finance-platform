@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 def get_user_by_email(db: Session, email: str) -> User | None:
     user = db.query(User).filter(User.email == email).first()
-    print(f"🔍 Checking email {email}, found: {user}")
+    logMessage(f"🔍 Checking email {email}, found: {user}")
     return user
 
 

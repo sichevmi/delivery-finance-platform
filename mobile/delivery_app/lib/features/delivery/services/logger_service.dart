@@ -23,7 +23,6 @@ class LoggerService {
     
     try {
       if (kIsWeb) {
-        // Для веба - просто храним в памяти
         _isInitialized = true;
         _webLogs.add('=' * 80);
         _webLogs.add('📱 Логи приложения FinFlow Delivery (Web)');
@@ -34,7 +33,6 @@ class LoggerService {
         return;
       }
 
-      // Для мобильных платформ - пишем в файл
       final directory = await getApplicationDocumentsDirectory();
       final logDir = Directory('${directory.path}/logs');
       if (!await logDir.exists()) {
@@ -58,11 +56,11 @@ class LoggerService {
       _flushBuffer();
     } catch (e) {
       print('❌ Ошибка инициализации логгера: $e');
-      // Даже если ошибка - помечаем как инициализированный
       _isInitialized = true;
     }
   }
 
+  // Метод для логирования
   void log(dynamic message) {
     // Выводим в консоль
     print(message);
@@ -105,9 +103,7 @@ class LoggerService {
   }
 
   Future<String?> getLogFilePath() async {
-    if (kIsWeb) {
-      return null; // На вебе нет файла
-    }
+    if (kIsWeb) return null;
     if (_logFile == null) return null;
     return _logFile!.path;
   }
@@ -127,9 +123,7 @@ class LoggerService {
   }
 
   Future<List<File>> getLogFiles() async {
-    if (kIsWeb) {
-      return [];
-    }
+    if (kIsWeb) return [];
     try {
       final directory = await getApplicationDocumentsDirectory();
       final logDir = Directory('${directory.path}/logs');

@@ -1,5 +1,6 @@
 // lib/features/delivery/providers/shift_provider.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:delivery_app/features/delivery/services/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 import 'package:delivery_app/features/delivery/services/gps_service.dart';
@@ -154,7 +155,7 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _gpsService = _ref.read(gpsServiceInstanceProvider);
       if (_gpsService != null && state.isActive) {
-        print('🟢 ShiftNotifier: GPS сервис получен, смена активна');
+        logMessage('🟢 ShiftNotifier: GPS сервис получен, смена активна');
         _gpsService!.startTracking();
       }
     });
@@ -252,16 +253,16 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
       _gpsService = _ref.read(gpsServiceInstanceProvider);
     }
     if (_gpsService != null) {
-      print('🟢 Запускаем GPS трекинг (смена активна)');
+      logMessage('🟢 Запускаем GPS трекинг (смена активна)');
       _gpsService!.startTracking();
     } else {
-      print('⚠️ GpsService не найден');
+      logMessage('⚠️ GpsService не найден');
     }
   }
 
   void _stopGpsTracking() {
     if (_gpsService != null) {
-      print('🛑 Останавливаем GPS трекинг (смена не активна)');
+      logMessage('🛑 Останавливаем GPS трекинг (смена не активна)');
       _gpsService!.stopTracking();
     }
   }

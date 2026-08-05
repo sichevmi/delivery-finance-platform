@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:delivery_app/features/delivery/services/logger.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:html' as html;
 
 class PermissionService {
   static Future<bool> requestLocationPermission(BuildContext context) async {
-    print('🔵 PermissionService: requestLocationPermission called');
+    logMessage('🔵 PermissionService: requestLocationPermission called');
 
     // ===== ВЕБ-ВЕРСИЯ =====
     if (const bool.fromEnvironment('dart.library.html')) {
@@ -24,7 +25,7 @@ class PermissionService {
       if (permissions != null) {
         try {
           final permission = await permissions.query({'name': 'geolocation'});
-          print('🔵 Web permission state: ${permission.state}');
+          logMessage('🔵 Web permission state: ${permission.state}');
 
           if (permission.state == 'granted') {
             return true;
@@ -36,7 +37,7 @@ class PermissionService {
               await html.window.navigator.geolocation.getCurrentPosition();
               return true;
             } catch (e) {
-              print('❌ Web geolocation error: $e');
+              logMessage('❌ Web geolocation error: $e');
               return false;
             }
           }
@@ -46,7 +47,7 @@ class PermissionService {
             return false;
           }
         } catch (e) {
-          print('❌ Permissions API error: $e');
+          logMessage('❌ Permissions API error: $e');
           // Если ошибка – пробуем напрямую запросить
         }
       }
@@ -59,7 +60,7 @@ class PermissionService {
         return false;
       }
     } catch (e) {
-      print('❌ Web permission error: $e');
+      logMessage('❌ Web permission error: $e');
       return false;
     }
   }
@@ -108,7 +109,7 @@ class PermissionService {
   // ===== NATIVE =====
   static Future<bool> _requestNativePermission(BuildContext context) async {
     var status = await Permission.location.status;
-    print('🔵 PermissionService: current status = $status');
+    logMessage('🔵 PermissionService: current status = $status');
 
     if (status.isGranted) {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();

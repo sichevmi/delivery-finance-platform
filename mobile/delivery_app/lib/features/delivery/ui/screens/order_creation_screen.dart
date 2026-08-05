@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:delivery_app/features/delivery/services/logger.dart';
 import 'order_route_screen.dart';
 
 class OrderCreationScreen extends StatefulWidget {
@@ -258,7 +259,7 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
       ? double.tryParse(_customCoefficientController.text) ?? 1.0
       : _selectedCoefficient;
 
-  print('🟢 OrderCreationScreen: переход с coefficient=$coefficient, segmentIndex=0');
+  logMessage('🟢 OrderCreationScreen: переход с coefficient=$coefficient, segmentIndex=0');
   Navigator.push(
     context,
     MaterialPageRoute(

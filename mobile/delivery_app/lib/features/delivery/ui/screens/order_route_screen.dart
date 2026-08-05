@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:delivery_app/features/delivery/services/logger.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:delivery_app/features/delivery/services/logger.dart';
 import 'package:delivery_app/features/delivery/providers/order_route_provider.dart';
 import 'package:delivery_app/features/delivery/ui/widgets/segment_progress.dart';
 import 'package:delivery_app/features/delivery/ui/widgets/order_card.dart';
@@ -34,7 +36,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   @override
   void initState() {
     super.initState();
-    print('🟢 OrderRouteScreen.initState()');
+    logMessage('🟢 OrderRouteScreen.initState()');
     // Инициализируем сразу, без addPostFrameCallback
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initOrderRoute();
@@ -42,7 +44,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   }
 
   void _initOrderRoute() {
-    print('🟢 OrderRouteScreen._initOrderRoute()');
+    logMessage('🟢 OrderRouteScreen._initOrderRoute()');
     final notifier = ref.read(orderRouteProvider.notifier);
     notifier.init(
       coefficient: widget.coefficient,

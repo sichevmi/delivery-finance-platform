@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:delivery_app/features/delivery/services/logger.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -62,7 +63,7 @@ class GpsService {
   void _log(String message) {
     final timestamp = DateTime.now().toIso8601String();
     _logBuffer += '[$timestamp] $message\n';
-    print(message);
+    logMessage(message);
   }
 
   Future<void> _saveLogToFile() async {
@@ -73,7 +74,7 @@ class GpsService {
       await file.writeAsString(_logBuffer);
       _log('📁 Log saved to: ${file.path}');
     } catch (e) {
-      print('❌ Failed to save log: $e');
+      logMessage('❌ Failed to save log: $e');
     }
   }
 
@@ -170,7 +171,7 @@ class GpsService {
 
   void stopTracking() {
     _log('🛑 Stop');
-    print('🔴 stopTracking() called from: ${StackTrace.current}');
+    logMessage('🔴 stopTracking() called from: ${StackTrace.current}');
     _isTracking = false;
     _isPaused = false;
     _positionSubscription?.cancel();

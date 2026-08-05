@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:delivery_app/features/delivery/services/logger.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:delivery_app/features/delivery/services/logger.dart';
 import 'package:delivery_app/core/theme/app_theme.dart';
 import 'package:delivery_app/features/auth/ui/screens/login_screen.dart';
 import 'package:delivery_app/features/delivery/ui/screens/home_screen.dart';
 import 'package:delivery_app/features/delivery/services/permission_service.dart';
 import 'package:delivery_app/features/auth/providers/auth_provider.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
-import 'package:delivery_app/features/delivery/services/logger_service.dart';
+import 'package:delivery_app/features/delivery/services/logger.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  final logger = LoggerService();
-  await logger.init();
+  // Инициализируем логгер
+  await initLogger();
+  logMessage('🚀 Приложение запущено');
   
   runApp(const ProviderScope(child: DeliveryApp()));
 }
@@ -36,11 +39,10 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
   }
 
   Future<void> _initializeApp() async {
-    final logger = LoggerService();
-    logger.log('🔐 DeliveryApp: инициализация...');
+    logMessage('🔐 DeliveryApp: инициализация...');
     
     final hasPermission = await PermissionService.requestLocationPermission(context);
-    logger.log('🔐 DeliveryApp: разрешение на геолокацию = $hasPermission');
+    logMessage('🔐 DeliveryApp: разрешение на геолокацию = $hasPermission');
     
     if (!hasPermission) {
       setState(() {
@@ -53,10 +55,10 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
     try {
       final authNotifier = ref.read(authProvider.notifier);
       final isAuthenticated = await authNotifier.autoLogin();
-      logger.log('🔐 DeliveryApp: isAuthenticated = $isAuthenticated');
+      logMessage('🔐 DeliveryApp: isAuthenticated = $isAuthenticated');
       
       ref.read(gpsInitProvider);
-      logger.log('🟢 GPS провайдер инициализирован');
+      logMessage('🟢 GPS провайдер инициализирован');
       
       setState(() {
         _hasPermission = true;
@@ -64,7 +66,7 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
         _isLoading = false;
       });
     } catch (e) {
-      logger.log('🔐 DeliveryApp: ошибка: $e');
+      logMessage('🔐 DeliveryApp: ошибка: $e');
       setState(() {
         _hasPermission = true;
         _isAuthenticated = false;

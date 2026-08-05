@@ -1,6 +1,8 @@
 // lib/features/delivery/providers/shift_provider.dart
 import 'package:flutter/material.dart';
+import 'package:delivery_app/features/delivery/services/logger.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:delivery_app/features/delivery/services/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 import 'package:delivery_app/features/delivery/services/gps_service.dart';
@@ -243,7 +245,7 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     try {
       return _ref.read(gpsServiceProvider);
     } catch (e) {
-      print('⚠️ Не удалось получить GPS сервис: $e');
+      logMessage('⚠️ Не удалось получить GPS сервис: $e');
       return null;
     }
   }
@@ -251,17 +253,17 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   void _startGpsTracking() {
     final gpsService = _getGpsService();
     if (gpsService != null) {
-      print('🟢 Запускаем GPS трекинг (смена активна, isOnOrder=${state.isOnOrder})');
+      logMessage('🟢 Запускаем GPS трекинг (смена активна, isOnOrder=${state.isOnOrder})');
       gpsService.startTracking();
     } else {
-      print('⚠️ GpsService не найден');
+      logMessage('⚠️ GpsService не найден');
     }
   }
 
   void _stopGpsTracking() {
     final gpsService = _getGpsService();
     if (gpsService != null) {
-      print('🛑 Останавливаем GPS трекинг (смена не активна)');
+      logMessage('🛑 Останавливаем GPS трекинг (смена не активна)');
       gpsService.stopTracking();
     }
   }
@@ -357,7 +359,7 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   }
 
   void addIdleDistance(double distance) {
-    print('📊 addIdleDistance вызван: distance=$distance, isActive=${state.isActive}, isOnOrder=${state.isOnOrder}');
+    logMessage('📊 addIdleDistance вызван: distance=$distance, isActive=${state.isActive}, isOnOrder=${state.isOnOrder}');
     if (!state.isActive || state.isOnOrder || distance <= 0) return;
     state = state.copyWith(
       totalIdleDistance: state.totalIdleDistance + distance,
