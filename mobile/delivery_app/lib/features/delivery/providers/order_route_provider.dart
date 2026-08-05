@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:delivery_app/features/delivery/services/logger.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:delivery_app/features/delivery/services/logger.dart';
 import 'package:delivery_app/features/delivery/models/delivery.dart';
 import 'package:delivery_app/features/delivery/services/gps_service.dart';
 import 'package:delivery_app/features/delivery/services/geocoder_service.dart';
@@ -9,6 +9,7 @@ import 'package:delivery_app/features/delivery/providers/pricing_provider.dart';
 import 'package:delivery_app/features/delivery/providers/tab_provider.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 import 'package:delivery_app/features/delivery/providers/shift_provider.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;  // <-- ДОБАВИТЬ ЭТОТ ИМПОРТ
 
 final orderRouteProvider = StateNotifierProvider<OrderRouteNotifier, OrderRouteState>((ref) {
   return OrderRouteNotifier(ref);
