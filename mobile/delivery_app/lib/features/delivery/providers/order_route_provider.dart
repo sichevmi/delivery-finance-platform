@@ -189,7 +189,6 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
       logMessage('🟢 OrderRouteNotifier: получили GpsService instance ${_gpsService.hashCode}');
     } catch (e) {
       logMessage('⚠️ Ошибка получения GpsService: $e');
-      // Инициализируем GPS
       ref.read(gpsInitProvider);
       _gpsService = ref.read(gpsServiceProvider);
       logMessage('🟢 OrderRouteNotifier: GpsService создан после инициализации');
@@ -247,8 +246,6 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
       shouldNavigateToHome: false,
     );
     
-    // Сбрасываем расстояние для нового сегмента
-    // НО не останавливаем GPS!
     logMessage('🟢 Сброс расстояния для нового сегмента ${state.currentSegment}');
     _gpsService.resetDistance();
     state = state.copyWith(distance: 0.0);
@@ -375,11 +372,16 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
 
   Future<Position?> _getCurrentPosition() async {
     try {
-      if (!_isGpsInitialized || _gpsService == null) {
-        logMessage('⚠️ GpsService не инициализирован, создаём...');
-        _gpsService = ref.read(gpsServiceProvider);
-        _isGpsInitialized = true;
-        _initGps();
+      if (kIsWeb) {
+        return await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.bestForNavigation,
+        ).timeout(
+          const Duration(seconds: 15),
+          onTimeout: () {
+            logMessage('⏰ Таймаут получения позиции на вебе');
+            throw TimeoutException('Превышено время ожидания позиции');
+          },
+        );
       }
       
       final lastPosition = await Geolocator.getLastKnownPosition();
@@ -395,13 +397,8 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
           throw TimeoutException('Превышено время ожидания позиции');
         },
       );
-    } on TimeoutException catch (e) {
-      logMessage('⏰ Таймаут: $e');
-      _gpsService?.addLog('⏰ Таймаут получения позиции');
-      return null;
     } catch (e) {
       logMessage('❌ Ошибка получения позиции: $e');
-      _gpsService?.addLog('❌ Ошибка получения позиции: $e');
       return null;
     }
   }
@@ -458,14 +455,28 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     _startSegment();
   }
 
+  // ===== ИСПРАВЛЕННЫЙ finishOrder =====
   void finishOrder() {
     if (!mounted) return;
-    logMessage('🛑 finishOrder() - останавливаем GPS');
-    _gpsService.stopTracking();
+    logMessage('🟢 finishOrder() - завершаем заказ');
+    
+    // НЕ ОСТАНАВЛИВАЕМ GPS - он должен продолжать работать для холостого пробега
+    // _gpsService.stopTracking(); // <-- УДАЛЕНО
+    
+    // Сбрасываем расстояние
+    _gpsService.resetDistance();
+    state = state.copyWith(distance: 0.0);
+    state = state.copyWith(manualDistance: 0.0);
+    
+    // Отписываемся от стрима, но GPS продолжает работать
     _gpsSubscription?.cancel();
     _gpsSubscription = null;
     _gpsTrackingStarted = false;
+    
+    // Сбрасываем состояние
     state = OrderRouteState.initial(coefficient: state.coefficient, segmentIndex: 0);
+    
+    logMessage('🟢 finishOrder() - GPS продолжает работу для холостого пробега');
   }
 
   void resetToInitial() {
@@ -480,28 +491,41 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     );
   }
 
+  // ===== ИСПРАВЛЕННЫЙ cancelOrder =====
   void cancelOrder() {
     if (!mounted) return;
+    
+    logMessage('🟢 cancelOrder() - отмена заказа');
     
     final shiftNotifier = ref.read(shiftProvider.notifier);
     shiftNotifier.cancelOrder();
     
-    _gpsService.stopTracking();
+    // НЕ ОСТАНАВЛИВАЕМ GPS
+    // _gpsService.stopTracking(); // <-- УДАЛЕНО
+    
+    _gpsService.resetDistance();
+    state = state.copyWith(distance: 0.0);
+    state = state.copyWith(manualDistance: 0.0);
+    
     _gpsSubscription?.cancel();
     _gpsSubscription = null;
     _gpsTrackingStarted = false;
+    
     state = OrderRouteState.initial(
       coefficient: state.coefficient,
       segmentIndex: 0,
     );
     state = state.copyWith(shouldNavigateToHome: true);
+    
+    logMessage('🟢 cancelOrder() - GPS продолжает работу для холостого пробега');
   }
 
   @override
   void dispose() {
     logMessage('🛑 OrderRouteNotifier.dispose()');
     _gpsSubscription?.cancel();
-    _gpsService.stopTracking();
+    // НЕ останавливаем GPS, он нужен для холостого пробега
+    // _gpsService.stopTracking(); // <-- УДАЛЕНО
     super.dispose();
   }
 }
