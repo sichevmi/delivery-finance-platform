@@ -115,28 +115,34 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   }
 
   Future<void> saveSettings() async {
-    try {
-      state = state.copyWith(isLoading: true);
-      final db = _ref.read(appDatabaseProvider);
+  try {
+    logMessage('🟢 saveSettings() вызван', category: 'SETTINGS');
+    state = state.copyWith(isLoading: true);
+    final db = _ref.read(appDatabaseProvider);
 
-      final settingsCompanion = SettingsTableCompanion(
-        fuelConsumption: Value(state.fuelConsumption),
-        fuelPrice: Value(state.fuelPrice),
-        repairCost: Value(state.repairCost),
-        additionalCosts: Value(state.additionalCosts),
-        name: Value('Текущие настройки'),
-        isDefault: Value(true),
-        isActive: Value(true),
-        isSynced: Value(false),
-        updatedAt: Value(DateTime.now()),
-      );
+    logMessage('📝 Сохраняем настройки: ${state.fuelConsumption}, ${state.fuelPrice}', category: 'SETTINGS');
 
-      if (state.settingsId != null) {
-        await db.settingsDao.updateSettings(state.settingsId!, settingsCompanion);
-      } else {
-        final id = await db.settingsDao.insertSettings(settingsCompanion);
-        state = state.copyWith(settingsId: id);
-      }
+    final settingsCompanion = SettingsTableCompanion(
+      fuelConsumption: Value(state.fuelConsumption),
+      fuelPrice: Value(state.fuelPrice),
+      repairCost: Value(state.repairCost),
+      additionalCosts: Value(state.additionalCosts),
+      name: Value('Текущие настройки'),
+      isDefault: Value(true),
+      isActive: Value(true),
+      isSynced: Value(false),
+      updatedAt: Value(DateTime.now()),
+    );
+
+    if (state.settingsId != null) {
+      logMessage('🔄 Обновляем настройки (id=${state.settingsId})', category: 'SETTINGS');
+      await db.settingsDao.updateSettings(state.settingsId!, settingsCompanion);
+    } else {
+      logMessage('💾 Вставляем новые настройки', category: 'SETTINGS');
+      final id = await db.settingsDao.insertSettings(settingsCompanion);
+      state = state.copyWith(settingsId: id);
+      logMessage('✅ Настройки вставлены, id=$id', category: 'SETTINGS');
+    }
 
       final pricingCompanion = PricingTableCompanion(
         receivingFee: Value(state.receivingFee),
@@ -152,10 +158,14 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       );
 
       if (state.pricingId != null) {
+              logMessage('🔄 Обновляем настройки (id=${state.pricingId})', category: 'SETTINGS');
+
         await db.pricingDao.updatePricing(state.pricingId!, pricingCompanion);
       } else {
+        logMessage('💾 Вставляем новые настройки', category: 'SETTINGS');
         final id = await db.pricingDao.insertPricing(pricingCompanion);
         state = state.copyWith(pricingId: id);
+        logMessage('✅ Настройки вставлены, id=$id', category: 'SETTINGS');
       }
 
       state = state.copyWith(isSynced: false, isLoading: false);
