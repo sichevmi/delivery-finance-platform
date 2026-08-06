@@ -8,6 +8,7 @@ import 'tables/deliveries.dart';
 import 'tables/gps_points.dart';
 import 'tables/pricing.dart';
 import 'tables/settings.dart';
+import 'tables/x5_settings.dart';
 
 import 'dao/shift_dao.dart';
 import 'dao/order_dao.dart';
@@ -15,6 +16,7 @@ import 'dao/delivery_dao.dart';
 import 'dao/gps_point_dao.dart';
 import 'dao/pricing_dao.dart';
 import 'dao/settings_dao.dart';
+import 'dao/x5_settings_dao.dart';
 
 part 'app_database.g.dart';
 
@@ -22,6 +24,7 @@ part 'app_database.g.dart';
   tables: [
     PricingTable,
     SettingsTable,
+    X5SettingsTable,  
     ShiftTable,
     OrderTable,
     DeliveryTable,
@@ -52,6 +55,7 @@ class AppDatabase extends _$AppDatabase {
   GpsPointDao get gpsPointDao => GpsPointDao(this);
   PricingDao get pricingDao => PricingDao(this);
   SettingsDao get settingsDao => SettingsDao(this);
+  X5SettingsDao get x5SettingsDao => X5SettingsDao(this);
 
   Future<void> _createDefaultData() async {
     try {
@@ -80,9 +84,21 @@ class AppDatabase extends _$AppDatabase {
       );
       await settingsDao.insertSettings(settingsCompanion);
 
+      final x5SettingsCompanion = X5SettingsTableCompanion(
+        pickupPrice: const Value(250.0),
+        deliveryPrice: const Value(150.0),
+        perKmPrice: const Value(25.0),
+        perKgPrice: const Value(10.0),
+        isDefault: const Value(true),
+        isActive: const Value(true),
+        createdAt: Value(DateTime.now()),
+      );
+      await x5SettingsDao.insertX5Settings(x5SettingsCompanion);
+
       logMessage('✅ Дефолтные справочники созданы', category: 'DATABASE');
     } catch (e) {
       logMessage('⚠️ Ошибка создания дефолтных справочников: $e', category: 'DATABASE');
+      logMessage('⚠️ Ошибка создания дефолтных X5 настроек: $e', category: 'DATABASE');
     }
   }
 }

@@ -1309,6 +1309,516 @@ class SettingsTableCompanion extends UpdateCompanion<SettingsTableData> {
   }
 }
 
+class $X5SettingsTableTable extends X5SettingsTable
+    with TableInfo<$X5SettingsTableTable, X5SettingsTableData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $X5SettingsTableTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _pickupPriceMeta =
+      const VerificationMeta('pickupPrice');
+  @override
+  late final GeneratedColumn<double> pickupPrice = GeneratedColumn<double>(
+      'pickup_price', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(250.0));
+  static const VerificationMeta _deliveryPriceMeta =
+      const VerificationMeta('deliveryPrice');
+  @override
+  late final GeneratedColumn<double> deliveryPrice = GeneratedColumn<double>(
+      'delivery_price', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(150.0));
+  static const VerificationMeta _perKmPriceMeta =
+      const VerificationMeta('perKmPrice');
+  @override
+  late final GeneratedColumn<double> perKmPrice = GeneratedColumn<double>(
+      'per_km_price', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(25.0));
+  static const VerificationMeta _perKgPriceMeta =
+      const VerificationMeta('perKgPrice');
+  @override
+  late final GeneratedColumn<double> perKgPrice = GeneratedColumn<double>(
+      'per_kg_price', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(10.0));
+  static const VerificationMeta _isDefaultMeta =
+      const VerificationMeta('isDefault');
+  @override
+  late final GeneratedColumn<bool> isDefault = GeneratedColumn<bool>(
+      'is_default', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_default" IN (0, 1))'),
+      defaultValue: const Constant(true));
+  static const VerificationMeta _isActiveMeta =
+      const VerificationMeta('isActive');
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+      'is_active', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_active" IN (0, 1))'),
+      defaultValue: const Constant(true));
+  static const VerificationMeta _isSyncedMeta =
+      const VerificationMeta('isSynced');
+  @override
+  late final GeneratedColumn<bool> isSynced = GeneratedColumn<bool>(
+      'is_synced', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_synced" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        pickupPrice,
+        deliveryPrice,
+        perKmPrice,
+        perKgPrice,
+        isDefault,
+        isActive,
+        isSynced,
+        createdAt,
+        updatedAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'x5_settings_table';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<X5SettingsTableData> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('pickup_price')) {
+      context.handle(
+          _pickupPriceMeta,
+          pickupPrice.isAcceptableOrUnknown(
+              data['pickup_price']!, _pickupPriceMeta));
+    }
+    if (data.containsKey('delivery_price')) {
+      context.handle(
+          _deliveryPriceMeta,
+          deliveryPrice.isAcceptableOrUnknown(
+              data['delivery_price']!, _deliveryPriceMeta));
+    }
+    if (data.containsKey('per_km_price')) {
+      context.handle(
+          _perKmPriceMeta,
+          perKmPrice.isAcceptableOrUnknown(
+              data['per_km_price']!, _perKmPriceMeta));
+    }
+    if (data.containsKey('per_kg_price')) {
+      context.handle(
+          _perKgPriceMeta,
+          perKgPrice.isAcceptableOrUnknown(
+              data['per_kg_price']!, _perKgPriceMeta));
+    }
+    if (data.containsKey('is_default')) {
+      context.handle(_isDefaultMeta,
+          isDefault.isAcceptableOrUnknown(data['is_default']!, _isDefaultMeta));
+    }
+    if (data.containsKey('is_active')) {
+      context.handle(_isActiveMeta,
+          isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta));
+    }
+    if (data.containsKey('is_synced')) {
+      context.handle(_isSyncedMeta,
+          isSynced.isAcceptableOrUnknown(data['is_synced']!, _isSyncedMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  X5SettingsTableData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return X5SettingsTableData(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      pickupPrice: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}pickup_price'])!,
+      deliveryPrice: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}delivery_price'])!,
+      perKmPrice: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}per_km_price'])!,
+      perKgPrice: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}per_kg_price'])!,
+      isDefault: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_default'])!,
+      isActive: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_active'])!,
+      isSynced: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_synced'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at']),
+    );
+  }
+
+  @override
+  $X5SettingsTableTable createAlias(String alias) {
+    return $X5SettingsTableTable(attachedDatabase, alias);
+  }
+}
+
+class X5SettingsTableData extends DataClass
+    implements Insertable<X5SettingsTableData> {
+  final int id;
+  final double pickupPrice;
+  final double deliveryPrice;
+  final double perKmPrice;
+  final double perKgPrice;
+  final bool isDefault;
+  final bool isActive;
+  final bool isSynced;
+  final DateTime createdAt;
+  final DateTime? updatedAt;
+  const X5SettingsTableData(
+      {required this.id,
+      required this.pickupPrice,
+      required this.deliveryPrice,
+      required this.perKmPrice,
+      required this.perKgPrice,
+      required this.isDefault,
+      required this.isActive,
+      required this.isSynced,
+      required this.createdAt,
+      this.updatedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['pickup_price'] = Variable<double>(pickupPrice);
+    map['delivery_price'] = Variable<double>(deliveryPrice);
+    map['per_km_price'] = Variable<double>(perKmPrice);
+    map['per_kg_price'] = Variable<double>(perKgPrice);
+    map['is_default'] = Variable<bool>(isDefault);
+    map['is_active'] = Variable<bool>(isActive);
+    map['is_synced'] = Variable<bool>(isSynced);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    return map;
+  }
+
+  X5SettingsTableCompanion toCompanion(bool nullToAbsent) {
+    return X5SettingsTableCompanion(
+      id: Value(id),
+      pickupPrice: Value(pickupPrice),
+      deliveryPrice: Value(deliveryPrice),
+      perKmPrice: Value(perKmPrice),
+      perKgPrice: Value(perKgPrice),
+      isDefault: Value(isDefault),
+      isActive: Value(isActive),
+      isSynced: Value(isSynced),
+      createdAt: Value(createdAt),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+    );
+  }
+
+  factory X5SettingsTableData.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return X5SettingsTableData(
+      id: serializer.fromJson<int>(json['id']),
+      pickupPrice: serializer.fromJson<double>(json['pickupPrice']),
+      deliveryPrice: serializer.fromJson<double>(json['deliveryPrice']),
+      perKmPrice: serializer.fromJson<double>(json['perKmPrice']),
+      perKgPrice: serializer.fromJson<double>(json['perKgPrice']),
+      isDefault: serializer.fromJson<bool>(json['isDefault']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
+      isSynced: serializer.fromJson<bool>(json['isSynced']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'pickupPrice': serializer.toJson<double>(pickupPrice),
+      'deliveryPrice': serializer.toJson<double>(deliveryPrice),
+      'perKmPrice': serializer.toJson<double>(perKmPrice),
+      'perKgPrice': serializer.toJson<double>(perKgPrice),
+      'isDefault': serializer.toJson<bool>(isDefault),
+      'isActive': serializer.toJson<bool>(isActive),
+      'isSynced': serializer.toJson<bool>(isSynced),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+    };
+  }
+
+  X5SettingsTableData copyWith(
+          {int? id,
+          double? pickupPrice,
+          double? deliveryPrice,
+          double? perKmPrice,
+          double? perKgPrice,
+          bool? isDefault,
+          bool? isActive,
+          bool? isSynced,
+          DateTime? createdAt,
+          Value<DateTime?> updatedAt = const Value.absent()}) =>
+      X5SettingsTableData(
+        id: id ?? this.id,
+        pickupPrice: pickupPrice ?? this.pickupPrice,
+        deliveryPrice: deliveryPrice ?? this.deliveryPrice,
+        perKmPrice: perKmPrice ?? this.perKmPrice,
+        perKgPrice: perKgPrice ?? this.perKgPrice,
+        isDefault: isDefault ?? this.isDefault,
+        isActive: isActive ?? this.isActive,
+        isSynced: isSynced ?? this.isSynced,
+        createdAt: createdAt ?? this.createdAt,
+        updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+      );
+  X5SettingsTableData copyWithCompanion(X5SettingsTableCompanion data) {
+    return X5SettingsTableData(
+      id: data.id.present ? data.id.value : this.id,
+      pickupPrice:
+          data.pickupPrice.present ? data.pickupPrice.value : this.pickupPrice,
+      deliveryPrice: data.deliveryPrice.present
+          ? data.deliveryPrice.value
+          : this.deliveryPrice,
+      perKmPrice:
+          data.perKmPrice.present ? data.perKmPrice.value : this.perKmPrice,
+      perKgPrice:
+          data.perKgPrice.present ? data.perKgPrice.value : this.perKgPrice,
+      isDefault: data.isDefault.present ? data.isDefault.value : this.isDefault,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      isSynced: data.isSynced.present ? data.isSynced.value : this.isSynced,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('X5SettingsTableData(')
+          ..write('id: $id, ')
+          ..write('pickupPrice: $pickupPrice, ')
+          ..write('deliveryPrice: $deliveryPrice, ')
+          ..write('perKmPrice: $perKmPrice, ')
+          ..write('perKgPrice: $perKgPrice, ')
+          ..write('isDefault: $isDefault, ')
+          ..write('isActive: $isActive, ')
+          ..write('isSynced: $isSynced, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, pickupPrice, deliveryPrice, perKmPrice,
+      perKgPrice, isDefault, isActive, isSynced, createdAt, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is X5SettingsTableData &&
+          other.id == this.id &&
+          other.pickupPrice == this.pickupPrice &&
+          other.deliveryPrice == this.deliveryPrice &&
+          other.perKmPrice == this.perKmPrice &&
+          other.perKgPrice == this.perKgPrice &&
+          other.isDefault == this.isDefault &&
+          other.isActive == this.isActive &&
+          other.isSynced == this.isSynced &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class X5SettingsTableCompanion extends UpdateCompanion<X5SettingsTableData> {
+  final Value<int> id;
+  final Value<double> pickupPrice;
+  final Value<double> deliveryPrice;
+  final Value<double> perKmPrice;
+  final Value<double> perKgPrice;
+  final Value<bool> isDefault;
+  final Value<bool> isActive;
+  final Value<bool> isSynced;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> updatedAt;
+  const X5SettingsTableCompanion({
+    this.id = const Value.absent(),
+    this.pickupPrice = const Value.absent(),
+    this.deliveryPrice = const Value.absent(),
+    this.perKmPrice = const Value.absent(),
+    this.perKgPrice = const Value.absent(),
+    this.isDefault = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.isSynced = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  });
+  X5SettingsTableCompanion.insert({
+    this.id = const Value.absent(),
+    this.pickupPrice = const Value.absent(),
+    this.deliveryPrice = const Value.absent(),
+    this.perKmPrice = const Value.absent(),
+    this.perKgPrice = const Value.absent(),
+    this.isDefault = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.isSynced = const Value.absent(),
+    required DateTime createdAt,
+    this.updatedAt = const Value.absent(),
+  }) : createdAt = Value(createdAt);
+  static Insertable<X5SettingsTableData> custom({
+    Expression<int>? id,
+    Expression<double>? pickupPrice,
+    Expression<double>? deliveryPrice,
+    Expression<double>? perKmPrice,
+    Expression<double>? perKgPrice,
+    Expression<bool>? isDefault,
+    Expression<bool>? isActive,
+    Expression<bool>? isSynced,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (pickupPrice != null) 'pickup_price': pickupPrice,
+      if (deliveryPrice != null) 'delivery_price': deliveryPrice,
+      if (perKmPrice != null) 'per_km_price': perKmPrice,
+      if (perKgPrice != null) 'per_kg_price': perKgPrice,
+      if (isDefault != null) 'is_default': isDefault,
+      if (isActive != null) 'is_active': isActive,
+      if (isSynced != null) 'is_synced': isSynced,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+    });
+  }
+
+  X5SettingsTableCompanion copyWith(
+      {Value<int>? id,
+      Value<double>? pickupPrice,
+      Value<double>? deliveryPrice,
+      Value<double>? perKmPrice,
+      Value<double>? perKgPrice,
+      Value<bool>? isDefault,
+      Value<bool>? isActive,
+      Value<bool>? isSynced,
+      Value<DateTime>? createdAt,
+      Value<DateTime?>? updatedAt}) {
+    return X5SettingsTableCompanion(
+      id: id ?? this.id,
+      pickupPrice: pickupPrice ?? this.pickupPrice,
+      deliveryPrice: deliveryPrice ?? this.deliveryPrice,
+      perKmPrice: perKmPrice ?? this.perKmPrice,
+      perKgPrice: perKgPrice ?? this.perKgPrice,
+      isDefault: isDefault ?? this.isDefault,
+      isActive: isActive ?? this.isActive,
+      isSynced: isSynced ?? this.isSynced,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (pickupPrice.present) {
+      map['pickup_price'] = Variable<double>(pickupPrice.value);
+    }
+    if (deliveryPrice.present) {
+      map['delivery_price'] = Variable<double>(deliveryPrice.value);
+    }
+    if (perKmPrice.present) {
+      map['per_km_price'] = Variable<double>(perKmPrice.value);
+    }
+    if (perKgPrice.present) {
+      map['per_kg_price'] = Variable<double>(perKgPrice.value);
+    }
+    if (isDefault.present) {
+      map['is_default'] = Variable<bool>(isDefault.value);
+    }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    if (isSynced.present) {
+      map['is_synced'] = Variable<bool>(isSynced.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('X5SettingsTableCompanion(')
+          ..write('id: $id, ')
+          ..write('pickupPrice: $pickupPrice, ')
+          ..write('deliveryPrice: $deliveryPrice, ')
+          ..write('perKmPrice: $perKmPrice, ')
+          ..write('perKgPrice: $perKgPrice, ')
+          ..write('isDefault: $isDefault, ')
+          ..write('isActive: $isActive, ')
+          ..write('isSynced: $isSynced, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $ShiftTableTable extends ShiftTable
     with TableInfo<$ShiftTableTable, ShiftTableData> {
   @override
@@ -3844,6 +4354,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $PricingTableTable pricingTable = $PricingTableTable(this);
   late final $SettingsTableTable settingsTable = $SettingsTableTable(this);
+  late final $X5SettingsTableTable x5SettingsTable =
+      $X5SettingsTableTable(this);
   late final $ShiftTableTable shiftTable = $ShiftTableTable(this);
   late final $OrderTableTable orderTable = $OrderTableTable(this);
   late final $DeliveryTableTable deliveryTable = $DeliveryTableTable(this);
@@ -3855,6 +4367,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   List<DatabaseSchemaEntity> get allSchemaEntities => [
         pricingTable,
         settingsTable,
+        x5SettingsTable,
         shiftTable,
         orderTable,
         deliveryTable,
@@ -4457,6 +4970,250 @@ typedef $$SettingsTableTableProcessedTableManager = ProcessedTableManager<
       BaseReferences<_$AppDatabase, $SettingsTableTable, SettingsTableData>
     ),
     SettingsTableData,
+    PrefetchHooks Function()>;
+typedef $$X5SettingsTableTableCreateCompanionBuilder = X5SettingsTableCompanion
+    Function({
+  Value<int> id,
+  Value<double> pickupPrice,
+  Value<double> deliveryPrice,
+  Value<double> perKmPrice,
+  Value<double> perKgPrice,
+  Value<bool> isDefault,
+  Value<bool> isActive,
+  Value<bool> isSynced,
+  required DateTime createdAt,
+  Value<DateTime?> updatedAt,
+});
+typedef $$X5SettingsTableTableUpdateCompanionBuilder = X5SettingsTableCompanion
+    Function({
+  Value<int> id,
+  Value<double> pickupPrice,
+  Value<double> deliveryPrice,
+  Value<double> perKmPrice,
+  Value<double> perKgPrice,
+  Value<bool> isDefault,
+  Value<bool> isActive,
+  Value<bool> isSynced,
+  Value<DateTime> createdAt,
+  Value<DateTime?> updatedAt,
+});
+
+class $$X5SettingsTableTableFilterComposer
+    extends Composer<_$AppDatabase, $X5SettingsTableTable> {
+  $$X5SettingsTableTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get pickupPrice => $composableBuilder(
+      column: $table.pickupPrice, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get deliveryPrice => $composableBuilder(
+      column: $table.deliveryPrice, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get perKmPrice => $composableBuilder(
+      column: $table.perKmPrice, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get perKgPrice => $composableBuilder(
+      column: $table.perKgPrice, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isDefault => $composableBuilder(
+      column: $table.isDefault, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+      column: $table.isActive, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isSynced => $composableBuilder(
+      column: $table.isSynced, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$X5SettingsTableTableOrderingComposer
+    extends Composer<_$AppDatabase, $X5SettingsTableTable> {
+  $$X5SettingsTableTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get pickupPrice => $composableBuilder(
+      column: $table.pickupPrice, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get deliveryPrice => $composableBuilder(
+      column: $table.deliveryPrice,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get perKmPrice => $composableBuilder(
+      column: $table.perKmPrice, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get perKgPrice => $composableBuilder(
+      column: $table.perKgPrice, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isDefault => $composableBuilder(
+      column: $table.isDefault, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+      column: $table.isActive, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isSynced => $composableBuilder(
+      column: $table.isSynced, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$X5SettingsTableTableAnnotationComposer
+    extends Composer<_$AppDatabase, $X5SettingsTableTable> {
+  $$X5SettingsTableTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<double> get pickupPrice => $composableBuilder(
+      column: $table.pickupPrice, builder: (column) => column);
+
+  GeneratedColumn<double> get deliveryPrice => $composableBuilder(
+      column: $table.deliveryPrice, builder: (column) => column);
+
+  GeneratedColumn<double> get perKmPrice => $composableBuilder(
+      column: $table.perKmPrice, builder: (column) => column);
+
+  GeneratedColumn<double> get perKgPrice => $composableBuilder(
+      column: $table.perKgPrice, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDefault =>
+      $composableBuilder(column: $table.isDefault, builder: (column) => column);
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  GeneratedColumn<bool> get isSynced =>
+      $composableBuilder(column: $table.isSynced, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$X5SettingsTableTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $X5SettingsTableTable,
+    X5SettingsTableData,
+    $$X5SettingsTableTableFilterComposer,
+    $$X5SettingsTableTableOrderingComposer,
+    $$X5SettingsTableTableAnnotationComposer,
+    $$X5SettingsTableTableCreateCompanionBuilder,
+    $$X5SettingsTableTableUpdateCompanionBuilder,
+    (
+      X5SettingsTableData,
+      BaseReferences<_$AppDatabase, $X5SettingsTableTable, X5SettingsTableData>
+    ),
+    X5SettingsTableData,
+    PrefetchHooks Function()> {
+  $$X5SettingsTableTableTableManager(
+      _$AppDatabase db, $X5SettingsTableTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$X5SettingsTableTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$X5SettingsTableTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$X5SettingsTableTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<double> pickupPrice = const Value.absent(),
+            Value<double> deliveryPrice = const Value.absent(),
+            Value<double> perKmPrice = const Value.absent(),
+            Value<double> perKgPrice = const Value.absent(),
+            Value<bool> isDefault = const Value.absent(),
+            Value<bool> isActive = const Value.absent(),
+            Value<bool> isSynced = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<DateTime?> updatedAt = const Value.absent(),
+          }) =>
+              X5SettingsTableCompanion(
+            id: id,
+            pickupPrice: pickupPrice,
+            deliveryPrice: deliveryPrice,
+            perKmPrice: perKmPrice,
+            perKgPrice: perKgPrice,
+            isDefault: isDefault,
+            isActive: isActive,
+            isSynced: isSynced,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<double> pickupPrice = const Value.absent(),
+            Value<double> deliveryPrice = const Value.absent(),
+            Value<double> perKmPrice = const Value.absent(),
+            Value<double> perKgPrice = const Value.absent(),
+            Value<bool> isDefault = const Value.absent(),
+            Value<bool> isActive = const Value.absent(),
+            Value<bool> isSynced = const Value.absent(),
+            required DateTime createdAt,
+            Value<DateTime?> updatedAt = const Value.absent(),
+          }) =>
+              X5SettingsTableCompanion.insert(
+            id: id,
+            pickupPrice: pickupPrice,
+            deliveryPrice: deliveryPrice,
+            perKmPrice: perKmPrice,
+            perKgPrice: perKgPrice,
+            isDefault: isDefault,
+            isActive: isActive,
+            isSynced: isSynced,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$X5SettingsTableTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $X5SettingsTableTable,
+    X5SettingsTableData,
+    $$X5SettingsTableTableFilterComposer,
+    $$X5SettingsTableTableOrderingComposer,
+    $$X5SettingsTableTableAnnotationComposer,
+    $$X5SettingsTableTableCreateCompanionBuilder,
+    $$X5SettingsTableTableUpdateCompanionBuilder,
+    (
+      X5SettingsTableData,
+      BaseReferences<_$AppDatabase, $X5SettingsTableTable, X5SettingsTableData>
+    ),
+    X5SettingsTableData,
     PrefetchHooks Function()>;
 typedef $$ShiftTableTableCreateCompanionBuilder = ShiftTableCompanion Function({
   Value<int> id,
@@ -5628,6 +6385,8 @@ class $AppDatabaseManager {
       $$PricingTableTableTableManager(_db, _db.pricingTable);
   $$SettingsTableTableTableManager get settingsTable =>
       $$SettingsTableTableTableManager(_db, _db.settingsTable);
+  $$X5SettingsTableTableTableManager get x5SettingsTable =>
+      $$X5SettingsTableTableTableManager(_db, _db.x5SettingsTable);
   $$ShiftTableTableTableManager get shiftTable =>
       $$ShiftTableTableTableManager(_db, _db.shiftTable);
   $$OrderTableTableTableManager get orderTable =>
