@@ -8,6 +8,7 @@ class PricingDao {
 
   PricingDao(this.db);
 
+  // Вставка новой записи
   Future<int> insertPricing(PricingTableCompanion pricing) async {
     try {
       final id = await db.into(db.pricingTable).insert(pricing);
@@ -19,6 +20,7 @@ class PricingDao {
     }
   }
 
+  // Получение активного тарифа
   Future<PricingTableData?> getActivePricing() async {
     try {
       return await (db.select(db.pricingTable)
@@ -31,6 +33,7 @@ class PricingDao {
     }
   }
 
+  // Получение всех тарифов
   Future<List<PricingTableData>> getAllPricings() async {
     try {
       return await (db.select(db.pricingTable)
@@ -44,10 +47,16 @@ class PricingDao {
     }
   }
 
+  // Обновление тарифа через delete + insert
   Future<bool> updatePricing(int id, PricingTableCompanion pricing) async {
     try {
-      await db.update(db.pricingTable).replace(pricing);
-      logMessage('🔄 Тариф $id обновлён', category: 'DATABASE');
+      // Удаляем старую запись
+      await (db.delete(db.pricingTable)..where((t) => t.id.equals(id))).go();
+      
+      // Вставляем новую с тем же id
+      await db.into(db.pricingTable).insert(pricing);
+      
+      logMessage('🔄 Тариф $id обновлён (delete+insert)', category: 'DATABASE');
       return true;
     } catch (e) {
       logMessage('❌ Ошибка обновления тарифа $id: $e', category: 'DATABASE', level: LogLevel.error);
