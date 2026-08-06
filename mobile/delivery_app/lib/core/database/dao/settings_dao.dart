@@ -20,16 +20,29 @@ class SettingsDao {
   }
 
   Future<SettingsTableData?> getActiveSettings() async {
-    try {
-      return await (db.select(db.settingsTable)
-        ..where((t) => t.isDefault.equals(true))
-        ..where((t) => t.isActive.equals(true))
-        ..limit(1)).getSingleOrNull();
-    } catch (e) {
-      logMessage('❌ Ошибка получения настроек: $e', category: 'DATABASE', level: LogLevel.error);
-      return null;
+  try {
+    final result = await (db.select(db.settingsTable)
+      ..where((t) => t.isDefault.equals(true))
+      ..where((t) => t.isActive.equals(true))
+      ..limit(1)).getSingleOrNull();
+    
+    if (result != null) {
+      logMessage('📖 Загружены настройки из БД:', category: 'DATABASE');
+      logMessage('  id: ${result.id}', category: 'DATABASE');
+      logMessage('  fuelConsumption: ${result.fuelConsumption}', category: 'DATABASE');
+      logMessage('  fuelPrice: ${result.fuelPrice}', category: 'DATABASE');
+      logMessage('  repairCost: ${result.repairCost}', category: 'DATABASE');
+      logMessage('  additionalCosts: ${result.additionalCosts}', category: 'DATABASE');
+    } else {
+      logMessage('⚠️ Настройки не найдены в БД', category: 'DATABASE');
     }
+    
+    return result;
+  } catch (e) {
+    logMessage('❌ Ошибка получения настроек: $e', category: 'DATABASE', level: LogLevel.error);
+    return null;
   }
+}
 
   Future<List<SettingsTableData>> getAllSettings() async {
     try {
@@ -46,20 +59,21 @@ class SettingsDao {
 
   // Обновление настроек через update (сохраняя id)
   Future<bool> updateSettings(int id, SettingsTableCompanion settings) async {
-    try {
-      final count = await (db.update(db.settingsTable)
-        ..where((t) => t.id.equals(id))).write(settings);
-      
-      if (count > 0) {
-        logMessage('🔄 Настройки $id обновлены (update)', category: 'DATABASE');
-        return true;
-      } else {
-        logMessage('⚠️ Настройки $id не найдены для обновления', category: 'DATABASE');
-        return false;
-      }
-    } catch (e) {
-      logMessage('❌ Ошибка обновления настроек $id: $e', category: 'DATABASE', level: LogLevel.error);
-      return false;
-    }
+  try {
+    logMessage('🔍 Обновляем настройки id=$id:', category: 'DATABASE');
+    logMessage('  fuelConsumption: ${settings.fuelConsumption.value}', category: 'DATABASE');
+    logMessage('  fuelPrice: ${settings.fuelPrice.value}', category: 'DATABASE');
+    logMessage('  repairCost: ${settings.repairCost.value}', category: 'DATABASE');
+    logMessage('  additionalCosts: ${settings.additionalCosts.value}', category: 'DATABASE');
+
+    final count = await (db.update(db.settingsTable)
+      ..where((t) => t.id.equals(id))).write(settings);
+    
+    logMessage('🔄 Настройки $id обновлены, затронуто строк: $count', category: 'DATABASE');
+    return count > 0;
+  } catch (e) {
+    logMessage('❌ Ошибка обновления настроек: $e', category: 'DATABASE', level: LogLevel.error);
+    return false;
   }
+}
 }

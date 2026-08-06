@@ -58,6 +58,7 @@ class AppDatabase extends _$AppDatabase {
   X5SettingsDao get x5SettingsDao => X5SettingsDao(this);
 
   Future<void> _createDefaultData() async {
+    logMessage('📁 Путь к БД: ${db.path}', category: 'DATABASE');
     try {
       final pricingCompanion = PricingTableCompanion(
         receivingFee: Value(50.0),
