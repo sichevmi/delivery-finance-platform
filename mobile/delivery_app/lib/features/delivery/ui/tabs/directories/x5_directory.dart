@@ -17,6 +17,7 @@ class _X5DirectoryState extends ConsumerState<X5Directory> {
   late TextEditingController _perKgPriceController;
 
   bool _isSaving = false;
+  bool _isInitialized = false;
 
   @override
   void initState() {
@@ -36,16 +37,44 @@ class _X5DirectoryState extends ConsumerState<X5Directory> {
     super.dispose();
   }
 
+  /// Обновляем контроллеры из состояния (без триггера onChanged)
+  void _updateControllersFromState(X5SettingsState settings) {
+    final pickupText = settings.pickupPrice.toStringAsFixed(0);
+    if (_pickupPriceController.text != pickupText) {
+      _pickupPriceController.text = pickupText;
+    }
+
+    final deliveryText = settings.deliveryPrice.toStringAsFixed(0);
+    if (_deliveryPriceController.text != deliveryText) {
+      _deliveryPriceController.text = deliveryText;
+    }
+
+    final perKmText = settings.perKmPrice.toStringAsFixed(0);
+    if (_perKmPriceController.text != perKmText) {
+      _perKmPriceController.text = perKmText;
+    }
+
+    final perKgText = settings.perKgPrice.toStringAsFixed(0);
+    if (_perKgPriceController.text != perKgText) {
+      _perKgPriceController.text = perKgText;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(x5SettingsProvider);
     final notifier = ref.read(x5SettingsProvider.notifier);
 
-    // Обновляем контроллеры
-    _pickupPriceController.text = settings.pickupPrice.toStringAsFixed(0);
-    _deliveryPriceController.text = settings.deliveryPrice.toStringAsFixed(0);
-    _perKmPriceController.text = settings.perKmPrice.toStringAsFixed(0);
-    _perKgPriceController.text = settings.perKgPrice.toStringAsFixed(0);
+    // Обновляем контроллеры при загрузке данных
+    if (!_isInitialized) {
+      _isInitialized = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _updateControllersFromState(settings);
+      });
+    }
+
+    // Если данные изменились (например, после сохранения) — обновляем контроллеры
+    _updateControllersFromState(settings);
 
     final parameters = [
       X5Parameter(
@@ -251,7 +280,7 @@ class _X5DirectoryState extends ConsumerState<X5Directory> {
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
-              textAlign: TextAlign.right,  // <-- ПЕРЕМЕСТИЛИ СЮДА
+              textAlign: TextAlign.right,
               decoration: InputDecoration(
                 border: InputBorder.none,
                 isDense: true,
