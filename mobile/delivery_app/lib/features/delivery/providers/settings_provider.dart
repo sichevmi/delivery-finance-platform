@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:delivery_app/logger.dart';
 import 'package:delivery_app/core/database/database_provider.dart';
-import 'package:delivery_app/core/database/tables/pricing.dart';
 import 'package:delivery_app/core/database/tables/settings.dart';
 import 'package:delivery_app/core/database/app_database.dart';
 import 'package:drift/drift.dart';
@@ -82,6 +81,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       state = state.copyWith(isLoading: true);
       final db = _ref.read(appDatabaseProvider);
 
+      // Загружаем настройки
       final settings = await db.settingsDao.getActiveSettings();
       if (settings != null) {
         state = state.copyWith(
@@ -92,8 +92,13 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
           settingsId: settings.id,
           isSynced: settings.isSynced,
         );
+        logMessage('📁 Настройки загружены из БД (id=${settings.id})', category: 'SETTINGS');
+      } else {
+        logMessage('⚠️ Настройки не найдены, создаём дефолтные', category: 'SETTINGS');
+        await _createDefaultSettings();
       }
 
+      // Загружаем тарифы
       final pricing = await db.pricingDao.getActivePricing();
       if (pricing != null) {
         state = state.copyWith(
@@ -104,69 +109,122 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
           baseCoefficient: pricing.baseCoefficient,
           pricingId: pricing.id,
         );
+        logMessage('📁 Тарифы загружены из БД (id=${pricing.id})', category: 'SETTINGS');
+      } else {
+        logMessage('⚠️ Тарифы не найдены, создаём дефолтные', category: 'SETTINGS');
+        await _createDefaultPricing();
       }
 
       state = state.copyWith(isLoading: false);
-      logMessage('📁 Настройки загружены из БД', category: 'SETTINGS');
     } catch (e) {
       logMessage('❌ Ошибка загрузки настроек: $e', category: 'SETTINGS', level: LogLevel.error);
       state = state.copyWith(isLoading: false);
     }
   }
 
+  Future<void> _createDefaultSettings() async {
+    try {
+      final db = _ref.read(appDatabaseProvider);
+      final companion = SettingsTableCompanion(
+        fuelConsumption: const Value(10.0),
+        fuelPrice: const Value(50.0),
+        repairCost: const Value(2.0),
+        additionalCosts: const Value(0.0),
+        name: const Value('Стандартные настройки'),
+        isDefault: const Value(true),
+        isActive: const Value(true),
+        isSynced: const Value(false),
+        createdAt: Value(DateTime.now()),
+        updatedAt: Value(DateTime.now()),
+      );
+      final id = await db.settingsDao.insertSettings(companion);
+      state = state.copyWith(settingsId: id);
+      logMessage('💾 Дефолтные настройки созданы (id=$id)', category: 'SETTINGS');
+    } catch (e) {
+      logMessage('❌ Ошибка создания дефолтных настроек: $e', category: 'SETTINGS', level: LogLevel.error);
+    }
+  }
+
+  Future<void> _createDefaultPricing() async {
+    try {
+      final db = _ref.read(appDatabaseProvider);
+      final companion = PricingTableCompanion(
+        receivingFee: const Value(50.0),
+        deliveryFee: const Value(100.0),
+        pricePerKg: const Value(5.0),
+        pricePerKm: const Value(10.0),
+        baseCoefficient: const Value(1.0),
+        name: const Value('Стандартный тариф'),
+        isDefault: const Value(true),
+        isActive: const Value(true),
+        isSynced: const Value(false),
+        createdAt: Value(DateTime.now()),
+        updatedAt: Value(DateTime.now()),
+      );
+      final id = await db.pricingDao.insertPricing(companion);
+      state = state.copyWith(pricingId: id);
+      logMessage('💾 Дефолтный тариф создан (id=$id)', category: 'SETTINGS');
+    } catch (e) {
+      logMessage('❌ Ошибка создания дефолтного тарифа: $e', category: 'SETTINGS', level: LogLevel.error);
+    }
+  }
+
   Future<void> saveSettings() async {
     try {
-      logMessage('🟢 saveSettings() вызван', category: 'SETTINGS');
       state = state.copyWith(isLoading: true);
       final db = _ref.read(appDatabaseProvider);
 
-      // Создаём Companion для настроек со ВСЕМИ полями
+      // Сохраняем настройки
+      final existingSettings = await db.settingsDao.getActiveSettings();
       final settingsCompanion = SettingsTableCompanion(
+        id: existingSettings != null ? Value(existingSettings.id) : const Value.absent(),
         fuelConsumption: Value(state.fuelConsumption),
         fuelPrice: Value(state.fuelPrice),
         repairCost: Value(state.repairCost),
         additionalCosts: Value(state.additionalCosts),
-        name: Value('Текущие настройки'),
-        isDefault: Value(true),
-        isActive: Value(true),
-        isSynced: Value(false),
-        createdAt: Value(DateTime.now()),
+        name: const Value('Текущие настройки'),
+        isDefault: const Value(true),
+        isActive: const Value(true),
+        isSynced: const Value(false),
+        createdAt: existingSettings != null ? Value(existingSettings.createdAt) : Value(DateTime.now()),
         updatedAt: Value(DateTime.now()),
       );
 
-      if (state.settingsId != null) {
-        logMessage('🔄 Обновляем настройки (id=${state.settingsId})', category: 'SETTINGS');
-        await db.settingsDao.updateSettings(state.settingsId!, settingsCompanion);
+      if (existingSettings != null) {
+        await db.settingsDao.updateSettings(existingSettings.id, settingsCompanion);
+        state = state.copyWith(settingsId: existingSettings.id);
+        logMessage('🔄 Настройки обновлены (id=${existingSettings.id})', category: 'SETTINGS');
       } else {
-        logMessage('💾 Вставляем новые настройки', category: 'SETTINGS');
         final id = await db.settingsDao.insertSettings(settingsCompanion);
         state = state.copyWith(settingsId: id);
-        logMessage('✅ Настройки вставлены, id=$id', category: 'SETTINGS');
+        logMessage('💾 Настройки созданы (id=$id)', category: 'SETTINGS');
       }
 
-      // Создаём Companion для тарифов со ВСЕМИ полями
+      // Сохраняем тарифы
+      final existingPricing = await db.pricingDao.getActivePricing();
       final pricingCompanion = PricingTableCompanion(
+        id: existingPricing != null ? Value(existingPricing.id) : const Value.absent(),
         receivingFee: Value(state.receivingFee),
         deliveryFee: Value(state.deliveryFee),
         pricePerKg: Value(state.pricePerKg),
         pricePerKm: Value(state.pricePerKm),
         baseCoefficient: Value(state.baseCoefficient),
-        name: Value('Текущий тариф'),
-        isDefault: Value(true),
-        isActive: Value(true),
-        isSynced: Value(false),
-        createdAt: Value(DateTime.now()),
+        name: const Value('Текущий тариф'),
+        isDefault: const Value(true),
+        isActive: const Value(true),
+        isSynced: const Value(false),
+        createdAt: existingPricing != null ? Value(existingPricing.createdAt) : Value(DateTime.now()),
         updatedAt: Value(DateTime.now()),
       );
 
-      if (state.pricingId != null) {
-        logMessage('🔄 Обновляем тариф (id=${state.pricingId})', category: 'SETTINGS');
-        await db.pricingDao.updatePricing(state.pricingId!, pricingCompanion);
+      if (existingPricing != null) {
+        await db.pricingDao.updatePricing(existingPricing.id, pricingCompanion);
+        state = state.copyWith(pricingId: existingPricing.id);
+        logMessage('🔄 Тарифы обновлены (id=${existingPricing.id})', category: 'SETTINGS');
       } else {
-        logMessage('💾 Вставляем новый тариф', category: 'SETTINGS');
         final id = await db.pricingDao.insertPricing(pricingCompanion);
         state = state.copyWith(pricingId: id);
-        logMessage('✅ Тариф вставлен, id=$id', category: 'SETTINGS');
+        logMessage('💾 Тарифы созданы (id=$id)', category: 'SETTINGS');
       }
 
       state = state.copyWith(isSynced: false, isLoading: false);

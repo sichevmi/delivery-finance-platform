@@ -8,7 +8,6 @@ class SettingsDao {
 
   SettingsDao(this.db);
 
-  // Вставка новой записи
   Future<int> insertSettings(SettingsTableCompanion settings) async {
     try {
       final id = await db.into(db.settingsTable).insert(settings);
@@ -20,7 +19,6 @@ class SettingsDao {
     }
   }
 
-  // Получение активных настроек
   Future<SettingsTableData?> getActiveSettings() async {
     try {
       return await (db.select(db.settingsTable)
@@ -33,7 +31,6 @@ class SettingsDao {
     }
   }
 
-  // Получение всех настроек
   Future<List<SettingsTableData>> getAllSettings() async {
     try {
       return await (db.select(db.settingsTable)
@@ -47,17 +44,19 @@ class SettingsDao {
     }
   }
 
-  // Обновление настроек через delete + insert
+  // Обновление настроек через update (сохраняя id)
   Future<bool> updateSettings(int id, SettingsTableCompanion settings) async {
     try {
-      // Удаляем старую запись
-      await (db.delete(db.settingsTable)..where((t) => t.id.equals(id))).go();
+      final count = await (db.update(db.settingsTable)
+        ..where((t) => t.id.equals(id))).write(settings);
       
-      // Вставляем новую с тем же id
-      await db.into(db.settingsTable).insert(settings);
-      
-      logMessage('🔄 Настройки $id обновлены (delete+insert)', category: 'DATABASE');
-      return true;
+      if (count > 0) {
+        logMessage('🔄 Настройки $id обновлены (update)', category: 'DATABASE');
+        return true;
+      } else {
+        logMessage('⚠️ Настройки $id не найдены для обновления', category: 'DATABASE');
+        return false;
+      }
     } catch (e) {
       logMessage('❌ Ошибка обновления настроек $id: $e', category: 'DATABASE', level: LogLevel.error);
       return false;
