@@ -22,7 +22,6 @@ void main() async {
   // Инициализируем базу данных
   try {
     final db = container.read(appDatabaseProvider);
-    logMessage('📁 Путь к БД: ${db.path}', category: 'DATABASE');
     logMessage('📁 База данных инициализирована', category: 'DATABASE');
   } catch (e) {
     logMessage('⚠️ Ошибка инициализации БД: $e', category: 'DATABASE', level: LogLevel.error);

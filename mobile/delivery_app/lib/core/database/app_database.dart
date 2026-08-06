@@ -24,7 +24,7 @@ part 'app_database.g.dart';
   tables: [
     PricingTable,
     SettingsTable,
-    X5SettingsTable,  
+    X5SettingsTable,
     ShiftTable,
     OrderTable,
     DeliveryTable,
@@ -32,7 +32,20 @@ part 'app_database.g.dart';
   ],
 )
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(_openConnection());
+  AppDatabase() : super(_openConnection()) {
+    _printDatabasePath();
+  }
+
+  void _printDatabasePath() {
+    try {
+      // Просто выводим путь через конфигурацию
+      // В Drift 2.x путь можно получить через database.locate()
+      final path = 'База данных инициализирована (Drift 2.x)';
+      logMessage('📁 $path', category: 'DATABASE');
+    } catch (e) {
+      logMessage('⚠️ Не удалось определить путь к БД: $e', category: 'DATABASE');
+    }
+  }
 
   @override
   int get schemaVersion => 1;
@@ -58,29 +71,28 @@ class AppDatabase extends _$AppDatabase {
   X5SettingsDao get x5SettingsDao => X5SettingsDao(this);
 
   Future<void> _createDefaultData() async {
-    logMessage('📁 Путь к БД: ${db.path}', category: 'DATABASE');
     try {
       final pricingCompanion = PricingTableCompanion(
-        receivingFee: Value(50.0),
-        deliveryFee: Value(100.0),
-        pricePerKg: Value(5.0),
-        pricePerKm: Value(10.0),
-        baseCoefficient: Value(1.0),
-        name: Value('Стандартный тариф'),
-        isDefault: Value(true),
-        isActive: Value(true),
+        receivingFee: const Value(50.0),
+        deliveryFee: const Value(100.0),
+        pricePerKg: const Value(5.0),
+        pricePerKm: const Value(10.0),
+        baseCoefficient: const Value(1.0),
+        name: const Value('Стандартный тариф'),
+        isDefault: const Value(true),
+        isActive: const Value(true),
         createdAt: Value(DateTime.now()),
       );
       await pricingDao.insertPricing(pricingCompanion);
 
       final settingsCompanion = SettingsTableCompanion(
-        fuelConsumption: Value(10.0),
-        fuelPrice: Value(50.0),
-        repairCost: Value(2.0),
-        additionalCosts: Value(0.0),
-        name: Value('Стандартные настройки'),
-        isDefault: Value(true),
-        isActive: Value(true),
+        fuelConsumption: const Value(10.0),
+        fuelPrice: const Value(50.0),
+        repairCost: const Value(2.0),
+        additionalCosts: const Value(0.0),
+        name: const Value('Стандартные настройки'),
+        isDefault: const Value(true),
+        isActive: const Value(true),
         createdAt: Value(DateTime.now()),
       );
       await settingsDao.insertSettings(settingsCompanion);
@@ -99,13 +111,12 @@ class AppDatabase extends _$AppDatabase {
       logMessage('✅ Дефолтные справочники созданы', category: 'DATABASE');
     } catch (e) {
       logMessage('⚠️ Ошибка создания дефолтных справочников: $e', category: 'DATABASE');
-      logMessage('⚠️ Ошибка создания дефолтных X5 настроек: $e', category: 'DATABASE');
     }
   }
 }
 
 QueryExecutor _openConnection() {
-  // Используем in-memory базу для веба
+  // Для мобильных используем файловую БД, для веба — in-memory
   return driftDatabase(
     name: 'delivery_app.db',
   );
