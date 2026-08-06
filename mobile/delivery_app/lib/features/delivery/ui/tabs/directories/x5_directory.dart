@@ -250,8 +250,8 @@ class _X5DirectoryState extends ConsumerState<X5Directory> {
                 color: Color(0xFF6C63FF),
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                textAlign: TextAlign.right,
               ),
+              textAlign: TextAlign.right,  // <-- ПЕРЕМЕСТИЛИ СЮДА
               decoration: InputDecoration(
                 border: InputBorder.none,
                 isDense: true,
