@@ -57,7 +57,9 @@ class X5SettingsNotifier extends StateNotifier<X5SettingsState> {
       state = state.copyWith(isLoading: true);
       final db = _ref.read(appDatabaseProvider);
 
+      // Ищем активную запись (isDefault = true, isActive = true)
       final settings = await db.x5SettingsDao.getActiveX5Settings();
+      
       if (settings != null) {
         state = state.copyWith(
           pickupPrice: settings.pickupPrice,
@@ -67,13 +69,39 @@ class X5SettingsNotifier extends StateNotifier<X5SettingsState> {
           id: settings.id,
           isSynced: settings.isSynced,
         );
+        logMessage('📁 X5 настройки загружены из БД (id=${settings.id})', category: 'SETTINGS');
+      } else {
+        // Если нет активной записи — создаём дефолтную
+        logMessage('⚠️ X5 настройки не найдены, создаём дефолтные', category: 'SETTINGS');
+        await _createDefaultSettings();
       }
 
       state = state.copyWith(isLoading: false);
-      logMessage('📁 X5 настройки загружены из БД', category: 'SETTINGS');
     } catch (e) {
       logMessage('❌ Ошибка загрузки X5 настроек: $e', category: 'SETTINGS', level: LogLevel.error);
       state = state.copyWith(isLoading: false);
+    }
+  }
+
+  Future<void> _createDefaultSettings() async {
+    try {
+      final db = _ref.read(appDatabaseProvider);
+      final companion = X5SettingsTableCompanion(
+        pickupPrice: const Value(250.0),
+        deliveryPrice: const Value(150.0),
+        perKmPrice: const Value(25.0),
+        perKgPrice: const Value(10.0),
+        isDefault: const Value(true),
+        isActive: const Value(true),
+        isSynced: const Value(false),
+        createdAt: Value(DateTime.now()),
+        updatedAt: Value(DateTime.now()),
+      );
+      final id = await db.x5SettingsDao.insertX5Settings(companion);
+      state = state.copyWith(id: id);
+      logMessage('💾 Дефолтные X5 настройки созданы (id=$id)', category: 'SETTINGS');
+    } catch (e) {
+      logMessage('❌ Ошибка создания дефолтных X5 настроек: $e', category: 'SETTINGS', level: LogLevel.error);
     }
   }
 
@@ -82,23 +110,32 @@ class X5SettingsNotifier extends StateNotifier<X5SettingsState> {
       state = state.copyWith(isLoading: true);
       final db = _ref.read(appDatabaseProvider);
 
+      // Получаем текущую запись, чтобы сохранить id
+      final existing = await db.x5SettingsDao.getActiveX5Settings();
+      
+      // Создаём companion с сохранением id
       final companion = X5SettingsTableCompanion(
+        id: existing != null ? Value(existing.id) : const Value.absent(),
         pickupPrice: Value(state.pickupPrice),
         deliveryPrice: Value(state.deliveryPrice),
         perKmPrice: Value(state.perKmPrice),
         perKgPrice: Value(state.perKgPrice),
-        isDefault: Value(true),
-        isActive: Value(true),
-        isSynced: Value(false),
-        createdAt: Value(DateTime.now()),
+        isDefault: const Value(true),
+        isActive: const Value(true),
+        isSynced: const Value(false),
+        createdAt: existing != null ? Value(existing.createdAt) : Value(DateTime.now()),
         updatedAt: Value(DateTime.now()),
       );
 
-      if (state.id != null) {
-        await db.x5SettingsDao.updateX5Settings(state.id!, companion);
+      if (existing != null) {
+        // Используем update вместо delete+insert, чтобы сохранить id
+        await db.x5SettingsDao.updateX5Settings(existing.id, companion);
+        state = state.copyWith(id: existing.id);
+        logMessage('🔄 X5 настройки обновлены (id=${existing.id})', category: 'SETTINGS');
       } else {
         final id = await db.x5SettingsDao.insertX5Settings(companion);
         state = state.copyWith(id: id);
+        logMessage('💾 X5 настройки созданы (id=$id)', category: 'SETTINGS');
       }
 
       state = state.copyWith(isSynced: false, isLoading: false);

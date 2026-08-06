@@ -33,10 +33,17 @@ class X5SettingsDao {
 
   Future<bool> updateX5Settings(int id, X5SettingsTableCompanion settings) async {
     try {
-      await (db.delete(db.x5SettingsTable)..where((t) => t.id.equals(id))).go();
-      await db.into(db.x5SettingsTable).insert(settings);
-      logMessage('🔄 X5 настройки $id обновлены (delete+insert)', category: 'DATABASE');
-      return true;
+      // Используем update вместо delete+insert
+      final count = await (db.update(db.x5SettingsTable)
+        ..where((t) => t.id.equals(id))).write(settings);
+      
+      if (count > 0) {
+        logMessage('🔄 X5 настройки $id обновлены (update)', category: 'DATABASE');
+        return true;
+      } else {
+        logMessage('⚠️ X5 настройки $id не найдены для обновления', category: 'DATABASE');
+        return false;
+      }
     } catch (e) {
       logMessage('❌ Ошибка обновления X5 настроек $id: $e', category: 'DATABASE', level: LogLevel.error);
       return false;
