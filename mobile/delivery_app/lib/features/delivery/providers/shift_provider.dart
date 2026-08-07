@@ -206,14 +206,13 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     }
   }
 
-  // ===== СОХРАНЕНИЕ В БД (через ShiftDao) =====
+  // ===== СОХРАНЕНИЕ В БД =====
 
   Future<void> _saveShiftToDatabase() async {
     try {
       final db = _ref.read(appDatabaseProvider);
       
       if (state.localShiftId != null) {
-        // Обновляем существующую смену
         final success = await db.shiftDao.updateShift(
           state.localShiftId!,
           startTime: state.shiftStartTime?.toIso8601String() ?? DateTime.now().toIso8601String(),
@@ -231,7 +230,6 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
           logMessage('🔄 Смена ${state.localShiftId} обновлена в БД', category: 'SHIFT');
         }
       } else {
-        // Создаём новую смену
         final id = await db.shiftDao.insertShift(
           startTime: state.shiftStartTime?.toIso8601String() ?? DateTime.now().toIso8601String(),
           endTime: state.shiftEndTime?.toIso8601String(),
@@ -382,12 +380,10 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   void startShift() async {
     if (state.isActive) return;
     
-    // Проверяем, есть ли активная смена в БД
     final db = _ref.read(appDatabaseProvider);
     final existingShift = await db.shiftDao.getActiveShift();
     
     if (existingShift != null) {
-      // Если есть активная смена — восстанавливаем её
       logMessage('⚠️ Найдена активная смена в БД (id=${existingShift.id}), восстанавливаем', category: 'SHIFT');
       state = state.copyWith(
         localShiftId: existingShift.id,
@@ -408,7 +404,6 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
       return;
     }
     
-    // Если активной смены нет — создаём новую
     final now = DateTime.now();
     state = state.copyWith(
       isActive: true,
@@ -513,13 +508,29 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   }
 
   void updatePaidDistance(double distance) {
-    if (!state.isActive || !state.isOnOrder || distance <= 0) return;
-    logMessage('⚠️ updatePaidDistance вызван, но платный пробег добавляется только через finishOrder', category: 'SHIFT');
+    // Этот метод больше не используется — платный пробег добавляется только через finishOrder
   }
 
+  // ===== ТАЙМЕР =====
+  
   void tick() {
     if (!state.isActive) return;
-    state = state.copyWith(lastTick: DateTime.now().millisecondsSinceEpoch);
+    
+    final now = DateTime.now();
+    
+    // Обновляем накопленное время работы
+    final currentWork = state.totalWorkTime + now.difference(state.shiftStartTime!);
+    final currentIdle = state.totalIdleTime + state.currentIdlePeriod;
+    
+    state = state.copyWith(
+      totalWorkTime: currentWork,
+      totalIdleTime: currentIdle,
+      shiftStartTime: now, // сбрасываем, чтобы не считать дважды
+      lastTick: now.millisecondsSinceEpoch,
+    );
+    
+    // Сохраняем состояние (но не каждый тик в БД, чтобы не перегружать)
+    _saveState();
   }
 
   void resetDay() {
