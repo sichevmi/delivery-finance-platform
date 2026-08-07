@@ -1,3 +1,4 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:delivery_app/core/theme/app_theme.dart';
@@ -8,6 +9,7 @@ import 'package:delivery_app/features/auth/providers/auth_provider.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 import 'package:delivery_app/logger.dart';
 import 'package:delivery_app/core/database/database_provider.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,10 +21,10 @@ void main() async {
   // Создаём контейнер для провайдеров
   final container = ProviderContainer();
   
-  // Инициализируем базу данных
+  // Инициализируем базу данных (для веба используем in-memory)
   try {
     final db = container.read(appDatabaseProvider);
-    logMessage('📁 База данных инициализирована', category: 'DATABASE');
+    logMessage('📁 База данных инициализирована${kIsWeb ? ' (веб-версия, in-memory)' : ''}', category: 'DATABASE');
   } catch (e) {
     logMessage('⚠️ Ошибка инициализации БД: $e', category: 'DATABASE', level: LogLevel.error);
   }

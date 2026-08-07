@@ -517,20 +517,36 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     if (!state.isActive) return;
     
     final now = DateTime.now();
+    bool changed = false;
     
-    // Обновляем накопленное время работы
-    final currentWork = state.totalWorkTime + now.difference(state.shiftStartTime!);
-    final currentIdle = state.totalIdleTime + state.currentIdlePeriod;
+    // Обновляем рабочее время (прирост с последнего вызова)
+    if (state.shiftStartTime != null) {
+      final workDelta = now.difference(state.shiftStartTime!);
+      if (workDelta.inSeconds > 0) {
+        state = state.copyWith(
+          totalWorkTime: state.totalWorkTime + workDelta,
+          shiftStartTime: now,
+        );
+        changed = true;
+      }
+    }
     
-    state = state.copyWith(
-      totalWorkTime: currentWork,
-      totalIdleTime: currentIdle,
-      shiftStartTime: now, // сбрасываем, чтобы не считать дважды
-      lastTick: now.millisecondsSinceEpoch,
-    );
+    // Обновляем время простоя (только если нет заказа и idleStartTime не null)
+    if (!state.isOnOrder && state.idleStartTime != null) {
+      final idleDelta = now.difference(state.idleStartTime!);
+      if (idleDelta.inSeconds > 0) {
+        state = state.copyWith(
+          totalIdleTime: state.totalIdleTime + idleDelta,
+          idleStartTime: now,
+        );
+        changed = true;
+      }
+    }
     
-    // Сохраняем состояние (но не каждый тик в БД, чтобы не перегружать)
-    _saveState();
+    if (changed) {
+      state = state.copyWith(lastTick: now.millisecondsSinceEpoch);
+      _saveState();
+    }
   }
 
   void resetDay() {

@@ -1,6 +1,11 @@
+// lib/core/database/app_database.dart
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:delivery_app/logger.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+
+// Импортируем web-версию Drift для веба
+import 'package:drift/web.dart' as web;
 
 import 'tables/shifts.dart';
 import 'tables/orders.dart';
@@ -38,8 +43,11 @@ class AppDatabase extends _$AppDatabase {
 
   void _printDatabasePath() {
     try {
-      final path = 'База данных инициализирована (Drift 2.x)';
-      logMessage('📁 $path', category: 'DATABASE');
+      if (kIsWeb) {
+        logMessage('📁 База данных работает в памяти (веб-версия)', category: 'DATABASE');
+      } else {
+        logMessage('📁 База данных инициализирована', category: 'DATABASE');
+      }
     } catch (e) {
       logMessage('⚠️ Не удалось определить путь к БД: $e', category: 'DATABASE');
     }
@@ -114,7 +122,16 @@ class AppDatabase extends _$AppDatabase {
 }
 
 QueryExecutor _openConnection() {
-  return driftDatabase(
-    name: 'delivery_app.db',
-  );
+  if (kIsWeb) {
+    // Для веба используем in-memory базу через web.WebDatabase
+    return web.WebDatabase(
+      name: 'delivery_app.db',
+      memory: true,
+    );
+  } else {
+    // Для мобильных используем файловую БД
+    return driftDatabase(
+      name: 'delivery_app.db',
+    );
+  }
 }
