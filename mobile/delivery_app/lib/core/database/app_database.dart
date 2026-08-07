@@ -4,9 +4,6 @@ import 'package:drift_flutter/drift_flutter.dart';
 import 'package:delivery_app/logger.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
-// Импортируем web-версию Drift для веба
-import 'package:drift/web.dart' as web;
-
 import 'tables/shifts.dart';
 import 'tables/orders.dart';
 import 'tables/deliveries.dart';
@@ -123,10 +120,10 @@ class AppDatabase extends _$AppDatabase {
 
 QueryExecutor _openConnection() {
   if (kIsWeb) {
-    // Для веба используем in-memory базу через web.WebDatabase
-    return web.WebDatabase(
+    // Для веба используем in-memory базу через дрфт-веб
+    // Используем только drift_flutter без web импорта
+    return driftDatabase(
       name: 'delivery_app.db',
-      memory: true,
     );
   } else {
     // Для мобильных используем файловую БД
