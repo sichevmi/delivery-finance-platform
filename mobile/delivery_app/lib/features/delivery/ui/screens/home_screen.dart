@@ -20,8 +20,6 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
-  Timer? _ticker;
-
   final List<GlobalKey<NavigatorState>> _navigatorKeys = [
     GlobalKey<NavigatorState>(),
     GlobalKey<NavigatorState>(),
@@ -50,32 +48,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _startTicker();
   }
 
   @override
   void dispose() {
-    _ticker?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _startTicker();
-    } else if (state == AppLifecycleState.paused) {
-      _ticker?.cancel();
-    }
-  }
-
-  void _startTicker() {
-    _ticker?.cancel();
-    _ticker = Timer.periodic(const Duration(seconds: 1), (timer) {
-      // Принудительно обновляем провайдеры, чтобы UI перестраивался
-      ref.invalidate(shiftProvider);
-      ref.invalidate(dailyStatsProvider);
-    });
+    // Ничего не делаем — таймеры в виджетах сами перезапустятся
   }
 
   @override
@@ -216,9 +199,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             // Верхняя строка: Время работы и Стоимость пробега
             Row(
               children: [
-                _buildTimeCard(
-                  icon: Icons.timer,
-                  value: stats.formattedWorkTime,
+                _TimeDisplay(
+                  shiftState: shiftState,
                   label: 'Время работы (за день)',
                   color: Colors.indigo,
                 ),
@@ -233,7 +215,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             ),
             const SizedBox(height: 8),
 
-            // Основные показатели (3 колонки)
+            // Основные показатели (3 колонки) — без изменений
             Row(
               children: [
                 _buildMetricCard(
@@ -458,5 +440,124 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     const weekdays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
     const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
     return '${weekdays[now.weekday - 1]}, ${now.day} ${months[now.month - 1]} ${now.year}';
+  }
+}
+
+// ============================================================
+// ОТДЕЛЬНЫЙ ВИДЖЕТ ДЛЯ ВРЕМЕНИ (обновляется только сам)
+// ============================================================
+class _TimeDisplay extends StatefulWidget {
+  final ShiftState shiftState;
+  final String label;
+  final Color color;
+
+  const _TimeDisplay({
+    required this.shiftState,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  State<_TimeDisplay> createState() => _TimeDisplayState();
+}
+
+class _TimeDisplayState extends State<_TimeDisplay> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant _TimeDisplay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Если смена стала активной или неактивной — перезапускаем таймер
+    if (widget.shiftState.isActive != oldWidget.shiftState.isActive) {
+      _startTimer();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    if (widget.shiftState.isActive) {
+      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        setState(() {});
+      });
+    } else {
+      // Если смена не активна — таймер не нужен, но один раз обновим
+      setState(() {});
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Вычисляем время работы прямо здесь
+    final String formattedTime;
+    if (widget.shiftState.isActive && widget.shiftState.shiftStartTime != null) {
+      final now = DateTime.now();
+      final duration = widget.shiftState.totalWorkTime + now.difference(widget.shiftState.shiftStartTime!);
+      formattedTime = _formatDuration(duration);
+    } else {
+      formattedTime = _formatDuration(widget.shiftState.totalWorkTime);
+    }
+
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E1E),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFF2C2C2C)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.timer, size: 16, color: widget.color),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    formattedTime,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: widget.color,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    widget.label,
+                    style: const TextStyle(
+                      fontSize: 9,
+                      color: Color(0xFF888888),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDuration(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 }
