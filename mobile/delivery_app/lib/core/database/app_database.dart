@@ -43,7 +43,7 @@ class AppDatabase extends _$AppDatabase {
       if (kIsWeb) {
         logMessage('📁 База данных работает в памяти (веб-версия)', category: 'DATABASE');
       } else {
-        logMessage('📁 База данных инициализирована', category: 'DATABASE');
+        logMessage('📁 База данных инициализирована (Drift 2.x)', category: 'DATABASE');
       }
     } catch (e) {
       logMessage('⚠️ Не удалось определить путь к БД: $e', category: 'DATABASE');
@@ -120,8 +120,7 @@ class AppDatabase extends _$AppDatabase {
 
 QueryExecutor _openConnection() {
   if (kIsWeb) {
-    // Для веба используем in-memory базу через дрфт-веб
-    // Используем только drift_flutter без web импорта
+    // Для веба используем in-memory базу
     return driftDatabase(
       name: 'delivery_app.db',
     );
