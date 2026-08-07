@@ -1,3 +1,4 @@
+// lib/features/delivery/providers/shift_provider.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -378,8 +379,36 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
 
   // ===== ОСНОВНЫЕ МЕТОДЫ =====
 
-  void startShift() {
+  void startShift() async {
     if (state.isActive) return;
+    
+    // Проверяем, есть ли активная смена в БД
+    final db = _ref.read(appDatabaseProvider);
+    final existingShift = await db.shiftDao.getActiveShift();
+    
+    if (existingShift != null) {
+      // Если есть активная смена — восстанавливаем её
+      logMessage('⚠️ Найдена активная смена в БД (id=${existingShift.id}), восстанавливаем', category: 'SHIFT');
+      state = state.copyWith(
+        localShiftId: existingShift.id,
+        isActive: true,
+        shiftStartTime: DateTime.tryParse(existingShift.startTime),
+        shiftEndTime: existingShift.endTime != null ? DateTime.tryParse(existingShift.endTime!) : null,
+        totalWorkTime: Duration(seconds: existingShift.durationSeconds),
+        totalPaidDistance: existingShift.totalPaidDistance,
+        totalIdleDistance: existingShift.totalIdleDistance,
+        ordersCount: existingShift.ordersCount,
+        totalIncome: existingShift.totalIncome,
+        totalExpenses: existingShift.totalExpenses,
+        netProfit: existingShift.netProfit,
+        idleStartTime: DateTime.now(),
+      );
+      _saveState();
+      _startGpsTracking();
+      return;
+    }
+    
+    // Если активной смены нет — создаём новую
     final now = DateTime.now();
     state = state.copyWith(
       isActive: true,

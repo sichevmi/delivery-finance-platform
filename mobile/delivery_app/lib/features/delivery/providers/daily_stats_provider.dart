@@ -95,6 +95,7 @@ final dailyStatsProvider = FutureProvider<DailyStats>((ref) async {
   var workDuration = Duration.zero;
   var idleDuration = Duration.zero;
 
+  // Суммируем все смены из БД
   for (final shift in shifts) {
     totalPaid += shift.totalPaidDistance;
     totalIdle += shift.totalIdleDistance;
@@ -103,12 +104,26 @@ final dailyStatsProvider = FutureProvider<DailyStats>((ref) async {
     expenses += shift.totalExpenses;
     profit += shift.netProfit;
     workDuration += Duration(seconds: shift.durationSeconds);
-    // idle время пока не хранится в БД, добавим позже
   }
 
   // Добавляем текущую активную смену (если есть)
   final shiftState = ref.read(shiftProvider);
-  if (shiftState.isActive) {
+  if (shiftState.isActive && shiftState.localShiftId != null) {
+    // Проверяем, не учтена ли эта смена уже в БД
+    final alreadyInDb = shifts.any((s) => s.id == shiftState.localShiftId);
+    if (!alreadyInDb) {
+      // Если смена ещё не в БД — добавляем её данные
+      totalPaid += shiftState.totalPaidDistance;
+      totalIdle += shiftState.totalIdleDistance;
+      orders += shiftState.ordersCount;
+      income += shiftState.totalIncome;
+      expenses += shiftState.totalExpenses;
+      profit += shiftState.netProfit;
+      workDuration += shiftState.workTime;
+      idleDuration += shiftState.totalIdleTimeDisplay;
+    }
+  } else if (shiftState.isActive && shiftState.localShiftId == null) {
+    // Если смена только что создана и ещё не сохранена в БД
     totalPaid += shiftState.totalPaidDistance;
     totalIdle += shiftState.totalIdleDistance;
     orders += shiftState.ordersCount;
