@@ -8,9 +8,36 @@ class ShiftDao {
 
   ShiftDao(this.db);
 
-  Future<int> insertShift(ShiftTableCompanion shift) async {
+  // Вставка с простыми параметрами
+  Future<int> insertShift({
+    required String startTime,
+    String? endTime,
+    required int durationSeconds,
+    required double totalPaidDistance,
+    required double totalIdleDistance,
+    required int ordersCount,
+    required double totalIncome,
+    required double totalExpenses,
+    required double netProfit,
+    required String status,
+  }) async {
     try {
-      final id = await db.into(db.shiftTable).insert(shift);
+      final companion = ShiftTableCompanion(
+        startTime: Value(startTime),
+        endTime: Value(endTime),
+        durationSeconds: Value(durationSeconds),
+        totalPaidDistance: Value(totalPaidDistance),
+        totalIdleDistance: Value(totalIdleDistance),
+        ordersCount: Value(ordersCount),
+        totalIncome: Value(totalIncome),
+        totalExpenses: Value(totalExpenses),
+        netProfit: Value(netProfit),
+        status: Value(status),
+        isSynced: const Value(false),
+        createdAt: Value(DateTime.now()),
+        updatedAt: Value(DateTime.now()),
+      );
+      final id = await db.into(db.shiftTable).insert(companion);
       logMessage('💾 Смена сохранена в БД, id=$id', category: 'DATABASE');
       return id;
     } catch (e) {
@@ -41,12 +68,47 @@ class ShiftDao {
     }
   }
 
-  Future<bool> updateShift(int id, ShiftTableCompanion shift) async {
+  // Обновление с простыми параметрами
+  Future<bool> updateShift(
+    int id, {
+    required String startTime,
+    String? endTime,
+    required int durationSeconds,
+    required double totalPaidDistance,
+    required double totalIdleDistance,
+    required int ordersCount,
+    required double totalIncome,
+    required double totalExpenses,
+    required double netProfit,
+    required String status,
+  }) async {
     try {
-      await db.update(db.shiftTable).replace(shift);
-      return true;
+      final companion = ShiftTableCompanion(
+        startTime: Value(startTime),
+        endTime: Value(endTime),
+        durationSeconds: Value(durationSeconds),
+        totalPaidDistance: Value(totalPaidDistance),
+        totalIdleDistance: Value(totalIdleDistance),
+        ordersCount: Value(ordersCount),
+        totalIncome: Value(totalIncome),
+        totalExpenses: Value(totalExpenses),
+        netProfit: Value(netProfit),
+        status: Value(status),
+        isSynced: const Value(false),
+        updatedAt: Value(DateTime.now()),
+      );
+      final count = await (db.update(db.shiftTable)
+        ..where((t) => t.id.equals(id))).write(companion);
+      
+      if (count > 0) {
+        logMessage('🔄 Смена $id обновлена', category: 'DATABASE');
+        return true;
+      } else {
+        logMessage('⚠️ Смена $id не найдена для обновления', category: 'DATABASE');
+        return false;
+      }
     } catch (e) {
-      logMessage('❌ Ошибка обновления смены: $e', category: 'DATABASE', level: LogLevel.error);
+      logMessage('❌ Ошибка обновления смены $id: $e', category: 'DATABASE', level: LogLevel.error);
       return false;
     }
   }

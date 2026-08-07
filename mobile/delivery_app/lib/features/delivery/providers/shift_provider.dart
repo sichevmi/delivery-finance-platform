@@ -1,11 +1,11 @@
-// lib/features/delivery/providers/shift_provider.dart
 import 'package:flutter/material.dart';
-import 'package:delivery_app/logger.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:delivery_app/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delivery_app/logger.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 import 'package:delivery_app/features/delivery/services/gps_service.dart';
+import 'package:delivery_app/core/database/database_provider.dart';
+import 'package:drift/drift.dart';
 
 class ShiftState {
   final bool isActive;
@@ -29,6 +29,8 @@ class ShiftState {
   final double netProfit;
 
   final int lastTick;
+  
+  final int? localShiftId;
 
   const ShiftState({
     this.isActive = false,
@@ -47,6 +49,7 @@ class ShiftState {
     this.totalExpenses = 0.0,
     this.netProfit = 0.0,
     this.lastTick = 0,
+    this.localShiftId,
   });
 
   ShiftState copyWith({
@@ -66,6 +69,7 @@ class ShiftState {
     double? totalExpenses,
     double? netProfit,
     int? lastTick,
+    int? localShiftId,
   }) {
     return ShiftState(
       isActive: isActive ?? this.isActive,
@@ -84,6 +88,7 @@ class ShiftState {
       totalExpenses: totalExpenses ?? this.totalExpenses,
       netProfit: netProfit ?? this.netProfit,
       lastTick: lastTick ?? this.lastTick,
+      localShiftId: localShiftId ?? this.localShiftId,
     );
   }
 
@@ -149,12 +154,104 @@ class ShiftState {
 
 class ShiftNotifier extends StateNotifier<ShiftState> {
   final Ref _ref;
+  GpsService? _gpsService;
 
   ShiftNotifier(this._ref) : super(const ShiftState()) {
     _loadState();
+    _initGpsService();
+    _loadShiftFromDatabase();
   }
 
-  // ===== ЗАГРУЗКА И СОХРАНЕНИЕ =====
+  // ===== ЗАГРУЗКА ИЗ БД =====
+
+  Future<void> _loadShiftFromDatabase() async {
+    try {
+      final db = _ref.read(appDatabaseProvider);
+      final savedShift = await db.shiftDao.getActiveShift();
+      
+      if (savedShift != null) {
+        logMessage('📁 Загружена активная смена из БД: id=${savedShift.id}', category: 'SHIFT');
+        logMessage('   startTime: ${savedShift.startTime}', category: 'SHIFT');
+        logMessage('   totalPaidDistance: ${savedShift.totalPaidDistance}', category: 'SHIFT');
+        logMessage('   ordersCount: ${savedShift.ordersCount}', category: 'SHIFT');
+        
+        if (!state.isActive) {
+          state = state.copyWith(
+            localShiftId: savedShift.id,
+            isActive: savedShift.status == 'active',
+            shiftStartTime: DateTime.tryParse(savedShift.startTime),
+            shiftEndTime: savedShift.endTime != null ? DateTime.tryParse(savedShift.endTime!) : null,
+            totalWorkTime: Duration(seconds: savedShift.durationSeconds),
+            totalPaidDistance: savedShift.totalPaidDistance,
+            totalIdleDistance: savedShift.totalIdleDistance,
+            ordersCount: savedShift.ordersCount,
+            totalIncome: savedShift.totalIncome,
+            totalExpenses: savedShift.totalExpenses,
+            netProfit: savedShift.netProfit,
+            idleStartTime: savedShift.status == 'active' ? DateTime.now() : null,
+          );
+          
+          if (state.isActive) {
+            _startGpsTracking();
+          }
+          
+          logMessage('✅ Состояние восстановлено из БД', category: 'SHIFT');
+        }
+      } else {
+        logMessage('📁 Активная смена в БД не найдена', category: 'SHIFT');
+      }
+    } catch (e) {
+      logMessage('⚠️ Ошибка загрузки смены из БД: $e', category: 'SHIFT', level: LogLevel.error);
+    }
+  }
+
+  // ===== СОХРАНЕНИЕ В БД (через ShiftDao) =====
+
+  Future<void> _saveShiftToDatabase() async {
+    try {
+      final db = _ref.read(appDatabaseProvider);
+      
+      if (state.localShiftId != null) {
+        // Обновляем существующую смену
+        final success = await db.shiftDao.updateShift(
+          state.localShiftId!,
+          startTime: state.shiftStartTime?.toIso8601String() ?? DateTime.now().toIso8601String(),
+          endTime: state.shiftEndTime?.toIso8601String(),
+          durationSeconds: state.workTime.inSeconds,
+          totalPaidDistance: state.totalPaidDistance,
+          totalIdleDistance: state.totalIdleDistance,
+          ordersCount: state.ordersCount,
+          totalIncome: state.totalIncome,
+          totalExpenses: state.totalExpenses,
+          netProfit: state.netProfit,
+          status: state.isActive ? 'active' : 'completed',
+        );
+        if (success) {
+          logMessage('🔄 Смена ${state.localShiftId} обновлена в БД', category: 'SHIFT');
+        }
+      } else {
+        // Создаём новую смену
+        final id = await db.shiftDao.insertShift(
+          startTime: state.shiftStartTime?.toIso8601String() ?? DateTime.now().toIso8601String(),
+          endTime: state.shiftEndTime?.toIso8601String(),
+          durationSeconds: state.workTime.inSeconds,
+          totalPaidDistance: state.totalPaidDistance,
+          totalIdleDistance: state.totalIdleDistance,
+          ordersCount: state.ordersCount,
+          totalIncome: state.totalIncome,
+          totalExpenses: state.totalExpenses,
+          netProfit: state.netProfit,
+          status: state.isActive ? 'active' : 'completed',
+        );
+        state = state.copyWith(localShiftId: id);
+        logMessage('💾 Смена $id сохранена в БД', category: 'SHIFT');
+      }
+    } catch (e) {
+      logMessage('❌ Ошибка сохранения смены в БД: $e', category: 'SHIFT', level: LogLevel.error);
+    }
+  }
+
+  // ===== ЗАГРУЗКА ИЗ SHARED_PREFERENCES =====
 
   Future<void> _loadState() async {
     final prefs = await SharedPreferences.getInstance();
@@ -182,6 +279,7 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
       totalIncome: prefs.getDouble('shift_income') ?? 0.0,
       totalExpenses: prefs.getDouble('shift_expenses') ?? 0.0,
       netProfit: prefs.getDouble('shift_net_profit') ?? 0.0,
+      localShiftId: null,
     );
 
     if (state.isActive && !state.isOnOrder && state.idleStartTime == null) {
@@ -241,30 +339,40 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
 
   // ===== УПРАВЛЕНИЕ GPS =====
 
-  GpsService? _getGpsService() {
+  void _initGpsService() {
     try {
-      return _ref.read(gpsServiceProvider);
+      _gpsService = _ref.read(gpsServiceProvider);
+      logMessage('🟢 ShiftNotifier: GPS сервис получен', category: 'SHIFT');
+      if (state.isActive) {
+        _gpsService!.startTracking();
+        logMessage('🟢 ShiftNotifier: GPS запущен (смена активна)', category: 'SHIFT');
+      }
     } catch (e) {
-      logMessage('⚠️ Не удалось получить GPS сервис: $e');
-      return null;
+      logMessage('⚠️ ShiftNotifier: GPS сервис ещё не готов: $e', category: 'SHIFT');
     }
   }
 
   void _startGpsTracking() {
-    final gpsService = _getGpsService();
-    if (gpsService != null) {
-      logMessage('🟢 Запускаем GPS трекинг (смена активна, isOnOrder=${state.isOnOrder})');
-      gpsService.startTracking();
+    if (_gpsService == null) {
+      try {
+        _gpsService = _ref.read(gpsServiceProvider);
+      } catch (e) {
+        logMessage('⚠️ Не удалось получить GPS сервис: $e', category: 'SHIFT');
+        return;
+      }
+    }
+    if (_gpsService != null) {
+      logMessage('🟢 Запускаем GPS трекинг (смена активна, isOnOrder=${state.isOnOrder})', category: 'SHIFT');
+      _gpsService!.startTracking();
     } else {
-      logMessage('⚠️ GpsService не найден');
+      logMessage('⚠️ GpsService не найден', category: 'SHIFT');
     }
   }
 
   void _stopGpsTracking() {
-    final gpsService = _getGpsService();
-    if (gpsService != null) {
-      logMessage('🛑 Останавливаем GPS трекинг (смена не активна)');
-      gpsService.stopTracking();
+    if (_gpsService != null) {
+      logMessage('🛑 Останавливаем GPS трекинг (смена не активна)', category: 'SHIFT');
+      _gpsService!.stopTracking();
     }
   }
 
@@ -278,13 +386,15 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
       shiftStartTime: now,
       shiftEndTime: null,
       idleStartTime: now,
+      localShiftId: null,
     );
     _saveState();
     _startGpsTracking();
+    _saveShiftToDatabase();
   }
 
   void stopShift() {
-    logMessage('🛑 stopShift() вызван из: ${StackTrace.current}');
+    logMessage('🛑 stopShift() вызван', category: 'SHIFT');
     if (!state.isActive) return;
     final now = DateTime.now();
     final addedWork = now.difference(state.shiftStartTime!);
@@ -308,6 +418,7 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     );
     _saveState();
     _stopGpsTracking();
+    _saveShiftToDatabase();
   }
 
   void startOrder() {
@@ -322,6 +433,7 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
       idleStartTime: null,
     );
     _saveState();
+    _saveShiftToDatabase();
   }
 
   void cancelOrder() {
@@ -333,6 +445,7 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
       idleStartTime: now,
     );
     _saveState();
+    _saveShiftToDatabase();
   }
 
   void finishOrder({
@@ -357,23 +470,22 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
       idleStartTime: now,
     );
     _saveState();
+    _saveShiftToDatabase();
   }
 
   void addIdleDistance(double distance) {
-    logMessage('📊 addIdleDistance вызван: distance=$distance, isActive=${state.isActive}, isOnOrder=${state.isOnOrder}');
+    logMessage('📊 addIdleDistance вызван: distance=$distance, isActive=${state.isActive}, isOnOrder=${state.isOnOrder}', category: 'SHIFT');
     if (!state.isActive || state.isOnOrder || distance <= 0) return;
     state = state.copyWith(
       totalIdleDistance: state.totalIdleDistance + distance,
     );
     _saveState();
+    _saveShiftToDatabase();
   }
 
   void updatePaidDistance(double distance) {
     if (!state.isActive || !state.isOnOrder || distance <= 0) return;
-    state = state.copyWith(
-      totalPaidDistance: state.totalPaidDistance + distance,
-    );
-    _saveState();
+    logMessage('⚠️ updatePaidDistance вызван, но платный пробег добавляется только через finishOrder', category: 'SHIFT');
   }
 
   void tick() {

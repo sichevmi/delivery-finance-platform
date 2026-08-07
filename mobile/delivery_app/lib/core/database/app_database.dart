@@ -38,8 +38,6 @@ class AppDatabase extends _$AppDatabase {
 
   void _printDatabasePath() {
     try {
-      // Просто выводим путь через конфигурацию
-      // В Drift 2.x путь можно получить через database.locate()
       final path = 'База данных инициализирована (Drift 2.x)';
       logMessage('📁 $path', category: 'DATABASE');
     } catch (e) {
@@ -116,7 +114,6 @@ class AppDatabase extends _$AppDatabase {
 }
 
 QueryExecutor _openConnection() {
-  // Для мобильных используем файловую БД, для веба — in-memory
   return driftDatabase(
     name: 'delivery_app.db',
   );
