@@ -515,38 +515,11 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   
   void tick() {
     if (!state.isActive) return;
-    
+    // Обновляем только lastTick, чтобы UI перестраивался
     final now = DateTime.now();
-    bool changed = false;
-    
-    // Обновляем рабочее время (прирост с последнего вызова)
-    if (state.shiftStartTime != null) {
-      final workDelta = now.difference(state.shiftStartTime!);
-      if (workDelta.inSeconds > 0) {
-        state = state.copyWith(
-          totalWorkTime: state.totalWorkTime + workDelta,
-          shiftStartTime: now,
-        );
-        changed = true;
-      }
-    }
-    
-    // Обновляем время простоя (только если нет заказа и idleStartTime не null)
-    if (!state.isOnOrder && state.idleStartTime != null) {
-      final idleDelta = now.difference(state.idleStartTime!);
-      if (idleDelta.inSeconds > 0) {
-        state = state.copyWith(
-          totalIdleTime: state.totalIdleTime + idleDelta,
-          idleStartTime: now,
-        );
-        changed = true;
-      }
-    }
-    
-    if (changed) {
-      state = state.copyWith(lastTick: now.millisecondsSinceEpoch);
-      _saveState();
-    }
+    state = state.copyWith(lastTick: now.millisecondsSinceEpoch);
+    // Не сохраняем в SharedPreferences каждый тик, чтобы не нагружать
+    // _saveState();
   }
 
   void resetDay() {
