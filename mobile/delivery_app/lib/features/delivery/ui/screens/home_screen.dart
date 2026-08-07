@@ -21,6 +21,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
   Timer? _ticker;
+  int _tickCount = 0;
 
   final List<GlobalKey<NavigatorState>> _navigatorKeys = [
     GlobalKey<NavigatorState>(),
@@ -72,8 +73,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   void _startTicker() {
     _ticker?.cancel();
     _ticker = Timer.periodic(const Duration(seconds: 1), (timer) {
-      ref.read(shiftProvider.notifier).tick();
-      // Обновляем дневную статистику при каждом тике
+      _tickCount++;
+      logMessage('🔔 Тик #$_tickCount', category: 'TICKER');
+      
+      final shiftNotifier = ref.read(shiftProvider.notifier);
+      shiftNotifier.tick();
+      
+      // Обновляем дневную статистику
       ref.invalidate(dailyStatsProvider);
     });
   }
@@ -85,6 +91,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final selectedTab = ref.watch(selectedTabProvider);
     final settings = ref.watch(settingsProvider);
     final dailyStatsAsync = ref.watch(dailyStatsProvider);
+
+    // Логируем время работы для отладки
+    if (shiftState.isActive) {
+      logMessage('⏱️ Текущее время работы: ${shiftState.formattedWorkTime}', category: 'SHIFT');
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -169,7 +180,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   Widget _buildHomeTab(ShiftState shiftState, SettingsState settings, AsyncValue<DailyStats> dailyStatsAsync) {
     final fuelCostPerKm = (settings.fuelConsumption / 100) * settings.fuelPrice;
 
-    // Показываем индикатор загрузки, если данные ещё не загружены
     return dailyStatsAsync.when(
       data: (stats) => Container(
         padding: const EdgeInsets.all(12),

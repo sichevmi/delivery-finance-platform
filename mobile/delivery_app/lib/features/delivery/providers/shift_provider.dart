@@ -514,13 +514,11 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   // ===== ТАЙМЕР =====
   
   void tick() {
-    if (!state.isActive) return;
-    // Обновляем только lastTick, чтобы UI перестраивался
-    final now = DateTime.now();
-    state = state.copyWith(lastTick: now.millisecondsSinceEpoch);
-    // Не сохраняем в SharedPreferences каждый тик, чтобы не нагружать
-    // _saveState();
-  }
+  if (!state.isActive) return;
+  final now = DateTime.now();
+  logMessage('🟢 tick() вызван в ${now.second}:${now.millisecond}', category: 'SHIFT');
+  state = state.copyWith(lastTick: now.millisecondsSinceEpoch);
+}
 
   void resetDay() {
     _resetDay();
