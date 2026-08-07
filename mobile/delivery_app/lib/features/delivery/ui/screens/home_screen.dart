@@ -21,7 +21,6 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
   Timer? _ticker;
-  int _tickCount = 0;
 
   final List<GlobalKey<NavigatorState>> _navigatorKeys = [
     GlobalKey<NavigatorState>(),
@@ -73,13 +72,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   void _startTicker() {
     _ticker?.cancel();
     _ticker = Timer.periodic(const Duration(seconds: 1), (timer) {
-      _tickCount++;
-      logMessage('🔔 Тик #$_tickCount', category: 'TICKER');
-      
-      final shiftNotifier = ref.read(shiftProvider.notifier);
-      shiftNotifier.tick();
-      
-      // Обновляем дневную статистику
+      // Принудительно обновляем провайдеры, чтобы UI перестраивался
+      ref.invalidate(shiftProvider);
       ref.invalidate(dailyStatsProvider);
     });
   }
@@ -91,11 +85,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final selectedTab = ref.watch(selectedTabProvider);
     final settings = ref.watch(settingsProvider);
     final dailyStatsAsync = ref.watch(dailyStatsProvider);
-
-    // Логируем время работы для отладки
-    if (shiftState.isActive) {
-      logMessage('⏱️ Текущее время работы: ${shiftState.formattedWorkTime}', category: 'SHIFT');
-    }
 
     return Scaffold(
       appBar: AppBar(

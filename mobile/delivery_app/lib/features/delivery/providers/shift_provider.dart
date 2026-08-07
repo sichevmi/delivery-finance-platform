@@ -514,10 +514,7 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   // ===== ТАЙМЕР =====
   
   void tick() {
-  if (!state.isActive) return;
-  final now = DateTime.now();
-  logMessage('🟢 tick() вызван в ${now.second}:${now.millisecond}', category: 'SHIFT');
-  state = state.copyWith(lastTick: now.millisecondsSinceEpoch);
+  
 }
 
   void resetDay() {
