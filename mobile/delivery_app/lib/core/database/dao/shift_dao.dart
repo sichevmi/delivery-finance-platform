@@ -68,6 +68,21 @@ class ShiftDao {
     }
   }
 
+  // НОВЫЙ МЕТОД: получить смены за указанную дату
+  Future<List<ShiftTableData>> getShiftsForDate(DateTime date) async {
+    try {
+      final start = DateTime(date.year, date.month, date.day);
+      final end = start.add(const Duration(days: 1));
+      return await (db.select(db.shiftTable)
+        ..where((t) => t.createdAt.isBetweenValues(start, end))
+        ..orderBy([(t) => OrderingTerm.asc(t.id)])
+      ).get();
+    } catch (e) {
+      logMessage('❌ Ошибка получения смен за дату: $e', category: 'DATABASE', level: LogLevel.error);
+      return [];
+    }
+  }
+
   // Обновление с простыми параметрами
   Future<bool> updateShift(
     int id, {
