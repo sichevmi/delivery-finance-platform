@@ -4,6 +4,7 @@ import 'package:delivery_app/logger.dart';
 import 'package:delivery_app/features/delivery/providers/tab_provider.dart';
 import 'package:delivery_app/features/delivery/providers/pricing_provider.dart';
 import 'package:delivery_app/features/delivery/providers/settings_provider.dart';
+import 'package:delivery_app/features/delivery/providers/daily_stats_provider.dart';
 import 'package:delivery_app/features/delivery/models/delivery.dart';
 import 'package:delivery_app/features/delivery/models/pricing_config.dart';
 
@@ -322,6 +323,9 @@ class OrderSummaryScreen extends ConsumerWidget {
                       child: ElevatedButton(
                         onPressed: () {
                           logMessage('🟢 Нажата кнопка "Завершить заказ"');
+                          // ===== ОБНОВЛЯЕМ СТАТИСТИКУ =====
+                          ref.invalidate(dailyStatsProvider);
+                          logMessage('📊 Статистика обновлена', category: 'STATS');
                           Navigator.pop(context, false);
                         },
                         style: ElevatedButton.styleFrom(

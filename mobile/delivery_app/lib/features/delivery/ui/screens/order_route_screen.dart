@@ -11,6 +11,7 @@ import 'order_summary_screen.dart';
 import 'package:delivery_app/features/delivery/providers/pricing_provider.dart';
 import 'package:delivery_app/features/delivery/providers/settings_provider.dart';
 import 'package:delivery_app/features/delivery/providers/shift_provider.dart';
+import 'package:delivery_app/features/delivery/providers/daily_stats_provider.dart';
 import 'package:delivery_app/features/delivery/models/pricing_config.dart';
 
 class OrderRouteScreen extends ConsumerStatefulWidget {
@@ -66,6 +67,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
     if (state.shouldNavigateToHome) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         notifier.resetNavigationFlag();
+        // Обновляем статистику перед выходом
+        ref.invalidate(dailyStatsProvider);
         Navigator.of(context).popUntil((route) => route.isFirst);
       });
     }
@@ -184,6 +187,10 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
           expenses: totalExpenses,
           orderDuration: orderDuration,
         );
+        
+        // ===== ОБНОВЛЯЕМ СТАТИСТИКУ =====
+        ref.invalidate(dailyStatsProvider);
+        logMessage('📊 Статистика обновлена', category: 'STATS');
         
         logMessage('   Вызов notifier.finishOrder()');
         notifier.finishOrder();
