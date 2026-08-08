@@ -79,11 +79,15 @@ class DailyStats {
   }
 }
 
-final dailyStatsProvider = FutureProvider<DailyStats>((ref) async {
+final dailyStatsProvider = FutureProvider<DailyStats>((ref) {
+  return _calculateDailyStats(ref);
+});
+
+// Отдельная функция для расчёта статистики
+Future<DailyStats> _calculateDailyStats(Ref ref) async {
   final db = ref.read(appDatabaseProvider);
   final now = DateTime.now();
   
-  // Получаем все смены за сегодня
   final shifts = await db.shiftDao.getShiftsForDate(now);
 
   var totalPaid = 0.0;
@@ -95,7 +99,6 @@ final dailyStatsProvider = FutureProvider<DailyStats>((ref) async {
   var workDuration = Duration.zero;
   var idleDuration = Duration.zero;
 
-  // Суммируем все смены из БД
   for (final shift in shifts) {
     totalPaid += shift.totalPaidDistance;
     totalIdle += shift.totalIdleDistance;
@@ -106,13 +109,10 @@ final dailyStatsProvider = FutureProvider<DailyStats>((ref) async {
     workDuration += Duration(seconds: shift.durationSeconds);
   }
 
-  // Добавляем текущую активную смену (если есть)
   final shiftState = ref.read(shiftProvider);
   if (shiftState.isActive && shiftState.localShiftId != null) {
-    // Проверяем, не учтена ли эта смена уже в БД
     final alreadyInDb = shifts.any((s) => s.id == shiftState.localShiftId);
     if (!alreadyInDb) {
-      // Если смена ещё не в БД — добавляем её данные
       totalPaid += shiftState.totalPaidDistance;
       totalIdle += shiftState.totalIdleDistance;
       orders += shiftState.ordersCount;
@@ -123,7 +123,6 @@ final dailyStatsProvider = FutureProvider<DailyStats>((ref) async {
       idleDuration += shiftState.totalIdleTimeDisplay;
     }
   } else if (shiftState.isActive && shiftState.localShiftId == null) {
-    // Если смена только что создана и ещё не сохранена в БД
     totalPaid += shiftState.totalPaidDistance;
     totalIdle += shiftState.totalIdleDistance;
     orders += shiftState.ordersCount;
@@ -146,4 +145,16 @@ final dailyStatsProvider = FutureProvider<DailyStats>((ref) async {
     totalWorkTime: workDuration,
     totalIdleTime: idleDuration,
   );
+}
+
+// Провайдер для ручного обновления статистики
+final refreshStatsProvider = Provider<void>((ref) {
+  // Этот провайдер нужен только для вызова invalidate
+  return null;
 });
+
+extension RefreshStats on ProviderContainer {
+  void refreshStats() {
+    this.invalidate(dailyStatsProvider);
+  }
+}
