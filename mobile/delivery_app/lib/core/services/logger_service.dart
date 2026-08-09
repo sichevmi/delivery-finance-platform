@@ -173,7 +173,13 @@ class LoggerService {
       final directory = await getApplicationDocumentsDirectory();
       final logDir = Directory('${directory.path}/logs');
       if (!await logDir.exists()) return [];
-      final files = await logDir.list().whereType<File>().toList();
+      
+      final List<File> files = [];
+      await for (final entity in logDir.list()) {
+        if (entity is File) {
+          files.add(entity);
+        }
+      }
       files.sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
       return files;
     } catch (e) {
