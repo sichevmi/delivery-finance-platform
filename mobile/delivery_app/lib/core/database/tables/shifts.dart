@@ -11,6 +11,9 @@ class ShiftTable extends Table {
   RealColumn get totalPaidDistance => real().withDefault(const Constant(0.0))();
   RealColumn get totalIdleDistance => real().withDefault(const Constant(0.0))();
   
+  // Время на заказах (в секундах)
+  IntColumn get totalOrderTimeSeconds => integer().withDefault(const Constant(0))(); // <-- ДОБАВЛЕНО
+  
   IntColumn get ordersCount => integer().withDefault(const Constant(0))();
   RealColumn get totalIncome => real().withDefault(const Constant(0.0))();
   RealColumn get totalExpenses => real().withDefault(const Constant(0.0))();

@@ -1,3 +1,4 @@
+// lib/core/services/logger_service.dart
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -41,23 +42,26 @@ class LoggerService {
   bool _isInitialized = false;
   File? _logFile;
   IOSink? _sink;
-  final List<LogEntry> _buffer = [];
+  final List<String> _buffer = [];
   static const int _maxBufferSize = 100;
-  static const int _maxLogFiles = 20;
 
-  final List<LogEntry> _webLogs = [];
-  static const int _maxWebLogs = 1000;
+  // Для веба - храним в памяти
+  final List<String> _webLogs = [];
+  static const int _maxWebLogs = 5000;
 
-  final List<void Function(LogEntry)> _listeners = [];
+  // Список логов для UI
+  final List<LogEntry> _recentLogs = [];
+  static const int _maxRecentLogs = 200;
 
   Future<void> init() async {
     if (_isInitialized) return;
 
     if (kIsWeb) {
       _isInitialized = true;
-      _log(LogLevel.info, '📱 Логи приложения FinFlow Delivery (Web)', category: 'SYSTEM');
-      _log(LogLevel.info, '🕐 Время старта: ${DateTime.now()}', category: 'SYSTEM');
-      _log(LogLevel.info, '=' * 80, category: 'SYSTEM');
+      _webLogs.add('=' * 80);
+      _webLogs.add('📱 Логи приложения FinFlow Delivery (Web)');
+      _webLogs.add('🕐 Время старта: ${DateTime.now()}');
+      _webLogs.add('=' * 80);
       print('📁 Логи хранятся в памяти (веб-версия)');
       return;
     }
@@ -74,10 +78,10 @@ class LoggerService {
       _sink = _logFile!.openWrite(mode: FileMode.append);
       _isInitialized = true;
 
-      _log(LogLevel.info, '=' * 80, category: 'SYSTEM');
-      _log(LogLevel.info, '📱 Логи приложения FinFlow Delivery', category: 'SYSTEM');
-      _log(LogLevel.info, '🕐 Время старта: ${DateTime.now()}', category: 'SYSTEM');
-      _log(LogLevel.info, '=' * 80, category: 'SYSTEM');
+      _writeToFile('=' * 80);
+      _writeToFile('📱 Логи приложения FinFlow Delivery');
+      _writeToFile('🕐 Время старта: ${DateTime.now()}');
+      _writeToFile('=' * 80);
 
       print('📁 Логи будут сохранены в: ${_logFile!.path}');
 
@@ -104,27 +108,24 @@ class LoggerService {
 
     print(entry.format());
 
+    _recentLogs.add(entry);
+    if (_recentLogs.length > _maxRecentLogs) {
+      _recentLogs.removeAt(0);
+    }
+
     if (kIsWeb) {
-      _webLogs.add(entry);
+      _webLogs.add(entry.format());
       if (_webLogs.length > _maxWebLogs) {
         _webLogs.removeAt(0);
       }
     } else {
-      _writeToFile(entry);
-    }
-
-    for (final listener in _listeners) {
-      listener(entry);
+      _writeToFile(entry.format());
     }
   }
 
-  void _log(LogLevel level, dynamic message, {String? category}) {
-    log(message, level: level, category: category);
-  }
-
-  void _writeToFile(LogEntry entry) {
+  void _writeToFile(String message) {
     if (!_isInitialized || _sink == null) {
-      _buffer.add(entry);
+      _buffer.add(message);
       if (_buffer.length > _maxBufferSize) {
         _buffer.removeAt(0);
       }
@@ -132,7 +133,7 @@ class LoggerService {
     }
 
     try {
-      _sink!.writeln(entry.format());
+      _sink!.writeln(message);
       _sink!.flush();
     } catch (e) {
       // Игнорируем ошибки записи
@@ -141,23 +142,15 @@ class LoggerService {
 
   void _flushBuffer() {
     if (_buffer.isEmpty) return;
-    for (final entry in _buffer) {
-      _writeToFile(entry);
+    for (final msg in _buffer) {
+      _writeToFile(msg);
     }
     _buffer.clear();
   }
 
-  void addListener(void Function(LogEntry) listener) {
-    _listeners.add(listener);
-  }
-
-  void removeListener(void Function(LogEntry) listener) {
-    _listeners.remove(listener);
-  }
-
   Future<String> readLogs() async {
     if (kIsWeb) {
-      return _webLogs.map((e) => e.format()).join('\n');
+      return _webLogs.join('\n');
     }
     if (_logFile == null || !await _logFile!.exists()) {
       return 'Файл логов не найден';
@@ -180,7 +173,7 @@ class LoggerService {
       final directory = await getApplicationDocumentsDirectory();
       final logDir = Directory('${directory.path}/logs');
       if (!await logDir.exists()) return [];
-      final files = await logDir.list().map((e) => e as File).toList();
+      final files = await logDir.list().whereType<File>().toList();
       files.sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
       return files;
     } catch (e) {
@@ -197,6 +190,7 @@ class LoggerService {
       );
     } catch (e) {
       log('Ошибка отправки логов: $e', level: LogLevel.error, category: 'LOGGER');
+      rethrow;
     }
   }
 
@@ -224,6 +218,7 @@ class LoggerService {
   }
 }
 
+// Глобальная функция для удобства
 void logMessage(
   dynamic message, {
   LogLevel level = LogLevel.info,

@@ -1876,6 +1876,14 @@ class $ShiftTableTable extends ShiftTable
           type: DriftSqlType.double,
           requiredDuringInsert: false,
           defaultValue: const Constant(0.0));
+  static const VerificationMeta _totalOrderTimeSecondsMeta =
+      const VerificationMeta('totalOrderTimeSeconds');
+  @override
+  late final GeneratedColumn<int> totalOrderTimeSeconds = GeneratedColumn<int>(
+      'total_order_time_seconds', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
   static const VerificationMeta _ordersCountMeta =
       const VerificationMeta('ordersCount');
   @override
@@ -1946,6 +1954,7 @@ class $ShiftTableTable extends ShiftTable
         durationSeconds,
         totalPaidDistance,
         totalIdleDistance,
+        totalOrderTimeSeconds,
         ordersCount,
         totalIncome,
         totalExpenses,
@@ -1999,6 +2008,12 @@ class $ShiftTableTable extends ShiftTable
           _totalIdleDistanceMeta,
           totalIdleDistance.isAcceptableOrUnknown(
               data['total_idle_distance']!, _totalIdleDistanceMeta));
+    }
+    if (data.containsKey('total_order_time_seconds')) {
+      context.handle(
+          _totalOrderTimeSecondsMeta,
+          totalOrderTimeSeconds.isAcceptableOrUnknown(
+              data['total_order_time_seconds']!, _totalOrderTimeSecondsMeta));
     }
     if (data.containsKey('orders_count')) {
       context.handle(
@@ -2063,6 +2078,8 @@ class $ShiftTableTable extends ShiftTable
           DriftSqlType.double, data['${effectivePrefix}total_paid_distance'])!,
       totalIdleDistance: attachedDatabase.typeMapping.read(
           DriftSqlType.double, data['${effectivePrefix}total_idle_distance'])!,
+      totalOrderTimeSeconds: attachedDatabase.typeMapping.read(DriftSqlType.int,
+          data['${effectivePrefix}total_order_time_seconds'])!,
       ordersCount: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}orders_count'])!,
       totalIncome: attachedDatabase.typeMapping
@@ -2096,6 +2113,7 @@ class ShiftTableData extends DataClass implements Insertable<ShiftTableData> {
   final int durationSeconds;
   final double totalPaidDistance;
   final double totalIdleDistance;
+  final int totalOrderTimeSeconds;
   final int ordersCount;
   final double totalIncome;
   final double totalExpenses;
@@ -2112,6 +2130,7 @@ class ShiftTableData extends DataClass implements Insertable<ShiftTableData> {
       required this.durationSeconds,
       required this.totalPaidDistance,
       required this.totalIdleDistance,
+      required this.totalOrderTimeSeconds,
       required this.ordersCount,
       required this.totalIncome,
       required this.totalExpenses,
@@ -2134,6 +2153,7 @@ class ShiftTableData extends DataClass implements Insertable<ShiftTableData> {
     map['duration_seconds'] = Variable<int>(durationSeconds);
     map['total_paid_distance'] = Variable<double>(totalPaidDistance);
     map['total_idle_distance'] = Variable<double>(totalIdleDistance);
+    map['total_order_time_seconds'] = Variable<int>(totalOrderTimeSeconds);
     map['orders_count'] = Variable<int>(ordersCount);
     map['total_income'] = Variable<double>(totalIncome);
     map['total_expenses'] = Variable<double>(totalExpenses);
@@ -2160,6 +2180,7 @@ class ShiftTableData extends DataClass implements Insertable<ShiftTableData> {
       durationSeconds: Value(durationSeconds),
       totalPaidDistance: Value(totalPaidDistance),
       totalIdleDistance: Value(totalIdleDistance),
+      totalOrderTimeSeconds: Value(totalOrderTimeSeconds),
       ordersCount: Value(ordersCount),
       totalIncome: Value(totalIncome),
       totalExpenses: Value(totalExpenses),
@@ -2184,6 +2205,8 @@ class ShiftTableData extends DataClass implements Insertable<ShiftTableData> {
       durationSeconds: serializer.fromJson<int>(json['durationSeconds']),
       totalPaidDistance: serializer.fromJson<double>(json['totalPaidDistance']),
       totalIdleDistance: serializer.fromJson<double>(json['totalIdleDistance']),
+      totalOrderTimeSeconds:
+          serializer.fromJson<int>(json['totalOrderTimeSeconds']),
       ordersCount: serializer.fromJson<int>(json['ordersCount']),
       totalIncome: serializer.fromJson<double>(json['totalIncome']),
       totalExpenses: serializer.fromJson<double>(json['totalExpenses']),
@@ -2205,6 +2228,7 @@ class ShiftTableData extends DataClass implements Insertable<ShiftTableData> {
       'durationSeconds': serializer.toJson<int>(durationSeconds),
       'totalPaidDistance': serializer.toJson<double>(totalPaidDistance),
       'totalIdleDistance': serializer.toJson<double>(totalIdleDistance),
+      'totalOrderTimeSeconds': serializer.toJson<int>(totalOrderTimeSeconds),
       'ordersCount': serializer.toJson<int>(ordersCount),
       'totalIncome': serializer.toJson<double>(totalIncome),
       'totalExpenses': serializer.toJson<double>(totalExpenses),
@@ -2224,6 +2248,7 @@ class ShiftTableData extends DataClass implements Insertable<ShiftTableData> {
           int? durationSeconds,
           double? totalPaidDistance,
           double? totalIdleDistance,
+          int? totalOrderTimeSeconds,
           int? ordersCount,
           double? totalIncome,
           double? totalExpenses,
@@ -2240,6 +2265,8 @@ class ShiftTableData extends DataClass implements Insertable<ShiftTableData> {
         durationSeconds: durationSeconds ?? this.durationSeconds,
         totalPaidDistance: totalPaidDistance ?? this.totalPaidDistance,
         totalIdleDistance: totalIdleDistance ?? this.totalIdleDistance,
+        totalOrderTimeSeconds:
+            totalOrderTimeSeconds ?? this.totalOrderTimeSeconds,
         ordersCount: ordersCount ?? this.ordersCount,
         totalIncome: totalIncome ?? this.totalIncome,
         totalExpenses: totalExpenses ?? this.totalExpenses,
@@ -2264,6 +2291,9 @@ class ShiftTableData extends DataClass implements Insertable<ShiftTableData> {
       totalIdleDistance: data.totalIdleDistance.present
           ? data.totalIdleDistance.value
           : this.totalIdleDistance,
+      totalOrderTimeSeconds: data.totalOrderTimeSeconds.present
+          ? data.totalOrderTimeSeconds.value
+          : this.totalOrderTimeSeconds,
       ordersCount:
           data.ordersCount.present ? data.ordersCount.value : this.ordersCount,
       totalIncome:
@@ -2289,6 +2319,7 @@ class ShiftTableData extends DataClass implements Insertable<ShiftTableData> {
           ..write('durationSeconds: $durationSeconds, ')
           ..write('totalPaidDistance: $totalPaidDistance, ')
           ..write('totalIdleDistance: $totalIdleDistance, ')
+          ..write('totalOrderTimeSeconds: $totalOrderTimeSeconds, ')
           ..write('ordersCount: $ordersCount, ')
           ..write('totalIncome: $totalIncome, ')
           ..write('totalExpenses: $totalExpenses, ')
@@ -2310,6 +2341,7 @@ class ShiftTableData extends DataClass implements Insertable<ShiftTableData> {
       durationSeconds,
       totalPaidDistance,
       totalIdleDistance,
+      totalOrderTimeSeconds,
       ordersCount,
       totalIncome,
       totalExpenses,
@@ -2329,6 +2361,7 @@ class ShiftTableData extends DataClass implements Insertable<ShiftTableData> {
           other.durationSeconds == this.durationSeconds &&
           other.totalPaidDistance == this.totalPaidDistance &&
           other.totalIdleDistance == this.totalIdleDistance &&
+          other.totalOrderTimeSeconds == this.totalOrderTimeSeconds &&
           other.ordersCount == this.ordersCount &&
           other.totalIncome == this.totalIncome &&
           other.totalExpenses == this.totalExpenses &&
@@ -2347,6 +2380,7 @@ class ShiftTableCompanion extends UpdateCompanion<ShiftTableData> {
   final Value<int> durationSeconds;
   final Value<double> totalPaidDistance;
   final Value<double> totalIdleDistance;
+  final Value<int> totalOrderTimeSeconds;
   final Value<int> ordersCount;
   final Value<double> totalIncome;
   final Value<double> totalExpenses;
@@ -2363,6 +2397,7 @@ class ShiftTableCompanion extends UpdateCompanion<ShiftTableData> {
     this.durationSeconds = const Value.absent(),
     this.totalPaidDistance = const Value.absent(),
     this.totalIdleDistance = const Value.absent(),
+    this.totalOrderTimeSeconds = const Value.absent(),
     this.ordersCount = const Value.absent(),
     this.totalIncome = const Value.absent(),
     this.totalExpenses = const Value.absent(),
@@ -2380,6 +2415,7 @@ class ShiftTableCompanion extends UpdateCompanion<ShiftTableData> {
     this.durationSeconds = const Value.absent(),
     this.totalPaidDistance = const Value.absent(),
     this.totalIdleDistance = const Value.absent(),
+    this.totalOrderTimeSeconds = const Value.absent(),
     this.ordersCount = const Value.absent(),
     this.totalIncome = const Value.absent(),
     this.totalExpenses = const Value.absent(),
@@ -2398,6 +2434,7 @@ class ShiftTableCompanion extends UpdateCompanion<ShiftTableData> {
     Expression<int>? durationSeconds,
     Expression<double>? totalPaidDistance,
     Expression<double>? totalIdleDistance,
+    Expression<int>? totalOrderTimeSeconds,
     Expression<int>? ordersCount,
     Expression<double>? totalIncome,
     Expression<double>? totalExpenses,
@@ -2415,6 +2452,8 @@ class ShiftTableCompanion extends UpdateCompanion<ShiftTableData> {
       if (durationSeconds != null) 'duration_seconds': durationSeconds,
       if (totalPaidDistance != null) 'total_paid_distance': totalPaidDistance,
       if (totalIdleDistance != null) 'total_idle_distance': totalIdleDistance,
+      if (totalOrderTimeSeconds != null)
+        'total_order_time_seconds': totalOrderTimeSeconds,
       if (ordersCount != null) 'orders_count': ordersCount,
       if (totalIncome != null) 'total_income': totalIncome,
       if (totalExpenses != null) 'total_expenses': totalExpenses,
@@ -2434,6 +2473,7 @@ class ShiftTableCompanion extends UpdateCompanion<ShiftTableData> {
       Value<int>? durationSeconds,
       Value<double>? totalPaidDistance,
       Value<double>? totalIdleDistance,
+      Value<int>? totalOrderTimeSeconds,
       Value<int>? ordersCount,
       Value<double>? totalIncome,
       Value<double>? totalExpenses,
@@ -2450,6 +2490,8 @@ class ShiftTableCompanion extends UpdateCompanion<ShiftTableData> {
       durationSeconds: durationSeconds ?? this.durationSeconds,
       totalPaidDistance: totalPaidDistance ?? this.totalPaidDistance,
       totalIdleDistance: totalIdleDistance ?? this.totalIdleDistance,
+      totalOrderTimeSeconds:
+          totalOrderTimeSeconds ?? this.totalOrderTimeSeconds,
       ordersCount: ordersCount ?? this.ordersCount,
       totalIncome: totalIncome ?? this.totalIncome,
       totalExpenses: totalExpenses ?? this.totalExpenses,
@@ -2484,6 +2526,10 @@ class ShiftTableCompanion extends UpdateCompanion<ShiftTableData> {
     }
     if (totalIdleDistance.present) {
       map['total_idle_distance'] = Variable<double>(totalIdleDistance.value);
+    }
+    if (totalOrderTimeSeconds.present) {
+      map['total_order_time_seconds'] =
+          Variable<int>(totalOrderTimeSeconds.value);
     }
     if (ordersCount.present) {
       map['orders_count'] = Variable<int>(ordersCount.value);
@@ -2522,6 +2568,7 @@ class ShiftTableCompanion extends UpdateCompanion<ShiftTableData> {
           ..write('durationSeconds: $durationSeconds, ')
           ..write('totalPaidDistance: $totalPaidDistance, ')
           ..write('totalIdleDistance: $totalIdleDistance, ')
+          ..write('totalOrderTimeSeconds: $totalOrderTimeSeconds, ')
           ..write('ordersCount: $ordersCount, ')
           ..write('totalIncome: $totalIncome, ')
           ..write('totalExpenses: $totalExpenses, ')
@@ -5223,6 +5270,7 @@ typedef $$ShiftTableTableCreateCompanionBuilder = ShiftTableCompanion Function({
   Value<int> durationSeconds,
   Value<double> totalPaidDistance,
   Value<double> totalIdleDistance,
+  Value<int> totalOrderTimeSeconds,
   Value<int> ordersCount,
   Value<double> totalIncome,
   Value<double> totalExpenses,
@@ -5240,6 +5288,7 @@ typedef $$ShiftTableTableUpdateCompanionBuilder = ShiftTableCompanion Function({
   Value<int> durationSeconds,
   Value<double> totalPaidDistance,
   Value<double> totalIdleDistance,
+  Value<int> totalOrderTimeSeconds,
   Value<int> ordersCount,
   Value<double> totalIncome,
   Value<double> totalExpenses,
@@ -5281,6 +5330,10 @@ class $$ShiftTableTableFilterComposer
 
   ColumnFilters<double> get totalIdleDistance => $composableBuilder(
       column: $table.totalIdleDistance,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get totalOrderTimeSeconds => $composableBuilder(
+      column: $table.totalOrderTimeSeconds,
       builder: (column) => ColumnFilters(column));
 
   ColumnFilters<int> get ordersCount => $composableBuilder(
@@ -5341,6 +5394,10 @@ class $$ShiftTableTableOrderingComposer
       column: $table.totalIdleDistance,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<int> get totalOrderTimeSeconds => $composableBuilder(
+      column: $table.totalOrderTimeSeconds,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<int> get ordersCount => $composableBuilder(
       column: $table.ordersCount, builder: (column) => ColumnOrderings(column));
 
@@ -5396,6 +5453,9 @@ class $$ShiftTableTableAnnotationComposer
 
   GeneratedColumn<double> get totalIdleDistance => $composableBuilder(
       column: $table.totalIdleDistance, builder: (column) => column);
+
+  GeneratedColumn<int> get totalOrderTimeSeconds => $composableBuilder(
+      column: $table.totalOrderTimeSeconds, builder: (column) => column);
 
   GeneratedColumn<int> get ordersCount => $composableBuilder(
       column: $table.ordersCount, builder: (column) => column);
@@ -5455,6 +5515,7 @@ class $$ShiftTableTableTableManager extends RootTableManager<
             Value<int> durationSeconds = const Value.absent(),
             Value<double> totalPaidDistance = const Value.absent(),
             Value<double> totalIdleDistance = const Value.absent(),
+            Value<int> totalOrderTimeSeconds = const Value.absent(),
             Value<int> ordersCount = const Value.absent(),
             Value<double> totalIncome = const Value.absent(),
             Value<double> totalExpenses = const Value.absent(),
@@ -5472,6 +5533,7 @@ class $$ShiftTableTableTableManager extends RootTableManager<
             durationSeconds: durationSeconds,
             totalPaidDistance: totalPaidDistance,
             totalIdleDistance: totalIdleDistance,
+            totalOrderTimeSeconds: totalOrderTimeSeconds,
             ordersCount: ordersCount,
             totalIncome: totalIncome,
             totalExpenses: totalExpenses,
@@ -5489,6 +5551,7 @@ class $$ShiftTableTableTableManager extends RootTableManager<
             Value<int> durationSeconds = const Value.absent(),
             Value<double> totalPaidDistance = const Value.absent(),
             Value<double> totalIdleDistance = const Value.absent(),
+            Value<int> totalOrderTimeSeconds = const Value.absent(),
             Value<int> ordersCount = const Value.absent(),
             Value<double> totalIncome = const Value.absent(),
             Value<double> totalExpenses = const Value.absent(),
@@ -5506,6 +5569,7 @@ class $$ShiftTableTableTableManager extends RootTableManager<
             durationSeconds: durationSeconds,
             totalPaidDistance: totalPaidDistance,
             totalIdleDistance: totalIdleDistance,
+            totalOrderTimeSeconds: totalOrderTimeSeconds,
             ordersCount: ordersCount,
             totalIncome: totalIncome,
             totalExpenses: totalExpenses,

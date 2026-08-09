@@ -52,7 +52,7 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.share),
-            onPressed: () => LoggerService().shareLogs(),
+            onPressed: _shareLogs,
             tooltip: 'Поделиться',
           ),
           IconButton(
@@ -94,6 +94,104 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
         child: const Icon(Icons.arrow_upward),
       ),
     );
+  }
+
+  void _shareLogs() async {
+    try {
+      final content = await LoggerService().readLogs();
+      
+      if (content.isEmpty || content == 'Файл логов не найден' || content == 'Логи пусты') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Нет данных для отправки'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          title: const Text(
+            '📤 Отправка логов',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: Container(
+            width: double.maxFinite,
+            constraints: const BoxConstraints(maxHeight: 300),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Всего символов: ${content.length}',
+                  style: const TextStyle(color: Color(0xFF888888), fontSize: 12),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: SelectableText(
+                      content.length > 5000 
+                          ? '${content.substring(0, 5000)}\n\n... (обрезано, полный лог в файле)'
+                          : content,
+                      style: const TextStyle(
+                        color: Color(0xFFB0B0B0),
+                        fontSize: 10,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Отмена',
+                style: TextStyle(color: Color(0xFF888888)),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                try {
+                  await LoggerService().shareLogs();
+                  logMessage('📤 Логи отправлены через share', category: 'UI');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('📤 Логи отправлены'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Ошибка отправки: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              child: const Text(
+                'Отправить',
+                style: TextStyle(color: Color(0xFF6C63FF)),
+              ),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      logMessage('Ошибка: $e', level: LogLevel.error, category: 'UI');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ошибка: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }
 
@@ -203,7 +301,6 @@ class _MoreTabState extends ConsumerState<MoreTab> {
           ),
           const SizedBox(height: 8),
 
-          // Начать/Остановить запись GPS
           Material(
             color: const Color(0xFF1E1E1E),
             borderRadius: BorderRadius.circular(8),
@@ -242,7 +339,6 @@ class _MoreTabState extends ConsumerState<MoreTab> {
           ),
           const SizedBox(height: 4),
 
-          // Просмотр GPS логов
           Material(
             color: const Color(0xFF1E1E1E),
             borderRadius: BorderRadius.circular(8),
@@ -256,7 +352,6 @@ class _MoreTabState extends ConsumerState<MoreTab> {
           ),
           const SizedBox(height: 4),
 
-          // Все логи приложения
           Material(
             color: const Color(0xFF1E1E1E),
             borderRadius: BorderRadius.circular(8),
@@ -278,7 +373,6 @@ class _MoreTabState extends ConsumerState<MoreTab> {
           ),
           const SizedBox(height: 4),
 
-          // Отправить логи (доступно на всех платформах через share_plus)
           Material(
             color: const Color(0xFF1E1E1E),
             borderRadius: BorderRadius.circular(8),
@@ -287,12 +381,11 @@ class _MoreTabState extends ConsumerState<MoreTab> {
               title: const Text('Отправить логи', style: TextStyle(color: Colors.white)),
               subtitle: const Text('Отправить логи по почте или в мессенджер', style: TextStyle(color: Color(0xFF888888), fontSize: 12)),
               trailing: const Icon(Icons.chevron_right, color: Color(0xFF888888)),
-              onTap: () => _shareLogs(),
+              onTap: () => _shareLogsFromMore(),
             ),
           ),
           const SizedBox(height: 4),
 
-          // Очистить старые логи (только для мобильных)
           if (!kIsWeb) ...[
             Material(
               color: const Color(0xFF1E1E1E),
@@ -507,21 +600,99 @@ class _MoreTabState extends ConsumerState<MoreTab> {
     }
   }
 
-  void _shareLogs() async {
+  void _shareLogsFromMore() async {
     try {
-      await LoggerService().shareLogs();
-      logMessage('📤 Логи отправлены', category: 'UI');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('📤 Логи отправлены'),
-          backgroundColor: Colors.green,
+      final logger = LoggerService();
+      final content = await logger.readLogs();
+      
+      if (content.isEmpty || content == 'Файл логов не найден' || content == 'Логи пусты') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Нет данных для отправки'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          title: const Text(
+            '📤 Отправка логов',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: Container(
+            width: double.maxFinite,
+            constraints: const BoxConstraints(maxHeight: 300),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Всего символов: ${content.length}',
+                  style: const TextStyle(color: Color(0xFF888888), fontSize: 12),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: SelectableText(
+                      content.length > 5000 
+                          ? '${content.substring(0, 5000)}\n\n... (обрезано, полный лог в файле)'
+                          : content,
+                      style: const TextStyle(
+                        color: Color(0xFFB0B0B0),
+                        fontSize: 10,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Отмена',
+                style: TextStyle(color: Color(0xFF888888)),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                try {
+                  await logger.shareLogs();
+                  logMessage('📤 Логи отправлены через share', category: 'UI');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('📤 Логи отправлены'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Ошибка отправки: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              child: const Text(
+                'Отправить',
+                style: TextStyle(color: Color(0xFF6C63FF)),
+              ),
+            ),
+          ],
         ),
       );
     } catch (e) {
-      logMessage('Ошибка отправки логов: $e', level: LogLevel.error, category: 'UI');
+      logMessage('Ошибка: $e', level: LogLevel.error, category: 'UI');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Ошибка отправки: $e'),
+          content: Text('Ошибка: $e'),
           backgroundColor: Colors.red,
         ),
       );

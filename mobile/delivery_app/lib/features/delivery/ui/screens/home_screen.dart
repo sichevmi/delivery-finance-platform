@@ -262,8 +262,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             const SizedBox(height: 6),
             Row(
               children: [
-                _buildMetricCard(
-                  value: '${stats.totalIdleDistance.toStringAsFixed(1)} км',
+                // ===== ХОЛОСТОЙ ПРОБЕГ — ОТДЕЛЬНЫЙ ВИДЖЕТ =====
+                _IdleDistanceDisplay(
+                  shiftState: shiftState,
                   label: 'Холостой пробег',
                   color: Colors.red,
                 ),
@@ -670,5 +671,102 @@ class _IdleTimeDisplayState extends State<_IdleTimeDisplay> {
     final minutes = duration.inMinutes.remainder(60);
     final seconds = duration.inSeconds.remainder(60);
     return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+}
+
+// ============================================================
+// ВИДЖЕТ ДЛЯ ХОЛОСТОГО ПРОБЕГА
+// ============================================================
+class _IdleDistanceDisplay extends StatefulWidget {
+  final ShiftState shiftState;
+  final String label;
+  final Color color;
+
+  const _IdleDistanceDisplay({
+    required this.shiftState,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  State<_IdleDistanceDisplay> createState() => _IdleDistanceDisplayState();
+}
+
+class _IdleDistanceDisplayState extends State<_IdleDistanceDisplay> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant _IdleDistanceDisplay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.shiftState.isActive != oldWidget.shiftState.isActive ||
+        widget.shiftState.isOnOrder != oldWidget.shiftState.isOnOrder) {
+      _startTimer();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    if (widget.shiftState.isActive && !widget.shiftState.isOnOrder) {
+      // Обновляем каждую секунду, когда нет заказа
+      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        setState(() {});
+      });
+    } else {
+      setState(() {});
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final distance = widget.shiftState.totalIdleDistance;
+    final formattedDistance = distance.toStringAsFixed(1);
+
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E1E),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFF2C2C2C)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${formattedDistance} км',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: widget.color,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              widget.label,
+              style: const TextStyle(
+                fontSize: 9,
+                color: Color(0xFF888888),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

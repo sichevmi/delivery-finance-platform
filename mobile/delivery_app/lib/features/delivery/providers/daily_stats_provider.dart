@@ -13,6 +13,7 @@ class DailyStats {
   final double netProfit;
   final Duration totalWorkTime;
   final Duration totalIdleTime;
+  final Duration totalOrderTime; // <-- ДОБАВЛЕНО
 
   DailyStats({
     this.totalPaidDistance = 0.0,
@@ -23,6 +24,7 @@ class DailyStats {
     this.netProfit = 0.0,
     this.totalWorkTime = Duration.zero,
     this.totalIdleTime = Duration.zero,
+    this.totalOrderTime = Duration.zero, // <-- ДОБАВЛЕНО
   });
 
   DailyStats copyWith({
@@ -34,6 +36,7 @@ class DailyStats {
     double? netProfit,
     Duration? totalWorkTime,
     Duration? totalIdleTime,
+    Duration? totalOrderTime, // <-- ДОБАВЛЕНО
   }) {
     return DailyStats(
       totalPaidDistance: totalPaidDistance ?? this.totalPaidDistance,
@@ -44,6 +47,7 @@ class DailyStats {
       netProfit: netProfit ?? this.netProfit,
       totalWorkTime: totalWorkTime ?? this.totalWorkTime,
       totalIdleTime: totalIdleTime ?? this.totalIdleTime,
+      totalOrderTime: totalOrderTime ?? this.totalOrderTime, // <-- ДОБАВЛЕНО
     );
   }
 
@@ -51,9 +55,12 @@ class DailyStats {
   double get avgDistancePerOrder => ordersCount > 0 ? totalPaidDistance / ordersCount : 0.0;
   double get avgCheck => ordersCount > 0 ? totalIncome / ordersCount : 0.0;
   
-  Duration get avgTimePerOrder => ordersCount > 0 
-      ? Duration(milliseconds: (totalWorkTime.inMilliseconds / ordersCount).round()) 
-      : Duration.zero;
+  Duration get avgTimePerOrder {
+    if (ordersCount == 0) return Duration.zero;
+    return Duration(
+      milliseconds: (totalOrderTime.inMilliseconds / ordersCount).round()
+    );
+  }
 
   String formatDuration(Duration duration) {
     final hours = duration.inHours;
@@ -80,6 +87,7 @@ class DailyStats {
 }
 
 final dailyStatsProvider = FutureProvider<DailyStats>((ref) {
+  logMessage('📊 Пересчёт дневной статистики', category: 'STATS');
   return _calculateDailyStats(ref);
 });
 
@@ -98,6 +106,7 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
   var profit = 0.0;
   var workDuration = Duration.zero;
   var idleDuration = Duration.zero;
+  var orderDuration = Duration.zero; // <-- ДОБАВЛЕНО
 
   for (final shift in shifts) {
     totalPaid += shift.totalPaidDistance;
@@ -121,6 +130,7 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
       profit += shiftState.netProfit;
       workDuration += shiftState.workTime;
       idleDuration += shiftState.totalIdleTimeDisplay;
+      orderDuration += shiftState.totalOrderTimeDisplay; // <-- ДОБАВЛЕНО
     }
   } else if (shiftState.isActive && shiftState.localShiftId == null) {
     totalPaid += shiftState.totalPaidDistance;
@@ -131,6 +141,7 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
     profit += shiftState.netProfit;
     workDuration += shiftState.workTime;
     idleDuration += shiftState.totalIdleTimeDisplay;
+    orderDuration += shiftState.totalOrderTimeDisplay; // <-- ДОБАВЛЕНО
   }
 
   logMessage('📊 Дневная статистика: заказов=$orders, пробег=$totalPaid, доход=$income', category: 'STATS');
@@ -144,12 +155,12 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
     netProfit: profit,
     totalWorkTime: workDuration,
     totalIdleTime: idleDuration,
+    totalOrderTime: orderDuration, // <-- ДОБАВЛЕНО
   );
 }
 
 // Провайдер для ручного обновления статистики
 final refreshStatsProvider = Provider<void>((ref) {
-  // Этот провайдер нужен только для вызова invalidate
   return null;
 });
 

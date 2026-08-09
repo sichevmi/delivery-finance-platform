@@ -7,6 +7,7 @@ import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 import 'package:delivery_app/features/delivery/services/gps_service.dart';
 import 'package:delivery_app/core/database/database_provider.dart';
 import 'package:drift/drift.dart';
+import 'package:delivery_app/features/delivery/providers/daily_stats_provider.dart';
 
 class ShiftState {
   final bool isActive;
@@ -209,46 +210,48 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   // ===== СОХРАНЕНИЕ В БД =====
 
   Future<void> _saveShiftToDatabase() async {
-    try {
-      final db = _ref.read(appDatabaseProvider);
-      
-      if (state.localShiftId != null) {
-        final success = await db.shiftDao.updateShift(
-          state.localShiftId!,
-          startTime: state.shiftStartTime?.toIso8601String() ?? DateTime.now().toIso8601String(),
-          endTime: state.shiftEndTime?.toIso8601String(),
-          durationSeconds: state.workTime.inSeconds,
-          totalPaidDistance: state.totalPaidDistance,
-          totalIdleDistance: state.totalIdleDistance,
-          ordersCount: state.ordersCount,
-          totalIncome: state.totalIncome,
-          totalExpenses: state.totalExpenses,
-          netProfit: state.netProfit,
-          status: state.isActive ? 'active' : 'completed',
-        );
-        if (success) {
-          logMessage('🔄 Смена ${state.localShiftId} обновлена в БД', category: 'SHIFT');
-        }
-      } else {
-        final id = await db.shiftDao.insertShift(
-          startTime: state.shiftStartTime?.toIso8601String() ?? DateTime.now().toIso8601String(),
-          endTime: state.shiftEndTime?.toIso8601String(),
-          durationSeconds: state.workTime.inSeconds,
-          totalPaidDistance: state.totalPaidDistance,
-          totalIdleDistance: state.totalIdleDistance,
-          ordersCount: state.ordersCount,
-          totalIncome: state.totalIncome,
-          totalExpenses: state.totalExpenses,
-          netProfit: state.netProfit,
-          status: state.isActive ? 'active' : 'completed',
-        );
-        state = state.copyWith(localShiftId: id);
-        logMessage('💾 Смена $id сохранена в БД', category: 'SHIFT');
+  try {
+    final db = _ref.read(appDatabaseProvider);
+    
+    if (state.localShiftId != null) {
+      final success = await db.shiftDao.updateShift(
+        state.localShiftId!,
+        startTime: state.shiftStartTime?.toIso8601String() ?? DateTime.now().toIso8601String(),
+        endTime: state.shiftEndTime?.toIso8601String(),
+        durationSeconds: state.workTime.inSeconds,
+        totalPaidDistance: state.totalPaidDistance,
+        totalIdleDistance: state.totalIdleDistance,
+        totalOrderTimeSeconds: state.totalOrderTimeDisplay.inSeconds,
+        ordersCount: state.ordersCount,
+        totalIncome: state.totalIncome,
+        totalExpenses: state.totalExpenses,
+        netProfit: state.netProfit,
+        status: state.isActive ? 'active' : 'completed',
+      );
+      if (success) {
+        logMessage('🔄 Смена ${state.localShiftId} обновлена в БД', category: 'SHIFT');
       }
-    } catch (e) {
-      logMessage('❌ Ошибка сохранения смены в БД: $e', category: 'SHIFT', level: LogLevel.error);
+    } else {
+      final id = await db.shiftDao.insertShift(
+        startTime: state.shiftStartTime?.toIso8601String() ?? DateTime.now().toIso8601String(),
+        endTime: state.shiftEndTime?.toIso8601String(),
+        durationSeconds: state.workTime.inSeconds,
+        totalPaidDistance: state.totalPaidDistance,
+        totalIdleDistance: state.totalIdleDistance,
+        totalOrderTimeSeconds: state.totalOrderTimeDisplay.inSeconds,
+        ordersCount: state.ordersCount,
+        totalIncome: state.totalIncome,
+        totalExpenses: state.totalExpenses,
+        netProfit: state.netProfit,
+        status: state.isActive ? 'active' : 'completed',
+      );
+      state = state.copyWith(localShiftId: id);
+      logMessage('💾 Смена $id сохранена в БД', category: 'SHIFT');
     }
+  } catch (e) {
+    logMessage('❌ Ошибка сохранения смены в БД: $e', category: 'SHIFT', level: LogLevel.error);
   }
+}
 
   // ===== ЗАГРУЗКА ИЗ SHARED_PREFERENCES =====
 
@@ -258,6 +261,7 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     final today = _getTodayKey();
 
     if (lastDate != today) {
+      logMessage('🔄 Новая дата: $today, предыдущая: $lastDate', category: 'SHIFT');
       await _resetDay();
       return;
     }
@@ -324,10 +328,18 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   }
 
   Future<void> _resetDay() async {
-    state = const ShiftState();
-    await _saveState();
-    _stopGpsTracking();
-  }
+  logMessage('🔄 Сброс дня: обнуление всех показателей', category: 'SHIFT');
+  
+  // Сбрасываем состояние смены
+  state = const ShiftState();
+  await _saveState();
+  _stopGpsTracking();
+  
+  // Принудительно сбрасываем кеш дневной статистики
+  _ref.invalidate(dailyStatsProvider);
+  
+  logMessage('✅ Дневная статистика сброшена', category: 'SHIFT');
+}
 
   String _getTodayKey() {
     final now = DateTime.now();
