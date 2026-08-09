@@ -13,7 +13,7 @@ class DailyStats {
   final double netProfit;
   final Duration totalWorkTime;
   final Duration totalIdleTime;
-  final Duration totalOrderTime; // <-- ДОБАВЛЕНО
+  final Duration totalOrderTime;
 
   DailyStats({
     this.totalPaidDistance = 0.0,
@@ -24,7 +24,7 @@ class DailyStats {
     this.netProfit = 0.0,
     this.totalWorkTime = Duration.zero,
     this.totalIdleTime = Duration.zero,
-    this.totalOrderTime = Duration.zero, // <-- ДОБАВЛЕНО
+    this.totalOrderTime = Duration.zero,
   });
 
   DailyStats copyWith({
@@ -36,7 +36,7 @@ class DailyStats {
     double? netProfit,
     Duration? totalWorkTime,
     Duration? totalIdleTime,
-    Duration? totalOrderTime, // <-- ДОБАВЛЕНО
+    Duration? totalOrderTime,
   }) {
     return DailyStats(
       totalPaidDistance: totalPaidDistance ?? this.totalPaidDistance,
@@ -47,7 +47,7 @@ class DailyStats {
       netProfit: netProfit ?? this.netProfit,
       totalWorkTime: totalWorkTime ?? this.totalWorkTime,
       totalIdleTime: totalIdleTime ?? this.totalIdleTime,
-      totalOrderTime: totalOrderTime ?? this.totalOrderTime, // <-- ДОБАВЛЕНО
+      totalOrderTime: totalOrderTime ?? this.totalOrderTime,
     );
   }
 
@@ -74,10 +74,15 @@ class DailyStats {
   
   String get formattedAvgTimePerOrder {
     final d = avgTimePerOrder;
-    final minutes = d.inMinutes;
-    final seconds = d.inSeconds.remainder(60);
-    if (minutes > 0 && seconds > 0) {
-      return '$minutes мин $seconds сек';
+    if (d == Duration.zero) return '0 мин';
+    
+    final totalSeconds = d.inSeconds;
+    final minutes = totalSeconds ~/ 60;
+    final seconds = totalSeconds % 60;
+    
+    // Округляем до минут
+    if (seconds >= 30) {
+      return '${minutes + 1} мин';
     } else if (minutes > 0) {
       return '$minutes мин';
     } else {
@@ -106,7 +111,7 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
   var profit = 0.0;
   var workDuration = Duration.zero;
   var idleDuration = Duration.zero;
-  var orderDuration = Duration.zero; // <-- ДОБАВЛЕНО
+  var orderDuration = Duration.zero;
 
   for (final shift in shifts) {
     totalPaid += shift.totalPaidDistance;
@@ -116,6 +121,7 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
     expenses += shift.totalExpenses;
     profit += shift.netProfit;
     workDuration += Duration(seconds: shift.durationSeconds);
+    orderDuration += Duration(seconds: shift.totalOrderTimeSeconds); // <-- ИСПРАВЛЕНО: ДОБАВЛЕНО
   }
 
   final shiftState = ref.read(shiftProvider);
@@ -130,7 +136,7 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
       profit += shiftState.netProfit;
       workDuration += shiftState.workTime;
       idleDuration += shiftState.totalIdleTimeDisplay;
-      orderDuration += shiftState.totalOrderTimeDisplay; // <-- ДОБАВЛЕНО
+      orderDuration += shiftState.totalOrderTimeDisplay;
     }
   } else if (shiftState.isActive && shiftState.localShiftId == null) {
     totalPaid += shiftState.totalPaidDistance;
@@ -141,7 +147,7 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
     profit += shiftState.netProfit;
     workDuration += shiftState.workTime;
     idleDuration += shiftState.totalIdleTimeDisplay;
-    orderDuration += shiftState.totalOrderTimeDisplay; // <-- ДОБАВЛЕНО
+    orderDuration += shiftState.totalOrderTimeDisplay;
   }
 
   logMessage('📊 Дневная статистика: заказов=$orders, пробег=$totalPaid, доход=$income', category: 'STATS');
@@ -155,7 +161,7 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
     netProfit: profit,
     totalWorkTime: workDuration,
     totalIdleTime: idleDuration,
-    totalOrderTime: orderDuration, // <-- ДОБАВЛЕНО
+    totalOrderTime: orderDuration,
   );
 }
 
