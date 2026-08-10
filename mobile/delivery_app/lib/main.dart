@@ -13,24 +13,38 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 
 void main() async {
-  // Сначала инициализируем Flutter
   WidgetsFlutterBinding.ensureInitialized();
   
-  // ПРИНУДИТЕЛЬНОЕ СОЗДАНИЕ ПАПКИ ДЛЯ ЛОГОВ
+  // ПРОВЕРКА: создаём папку вручную и логируем
   try {
     final directory = await getApplicationDocumentsDirectory();
+    print('🔴 DOC DIR: ${directory.path}');
+    
     final logDir = Directory('${directory.path}/logs');
-    if (!await logDir.exists()) {
+    print('🔴 LOG DIR PATH: ${logDir.path}');
+    
+    final exists = await logDir.exists();
+    print('🔴 LOG DIR EXISTS: $exists');
+    
+    if (!exists) {
       await logDir.create(recursive: true);
-      print('🔴 ПАПКА LOGS СОЗДАНА ПРИНУДИТЕЛЬНО: ${logDir.path}');
-    } else {
-      print('🔴 ПАПКА LOGS УЖЕ СУЩЕСТВУЕТ: ${logDir.path}');
+      print('🔴 LOG DIR CREATED');
     }
+    
+    // Проверяем, что папка действительно создалась
+    final checkExists = await logDir.exists();
+    print('🔴 LOG DIR EXISTS AFTER CREATE: $checkExists');
+    
+    // Создаём тестовый файл
+    final testFile = File('${logDir.path}/test.txt');
+    await testFile.writeAsString('Тестовый файл');
+    print('🔴 TEST FILE CREATED: ${testFile.path}');
+    
   } catch (e) {
-    print('🔴 ОШИБКА СОЗДАНИЯ ПАПКИ: $e');
+    print('🔴 ERROR: $e');
   }
   
-  // Затем инициализируем логгер
+  // ... дальше инициализация логгера
   await LoggerService().init();
   
   // Теперь можно использовать logMessage
