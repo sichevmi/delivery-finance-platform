@@ -52,9 +52,15 @@ class LoggerService {
   static const int _maxRecentLogs = 200;
 
   Future<void> init() async {
-    if (_isInitialized) return;
+    print('🔴 [LOGGER] init() STARTED');
+    
+    if (_isInitialized) {
+      print('🔴 [LOGGER] Already initialized');
+      return;
+    }
 
     if (kIsWeb) {
+      print('🔴 [LOGGER] Web mode');
       _isInitialized = true;
       _webLogs.add('=' * 80);
       _webLogs.add('📱 Логи приложения FinFlow Delivery (Web)');
@@ -65,15 +71,31 @@ class LoggerService {
     }
 
     try {
+      print('🔴 [LOGGER] Getting documents directory...');
       final directory = await getApplicationDocumentsDirectory();
+      print('🔴 [LOGGER] Documents directory: ${directory.path}');
       
       final logDir = Directory('${directory.path}/logs');
+      print('🔴 [LOGGER] Log directory: ${logDir.path}');
+      
       if (!await logDir.exists()) {
+        print('🔴 [LOGGER] Creating log directory...');
         await logDir.create(recursive: true);
+        print('🔴 [LOGGER] Log directory created');
+      } else {
+        print('🔴 [LOGGER] Log directory already exists');
       }
 
       final fileName = 'app_log_${DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19)}.txt';
       _logFile = File('${logDir.path}/$fileName');
+      print('🔴 [LOGGER] Log file: ${_logFile!.path}');
+      
+      // Проверяем, можно ли писать в файл
+      if (!await _logFile!.exists()) {
+        await _logFile!.create(recursive: true);
+        print('🔴 [LOGGER] Log file created');
+      }
+      
       _sink = _logFile!.openWrite(mode: FileMode.append);
       _isInitialized = true;
 
