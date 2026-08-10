@@ -10,11 +10,16 @@ import 'package:delivery_app/logger.dart';
 import 'package:delivery_app/core/database/database_provider.dart';
 
 void main() async {
+  print('🔴 MAIN: START');
   WidgetsFlutterBinding.ensureInitialized();
+  print('🔴 MAIN: AFTER ensureInitialized');
   
-  // Инициализируем логгер
+  print('🔴 MAIN: BEFORE LOGGER INIT');
   await LoggerService().init();
+  print('🔴 MAIN: AFTER LOGGER INIT');
+  
   logMessage('🚀 Приложение запущено');
+  print('🔴 MAIN: AFTER LOG MESSAGE');
   
   // Создаём контейнер для провайдеров
   final container = ProviderContainer();
