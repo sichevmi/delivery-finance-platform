@@ -11,18 +11,15 @@ import 'package:delivery_app/logger.dart';
 import 'package:delivery_app/core/database/database_provider.dart';
 
 void main() async {
-  // Используем logMessage для вывода
-  logMessage('🔴 MAIN: START', category: 'SYSTEM');
-  
+  // Сначала инициализируем Flutter
   WidgetsFlutterBinding.ensureInitialized();
-  print('🔴 MAIN: START (PRINT)');
+  print('🔴 MAIN: AFTER ensureInitialized (PRINT)');
   
-  // Инициализируем логгер
+  // Затем инициализируем логгер
   await LoggerService().init();
-  logMessage('🚀 Приложение запущено', category: 'SYSTEM');
-  
   print('🔴 MAIN: AFTER LOGGER INIT (PRINT)');
   
+  // Только ПОСЛЕ инициализации используем logMessage
   logMessage('🚀 Приложение запущено', category: 'SYSTEM');
   logMessage('🔴 MAIN: AFTER LOG MESSAGE', category: 'SYSTEM');
   
@@ -50,8 +47,6 @@ void main() async {
   logMessage('🔴 MAIN: AFTER RUN APP', category: 'SYSTEM');
 }
 
-// ... остальной код без изменений
-
 class DeliveryApp extends ConsumerStatefulWidget {
   const DeliveryApp({super.key});
 
@@ -71,10 +66,10 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
   }
 
   Future<void> _initializeApp() async {
-    logMessage('🔐 DeliveryApp: инициализация...');
+    logMessage('🔐 DeliveryApp: инициализация...', category: 'SYSTEM');
     
     final hasPermission = await PermissionService.requestLocationPermission(context);
-    logMessage('🔐 DeliveryApp: разрешение на геолокацию = $hasPermission');
+    logMessage('🔐 DeliveryApp: разрешение на геолокацию = $hasPermission', category: 'SYSTEM');
     
     if (!hasPermission) {
       setState(() {
@@ -87,11 +82,11 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
     try {
       final authNotifier = ref.read(authProvider.notifier);
       final isAuthenticated = await authNotifier.autoLogin();
-      logMessage('🔐 DeliveryApp: isAuthenticated = $isAuthenticated');
+      logMessage('🔐 DeliveryApp: isAuthenticated = $isAuthenticated', category: 'SYSTEM');
       
       // Инициализируем GPS
       ref.read(gpsInitProvider);
-      logMessage('🟢 GPS провайдер инициализирован');
+      logMessage('🟢 GPS провайдер инициализирован', category: 'SYSTEM');
       
       setState(() {
         _hasPermission = true;
@@ -99,7 +94,7 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
         _isLoading = false;
       });
     } catch (e) {
-      logMessage('🔐 DeliveryApp: ошибка: $e');
+      logMessage('🔐 DeliveryApp: ошибка: $e', category: 'SYSTEM', level: LogLevel.error);
       setState(() {
         _hasPermission = true;
         _isAuthenticated = false;
