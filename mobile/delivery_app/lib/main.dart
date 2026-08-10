@@ -7,37 +7,33 @@ import 'package:delivery_app/features/delivery/ui/screens/home_screen.dart';
 import 'package:delivery_app/features/delivery/services/permission_service.dart';
 import 'package:delivery_app/features/auth/providers/auth_provider.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
-import 'package:delivery_app/logger.dart';
-import 'package:delivery_app/core/database/database_provider.dart';
-import 'package:delivery_app/test_logger.dart';  // <-- ДОБАВИТЬ
+import 'package:delivery_app/simple_logger.dart';
 
 void main() async {
-  // ТЕСТ: пишем лог в gps_log_final.txt
-  TestLogger.log('🚀 ПРИЛОЖЕНИЕ ЗАПУСКАЕТСЯ');
+  // Инициализируем простой логгер
+  await SimpleLogger.init();
+  SimpleLogger.log('🚀 ПРИЛОЖЕНИЕ ЗАПУСКАЕТСЯ');
   
   WidgetsFlutterBinding.ensureInitialized();
-  TestLogger.log('✅ Flutter инициализирован');
+  SimpleLogger.log('✅ Flutter инициализирован');
   
-  await LoggerService().init();
-  TestLogger.log('✅ Логгер инициализирован');
-  
-  logMessage('🚀 Приложение запущено', category: 'SYSTEM');
-  TestLogger.log('✅ logMessage вызван');
+  // Инициализируем старый логгер для совместимости
+  // await LoggerService().init();
+  // logMessage('🚀 Приложение запущено', category: 'SYSTEM');
   
   // Создаём контейнер для провайдеров
   final container = ProviderContainer();
+  SimpleLogger.log('✅ Контейнер создан');
   
   // Инициализируем базу данных
   try {
     final db = container.read(appDatabaseProvider);
-    logMessage('📁 База данных инициализирована', category: 'DATABASE');
-    TestLogger.log('✅ База данных инициализирована');
+    SimpleLogger.log('✅ База данных инициализирована');
   } catch (e) {
-    logMessage('⚠️ Ошибка инициализации БД: $e', category: 'DATABASE', level: LogLevel.error);
-    TestLogger.log('❌ Ошибка БД: $e');
+    SimpleLogger.log('❌ Ошибка БД: $e');
   }
   
-  TestLogger.log('🚀 ЗАПУСК APP');
+  SimpleLogger.log('🚀 ЗАПУСК APP');
   
   runApp(
     UncontrolledProviderScope(
@@ -46,10 +42,9 @@ void main() async {
     ),
   );
   
-  TestLogger.log('✅ APP ЗАПУЩЕН');
+  SimpleLogger.log('✅ APP ЗАПУЩЕН');
 }
 
-// ... остальной код без изменений
 class DeliveryApp extends ConsumerStatefulWidget {
   const DeliveryApp({super.key});
 
@@ -69,10 +64,10 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
   }
 
   Future<void> _initializeApp() async {
-    logMessage('🔐 DeliveryApp: инициализация...', category: 'SYSTEM');
+    SimpleLogger.log('🔐 DeliveryApp: инициализация...');
     
     final hasPermission = await PermissionService.requestLocationPermission(context);
-    logMessage('🔐 DeliveryApp: разрешение на геолокацию = $hasPermission', category: 'SYSTEM');
+    SimpleLogger.log('🔐 DeliveryApp: разрешение на геолокацию = $hasPermission');
     
     if (!hasPermission) {
       setState(() {
@@ -85,11 +80,10 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
     try {
       final authNotifier = ref.read(authProvider.notifier);
       final isAuthenticated = await authNotifier.autoLogin();
-      logMessage('🔐 DeliveryApp: isAuthenticated = $isAuthenticated', category: 'SYSTEM');
+      SimpleLogger.log('🔐 DeliveryApp: isAuthenticated = $isAuthenticated');
       
-      // Инициализируем GPS
       ref.read(gpsInitProvider);
-      logMessage('🟢 GPS провайдер инициализирован', category: 'SYSTEM');
+      SimpleLogger.log('🟢 GPS провайдер инициализирован');
       
       setState(() {
         _hasPermission = true;
@@ -97,7 +91,7 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
         _isLoading = false;
       });
     } catch (e) {
-      logMessage('🔐 DeliveryApp: ошибка: $e', category: 'SYSTEM', level: LogLevel.error);
+      SimpleLogger.log('🔐 DeliveryApp: ошибка: $e');
       setState(() {
         _hasPermission = true;
         _isAuthenticated = false;
