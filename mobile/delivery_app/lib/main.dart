@@ -15,11 +15,13 @@ void main() async {
   logMessage('🔴 MAIN: START', category: 'SYSTEM');
   
   WidgetsFlutterBinding.ensureInitialized();
-  logMessage('🔴 MAIN: AFTER ensureInitialized', category: 'SYSTEM');
+  print('🔴 MAIN: START (PRINT)');
   
-  logMessage('🔴 MAIN: BEFORE LOGGER INIT', category: 'SYSTEM');
+  // Инициализируем логгер
   await LoggerService().init();
-  logMessage('🔴 MAIN: AFTER LOGGER INIT', category: 'SYSTEM');
+  logMessage('🚀 Приложение запущено', category: 'SYSTEM');
+  
+  print('🔴 MAIN: AFTER LOGGER INIT (PRINT)');
   
   logMessage('🚀 Приложение запущено', category: 'SYSTEM');
   logMessage('🔴 MAIN: AFTER LOG MESSAGE', category: 'SYSTEM');
