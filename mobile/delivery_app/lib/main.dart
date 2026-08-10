@@ -1,3 +1,4 @@
+// main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:delivery_app/core/theme/app_theme.dart';
@@ -10,19 +11,22 @@ import 'package:delivery_app/logger.dart';
 import 'package:delivery_app/core/database/database_provider.dart';
 
 void main() async {
-  print('🔴 MAIN: START');
+  // Используем logMessage для вывода
+  logMessage('🔴 MAIN: START', category: 'SYSTEM');
+  
   WidgetsFlutterBinding.ensureInitialized();
-  print('🔴 MAIN: AFTER ensureInitialized');
+  logMessage('🔴 MAIN: AFTER ensureInitialized', category: 'SYSTEM');
   
-  print('🔴 MAIN: BEFORE LOGGER INIT');
+  logMessage('🔴 MAIN: BEFORE LOGGER INIT', category: 'SYSTEM');
   await LoggerService().init();
-  print('🔴 MAIN: AFTER LOGGER INIT');
+  logMessage('🔴 MAIN: AFTER LOGGER INIT', category: 'SYSTEM');
   
-  logMessage('🚀 Приложение запущено');
-  print('🔴 MAIN: AFTER LOG MESSAGE');
+  logMessage('🚀 Приложение запущено', category: 'SYSTEM');
+  logMessage('🔴 MAIN: AFTER LOG MESSAGE', category: 'SYSTEM');
   
   // Создаём контейнер для провайдеров
   final container = ProviderContainer();
+  logMessage('🔴 MAIN: AFTER CONTAINER', category: 'SYSTEM');
   
   // Инициализируем базу данных
   try {
@@ -32,13 +36,19 @@ void main() async {
     logMessage('⚠️ Ошибка инициализации БД: $e', category: 'DATABASE', level: LogLevel.error);
   }
   
+  logMessage('🔴 MAIN: BEFORE RUN APP', category: 'SYSTEM');
+  
   runApp(
     UncontrolledProviderScope(
       container: container,
       child: const DeliveryApp(),
     ),
   );
+  
+  logMessage('🔴 MAIN: AFTER RUN APP', category: 'SYSTEM');
 }
+
+// ... остальной код без изменений
 
 class DeliveryApp extends ConsumerStatefulWidget {
   const DeliveryApp({super.key});
