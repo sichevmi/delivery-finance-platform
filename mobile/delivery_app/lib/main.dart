@@ -9,46 +9,20 @@ import 'package:delivery_app/features/auth/providers/auth_provider.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 import 'package:delivery_app/logger.dart';
 import 'package:delivery_app/core/database/database_provider.dart';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
+import 'package:delivery_app/test_logger.dart';  // <-- ДОБАВИТЬ
 
 void main() async {
+  // ТЕСТ: пишем лог в gps_log_final.txt
+  TestLogger.log('🚀 ПРИЛОЖЕНИЕ ЗАПУСКАЕТСЯ');
+  
   WidgetsFlutterBinding.ensureInitialized();
+  TestLogger.log('✅ Flutter инициализирован');
   
-  // ПРОВЕРКА: создаём папку вручную и логируем
-  try {
-    final directory = await getApplicationDocumentsDirectory();
-    print('🔴 DOC DIR: ${directory.path}');
-    
-    final logDir = Directory('${directory.path}/logs');
-    print('🔴 LOG DIR PATH: ${logDir.path}');
-    
-    final exists = await logDir.exists();
-    print('🔴 LOG DIR EXISTS: $exists');
-    
-    if (!exists) {
-      await logDir.create(recursive: true);
-      print('🔴 LOG DIR CREATED');
-    }
-    
-    // Проверяем, что папка действительно создалась
-    final checkExists = await logDir.exists();
-    print('🔴 LOG DIR EXISTS AFTER CREATE: $checkExists');
-    
-    // Создаём тестовый файл
-    final testFile = File('${logDir.path}/test.txt');
-    await testFile.writeAsString('Тестовый файл');
-    print('🔴 TEST FILE CREATED: ${testFile.path}');
-    
-  } catch (e) {
-    print('🔴 ERROR: $e');
-  }
-  
-  // ... дальше инициализация логгера
   await LoggerService().init();
+  TestLogger.log('✅ Логгер инициализирован');
   
-  // Теперь можно использовать logMessage
   logMessage('🚀 Приложение запущено', category: 'SYSTEM');
+  TestLogger.log('✅ logMessage вызван');
   
   // Создаём контейнер для провайдеров
   final container = ProviderContainer();
@@ -57,9 +31,13 @@ void main() async {
   try {
     final db = container.read(appDatabaseProvider);
     logMessage('📁 База данных инициализирована', category: 'DATABASE');
+    TestLogger.log('✅ База данных инициализирована');
   } catch (e) {
     logMessage('⚠️ Ошибка инициализации БД: $e', category: 'DATABASE', level: LogLevel.error);
+    TestLogger.log('❌ Ошибка БД: $e');
   }
+  
+  TestLogger.log('🚀 ЗАПУСК APP');
   
   runApp(
     UncontrolledProviderScope(
@@ -67,10 +45,11 @@ void main() async {
       child: const DeliveryApp(),
     ),
   );
+  
+  TestLogger.log('✅ APP ЗАПУЩЕН');
 }
 
 // ... остальной код без изменений
-
 class DeliveryApp extends ConsumerStatefulWidget {
   const DeliveryApp({super.key});
 
