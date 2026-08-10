@@ -9,23 +9,35 @@ import 'package:delivery_app/features/auth/providers/auth_provider.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 import 'package:delivery_app/logger.dart';
 import 'package:delivery_app/core/database/database_provider.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 void main() async {
   // Сначала инициализируем Flutter
   WidgetsFlutterBinding.ensureInitialized();
-  print('🔴 MAIN: AFTER ensureInitialized (PRINT)');
+  
+  // ПРИНУДИТЕЛЬНОЕ СОЗДАНИЕ ПАПКИ ДЛЯ ЛОГОВ
+  try {
+    final directory = await getApplicationDocumentsDirectory();
+    final logDir = Directory('${directory.path}/logs');
+    if (!await logDir.exists()) {
+      await logDir.create(recursive: true);
+      print('🔴 ПАПКА LOGS СОЗДАНА ПРИНУДИТЕЛЬНО: ${logDir.path}');
+    } else {
+      print('🔴 ПАПКА LOGS УЖЕ СУЩЕСТВУЕТ: ${logDir.path}');
+    }
+  } catch (e) {
+    print('🔴 ОШИБКА СОЗДАНИЯ ПАПКИ: $e');
+  }
   
   // Затем инициализируем логгер
   await LoggerService().init();
-  print('🔴 MAIN: AFTER LOGGER INIT (PRINT)');
   
-  // Только ПОСЛЕ инициализации используем logMessage
+  // Теперь можно использовать logMessage
   logMessage('🚀 Приложение запущено', category: 'SYSTEM');
-  logMessage('🔴 MAIN: AFTER LOG MESSAGE', category: 'SYSTEM');
   
   // Создаём контейнер для провайдеров
   final container = ProviderContainer();
-  logMessage('🔴 MAIN: AFTER CONTAINER', category: 'SYSTEM');
   
   // Инициализируем базу данных
   try {
@@ -35,17 +47,15 @@ void main() async {
     logMessage('⚠️ Ошибка инициализации БД: $e', category: 'DATABASE', level: LogLevel.error);
   }
   
-  logMessage('🔴 MAIN: BEFORE RUN APP', category: 'SYSTEM');
-  
   runApp(
     UncontrolledProviderScope(
       container: container,
       child: const DeliveryApp(),
     ),
   );
-  
-  logMessage('🔴 MAIN: AFTER RUN APP', category: 'SYSTEM');
 }
+
+// ... остальной код без изменений
 
 class DeliveryApp extends ConsumerStatefulWidget {
   const DeliveryApp({super.key});
