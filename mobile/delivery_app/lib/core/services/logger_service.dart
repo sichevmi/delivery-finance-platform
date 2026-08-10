@@ -1,4 +1,4 @@
-// lib/core/services/logger_service.dart
+// lib/features/delivery/services/logger_service.dart
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -52,15 +52,10 @@ class LoggerService {
   static const int _maxRecentLogs = 200;
 
   Future<void> init() async {
-  print('🔴 LOGGER INIT STARTED');
-  if (_isInitialized) {
-    print('🔴 LOGGER ALREADY INITIALIZED');
-    return;
-  }
+    if (_isInitialized) return;
 
-  if (kIsWeb) {
-    print('🔴 LOGGER WEB MODE');
-    _isInitialized = true;
+    if (kIsWeb) {
+      _isInitialized = true;
       _webLogs.add('=' * 80);
       _webLogs.add('📱 Логи приложения FinFlow Delivery (Web)');
       _webLogs.add('🕐 Время старта: ${DateTime.now()}');
@@ -70,42 +65,32 @@ class LoggerService {
     }
 
     try {
-    print('🔴 GETTING DOCUMENTS DIRECTORY');
-    final directory = await getApplicationDocumentsDirectory();
-    print('🔴 DOCUMENTS DIRECTORY: ${directory.path}');
-    
-    final logDir = Directory('${directory.path}/logs');
-    print('🔴 LOG DIR: ${logDir.path}');
-    
-    if (!await logDir.exists()) {
-      print('🔴 CREATING LOG DIR');
-      await logDir.create(recursive: true);
-      print('🔴 LOG DIR CREATED');
-    } else {
-      print('🔴 LOG DIR ALREADY EXISTS');
+      final directory = await getApplicationDocumentsDirectory();
+      
+      final logDir = Directory('${directory.path}/logs');
+      if (!await logDir.exists()) {
+        await logDir.create(recursive: true);
+      }
+
+      final fileName = 'app_log_${DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19)}.txt';
+      _logFile = File('${logDir.path}/$fileName');
+      _sink = _logFile!.openWrite(mode: FileMode.append);
+      _isInitialized = true;
+
+      _writeToFile('=' * 80);
+      _writeToFile('📱 Логи приложения FinFlow Delivery');
+      _writeToFile('🕐 Время старта: ${DateTime.now()}');
+      _writeToFile('=' * 80);
+      _writeToFile('');
+
+      print('📁 Логи будут сохранены в: ${_logFile!.path}');
+
+      _flushBuffer();
+    } catch (e) {
+      print('❌ Ошибка инициализации логгера: $e');
+      _isInitialized = true;
     }
-
-    final fileName = 'app_log_${DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19)}.txt';
-    _logFile = File('${logDir.path}/$fileName');
-    print('🔴 LOG FILE: ${_logFile!.path}');
-    
-    _sink = _logFile!.openWrite(mode: FileMode.append);
-    _isInitialized = true;
-
-    _writeToFile('=' * 80);
-    _writeToFile('📱 Логи приложения FinFlow Delivery');
-    _writeToFile('🕐 Время старта: ${DateTime.now()}');
-    _writeToFile('=' * 80);
-    _writeToFile('');
-
-    print('📁 Логи будут сохранены в: ${_logFile!.path}');
-
-    _flushBuffer();
-  } catch (e) {
-    print('❌ Ошибка инициализации логгера: $e');
-    _isInitialized = true;
   }
-}
 
   void log(
     dynamic message, {
