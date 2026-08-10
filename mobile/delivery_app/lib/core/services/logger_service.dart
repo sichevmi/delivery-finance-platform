@@ -60,8 +60,7 @@ class LoggerService {
       _webLogs.add('📱 Логи приложения FinFlow Delivery (Web)');
       _webLogs.add('🕐 Время старта: ${DateTime.now()}');
       _webLogs.add('=' * 80);
-      // Используем logMessage вместо print
-      logMessage('📁 Логи хранятся в памяти (веб-версия)', category: 'LOGGER');
+      print('📁 Логи хранятся в памяти (веб-версия)');
       return;
     }
 
@@ -83,12 +82,11 @@ class LoggerService {
       _writeToFile('=' * 80);
       _writeToFile('');
 
-      // Вместо print используем logMessage
-      logMessage('📁 Логи будут сохранены в: ${_logFile!.path}', category: 'LOGGER');
+      print('📁 Логи будут сохранены в: ${_logFile!.path}');
 
       _flushBuffer();
     } catch (e) {
-      logMessage('❌ Ошибка инициализации логгера: $e', category: 'LOGGER', level: LogLevel.error);
+      print('❌ Ошибка инициализации логгера: $e');
       _isInitialized = true;
     }
   }
