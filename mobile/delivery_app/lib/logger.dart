@@ -1,8 +1,8 @@
 // lib/logger.dart
-export 'features/delivery/services/logger_service.dart';
+export 'core/services/logger_service.dart';
 
 // Импортируем сервис для работы внутри файла
-import 'features/delivery/services/logger_service.dart';
+import 'core/services/logger_service.dart';
 
 final LoggerService _logger = LoggerService();
 
