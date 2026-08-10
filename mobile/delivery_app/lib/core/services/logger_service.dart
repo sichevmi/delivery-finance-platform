@@ -45,11 +45,9 @@ class LoggerService {
   final List<String> _buffer = [];
   static const int _maxBufferSize = 100;
 
-  // Для веба - храним в памяти
   final List<String> _webLogs = [];
   static const int _maxWebLogs = 5000;
 
-  // Список логов для UI
   final List<LogEntry> _recentLogs = [];
   static const int _maxRecentLogs = 200;
 
@@ -68,13 +66,25 @@ class LoggerService {
 
     try {
       final directory = await getApplicationDocumentsDirectory();
+      print('🔴 Documents directory: ${directory.path}');
+      
       final logDir = Directory('${directory.path}/logs');
+      
+      // ПРИНУДИТЕЛЬНО СОЗДАЁМ ПАПКУ
       if (!await logDir.exists()) {
+        print('🔴 Создаём папку logs...');
         await logDir.create(recursive: true);
+        print('🔴 Папка logs создана');
       }
 
       final fileName = 'app_log_${DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19)}.txt';
       _logFile = File('${logDir.path}/$fileName');
+      
+      // ПРИНУДИТЕЛЬНО СОЗДАЁМ ФАЙЛ
+      if (!await _logFile!.exists()) {
+        await _logFile!.create(recursive: true);
+      }
+      
       _sink = _logFile!.openWrite(mode: FileMode.append);
       _isInitialized = true;
 
@@ -82,6 +92,7 @@ class LoggerService {
       _writeToFile('📱 Логи приложения FinFlow Delivery');
       _writeToFile('🕐 Время старта: ${DateTime.now()}');
       _writeToFile('=' * 80);
+      _writeToFile('');
 
       print('📁 Логи будут сохранены в: ${_logFile!.path}');
 
@@ -190,6 +201,9 @@ class LoggerService {
   Future<void> shareLogs() async {
     try {
       final content = await readLogs();
+      if (content.isEmpty || content == 'Файл логов не найден') {
+        throw Exception('Нет данных для отправки');
+      }
       await Share.share(
         '📱 Логи FinFlow Delivery\n\n$content',
         subject: 'Логи приложения',
