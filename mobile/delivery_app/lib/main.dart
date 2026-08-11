@@ -9,29 +9,65 @@ import 'package:delivery_app/features/auth/providers/auth_provider.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 import 'package:delivery_app/core/database/database_provider.dart';
 import 'package:delivery_app/logger_simple.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 void main() async {
-  // Инициализируем логгер
-  await AppLogger.init();
-  AppLogger.log('🚀 APP STARTED');
+  // ПРИНУДИТЕЛЬНО создаём лог-файл и пишем в него
+  try {
+    // Сначала выводим в консоль
+    print('🔴 MAIN: START');
+    
+    // Получаем папку приложения
+    final dir = await getApplicationDocumentsDirectory();
+    print('🔴 DOC DIR: ${dir.path}');
+    
+    // Создаём папку logs
+    final logDir = Directory('${dir.path}/logs');
+    if (!await logDir.exists()) {
+      await logDir.create(recursive: true);
+      print('🔴 LOG DIR CREATED');
+    } else {
+      print('🔴 LOG DIR ALREADY EXISTS');
+    }
+    
+    // Создаём файл
+    final fileName = 'app_log_${DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19)}.txt';
+    final logFile = File('${logDir.path}/$fileName');
+    print('🔴 LOG FILE: ${logFile.path}');
+    
+    // Пишем в файл
+    logFile.writeAsStringSync(
+      '${DateTime.now().toIso8601String()} 🚀 ПРИЛОЖЕНИЕ ЗАПУЩЕНО\n',
+      mode: FileMode.append,
+    );
+    print('🔴 LOG WRITTEN TO FILE');
+    
+    // Сохраняем в глобальную переменную для дальнейшего использования
+    AppLogger._logFile = logFile;
+    AppLogger._isReady = true;
+    
+  } catch (e) {
+    print('❌ LOGGER INIT ERROR: $e');
+  }
   
   WidgetsFlutterBinding.ensureInitialized();
-  AppLogger.log('✅ Flutter initialized');
+  AppLogger.log('✅ Flutter инициализирован');
   
   final container = ProviderContainer();
-  AppLogger.log('✅ Container created');
+  AppLogger.log('✅ Контейнер создан');
   
   try {
     final db = container.read(appDatabaseProvider);
-    AppLogger.log('📁 Database initialized');
+    AppLogger.log('📁 База данных инициализирована');
   } catch (e) {
-    AppLogger.log('⚠️ DB error: $e');
+    AppLogger.log('⚠️ Ошибка БД: $e');
   }
   
   ref.read(gpsInitProvider);
-  AppLogger.log('🟢 GPS initialized');
+  AppLogger.log('🟢 GPS инициализирован');
   
-  AppLogger.log('🚀 RUNNING APP');
+  AppLogger.log('🚀 ЗАПУСК APP');
   
   runApp(
     UncontrolledProviderScope(
@@ -40,7 +76,7 @@ void main() async {
     ),
   );
   
-  AppLogger.log('✅ APP RUNNING');
+  AppLogger.log('✅ APP ЗАПУЩЕН');
 }
 
 class DeliveryApp extends ConsumerStatefulWidget {
@@ -62,10 +98,10 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
   }
 
   Future<void> _initializeApp() async {
-    AppLogger.log('🔐 DeliveryApp init...');
+    AppLogger.log('🔐 DeliveryApp: инициализация...');
     
     final hasPermission = await PermissionService.requestLocationPermission(context);
-    AppLogger.log('🔐 Permission: $hasPermission');
+    AppLogger.log('🔐 DeliveryApp: разрешение = $hasPermission');
     
     if (!hasPermission) {
       setState(() {
@@ -78,10 +114,10 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
     try {
       final authNotifier = ref.read(authProvider.notifier);
       final isAuthenticated = await authNotifier.autoLogin();
-      AppLogger.log('🔐 Authenticated: $isAuthenticated');
+      AppLogger.log('🔐 DeliveryApp: авторизован = $isAuthenticated');
       
       ref.read(gpsInitProvider);
-      AppLogger.log('🟢 GPS provider ready');
+      AppLogger.log('🟢 GPS провайдер инициализирован');
       
       setState(() {
         _hasPermission = true;
@@ -89,7 +125,7 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
         _isLoading = false;
       });
     } catch (e) {
-      AppLogger.log('🔐 Error: $e');
+      AppLogger.log('🔐 DeliveryApp: ошибка: $e');
       setState(() {
         _hasPermission = true;
         _isAuthenticated = false;
