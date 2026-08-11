@@ -80,7 +80,6 @@ class DailyStats {
     final minutes = totalSeconds ~/ 60;
     final seconds = totalSeconds % 60;
     
-    // Округляем до минут
     if (seconds >= 30) {
       return '${minutes + 1} мин';
     } else if (minutes > 0) {
@@ -101,67 +100,64 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
   final db = ref.read(appDatabaseProvider);
   final now = DateTime.now();
   
-  final shifts = await db.shiftDao.getShiftsForDate(now);
-
+  // Получаем все заказы за сегодня из БД
+  final orders = await db.orderDao.getOrdersForDate(now);
+  
   var totalPaid = 0.0;
+  var totalIncome = 0.0;
+  var totalExpenses = 0.0;
+  var totalProfit = 0.0;
+  var totalOrderTime = Duration.zero;
+  var ordersCount = orders.length;
+  
+  for (final order in orders) {
+    totalPaid += order.totalPaidDistance;
+    totalIncome += order.totalIncome;
+    totalExpenses += order.totalExpenses;
+    totalProfit += order.netProfit;
+    totalOrderTime += Duration(seconds: order.totalTimeSeconds);
+  }
+  
+  // Получаем смены для рабочего времени и холостого пробега
+  final shifts = await db.shiftDao.getShiftsForDate(now);
+  
   var totalIdle = 0.0;
-  var orders = 0;
-  var income = 0.0;
-  var expenses = 0.0;
-  var profit = 0.0;
   var workDuration = Duration.zero;
   var idleDuration = Duration.zero;
-  var orderDuration = Duration.zero;
 
   for (final shift in shifts) {
-    totalPaid += shift.totalPaidDistance;
     totalIdle += shift.totalIdleDistance;
-    orders += shift.ordersCount;
-    income += shift.totalIncome;
-    expenses += shift.totalExpenses;
-    profit += shift.netProfit;
     workDuration += Duration(seconds: shift.durationSeconds);
-    orderDuration += Duration(seconds: shift.totalOrderTimeSeconds); // <-- ИСПРАВЛЕНО: ДОБАВЛЕНО
   }
 
+  // Добавляем текущую активную смену (если есть)
   final shiftState = ref.read(shiftProvider);
   if (shiftState.isActive && shiftState.localShiftId != null) {
     final alreadyInDb = shifts.any((s) => s.id == shiftState.localShiftId);
     if (!alreadyInDb) {
-      totalPaid += shiftState.totalPaidDistance;
       totalIdle += shiftState.totalIdleDistance;
-      orders += shiftState.ordersCount;
-      income += shiftState.totalIncome;
-      expenses += shiftState.totalExpenses;
-      profit += shiftState.netProfit;
       workDuration += shiftState.workTime;
       idleDuration += shiftState.totalIdleTimeDisplay;
-      orderDuration += shiftState.totalOrderTimeDisplay;
+      // Заказы из активной смены не дублируем, они уже сохранены в БД
     }
   } else if (shiftState.isActive && shiftState.localShiftId == null) {
-    totalPaid += shiftState.totalPaidDistance;
     totalIdle += shiftState.totalIdleDistance;
-    orders += shiftState.ordersCount;
-    income += shiftState.totalIncome;
-    expenses += shiftState.totalExpenses;
-    profit += shiftState.netProfit;
     workDuration += shiftState.workTime;
     idleDuration += shiftState.totalIdleTimeDisplay;
-    orderDuration += shiftState.totalOrderTimeDisplay;
   }
 
-  logMessage('📊 Дневная статистика: заказов=$orders, пробег=$totalPaid, доход=$income', category: 'STATS');
+  logMessage('📊 Дневная статистика: заказов=$ordersCount, пробег=$totalPaid, доход=$totalIncome', category: 'STATS');
 
   return DailyStats(
     totalPaidDistance: totalPaid,
     totalIdleDistance: totalIdle,
-    ordersCount: orders,
-    totalIncome: income,
-    totalExpenses: expenses,
-    netProfit: profit,
+    ordersCount: ordersCount,
+    totalIncome: totalIncome,
+    totalExpenses: totalExpenses,
+    netProfit: totalProfit,
     totalWorkTime: workDuration,
     totalIdleTime: idleDuration,
-    totalOrderTime: orderDuration,
+    totalOrderTime: totalOrderTime,
   );
 }
 

@@ -2609,24 +2609,68 @@ class $OrderTableTable extends OrderTable
   late final GeneratedColumn<int> shiftId = GeneratedColumn<int>(
       'shift_id', aliasedName, true,
       type: DriftSqlType.int, requiredDuringInsert: false);
-  static const VerificationMeta _deliveryNumberMeta =
-      const VerificationMeta('deliveryNumber');
-  @override
-  late final GeneratedColumn<int> deliveryNumber = GeneratedColumn<int>(
-      'delivery_number', aliasedName, true,
-      type: DriftSqlType.int, requiredDuringInsert: false);
-  static const VerificationMeta _coefficientMeta =
-      const VerificationMeta('coefficient');
-  @override
-  late final GeneratedColumn<double> coefficient = GeneratedColumn<double>(
-      'coefficient', aliasedName, true,
-      type: DriftSqlType.double, requiredDuringInsert: false);
   static const VerificationMeta _serviceNameMeta =
       const VerificationMeta('serviceName');
   @override
   late final GeneratedColumn<String> serviceName = GeneratedColumn<String>(
-      'service_name', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
+      'service_name', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _coefficientMeta =
+      const VerificationMeta('coefficient');
+  @override
+  late final GeneratedColumn<double> coefficient = GeneratedColumn<double>(
+      'coefficient', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(1.0));
+  static const VerificationMeta _deliveryNumberMeta =
+      const VerificationMeta('deliveryNumber');
+  @override
+  late final GeneratedColumn<int> deliveryNumber = GeneratedColumn<int>(
+      'delivery_number', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(1));
+  static const VerificationMeta _totalPaidDistanceMeta =
+      const VerificationMeta('totalPaidDistance');
+  @override
+  late final GeneratedColumn<double> totalPaidDistance =
+      GeneratedColumn<double>('total_paid_distance', aliasedName, false,
+          type: DriftSqlType.double,
+          requiredDuringInsert: false,
+          defaultValue: const Constant(0.0));
+  static const VerificationMeta _totalIncomeMeta =
+      const VerificationMeta('totalIncome');
+  @override
+  late final GeneratedColumn<double> totalIncome = GeneratedColumn<double>(
+      'total_income', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
+  static const VerificationMeta _totalExpensesMeta =
+      const VerificationMeta('totalExpenses');
+  @override
+  late final GeneratedColumn<double> totalExpenses = GeneratedColumn<double>(
+      'total_expenses', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
+  static const VerificationMeta _netProfitMeta =
+      const VerificationMeta('netProfit');
+  @override
+  late final GeneratedColumn<double> netProfit = GeneratedColumn<double>(
+      'net_profit', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
+  static const VerificationMeta _totalTimeSecondsMeta =
+      const VerificationMeta('totalTimeSeconds');
+  @override
+  late final GeneratedColumn<int> totalTimeSeconds = GeneratedColumn<int>(
+      'total_time_seconds', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
   static const VerificationMeta _statusMeta = const VerificationMeta('status');
   @override
   late final GeneratedColumn<String> status = GeneratedColumn<String>(
@@ -2661,9 +2705,14 @@ class $OrderTableTable extends OrderTable
         id,
         serverId,
         shiftId,
-        deliveryNumber,
-        coefficient,
         serviceName,
+        coefficient,
+        deliveryNumber,
+        totalPaidDistance,
+        totalIncome,
+        totalExpenses,
+        netProfit,
+        totalTimeSeconds,
         status,
         isSynced,
         createdAt,
@@ -2690,11 +2739,13 @@ class $OrderTableTable extends OrderTable
       context.handle(_shiftIdMeta,
           shiftId.isAcceptableOrUnknown(data['shift_id']!, _shiftIdMeta));
     }
-    if (data.containsKey('delivery_number')) {
+    if (data.containsKey('service_name')) {
       context.handle(
-          _deliveryNumberMeta,
-          deliveryNumber.isAcceptableOrUnknown(
-              data['delivery_number']!, _deliveryNumberMeta));
+          _serviceNameMeta,
+          serviceName.isAcceptableOrUnknown(
+              data['service_name']!, _serviceNameMeta));
+    } else if (isInserting) {
+      context.missing(_serviceNameMeta);
     }
     if (data.containsKey('coefficient')) {
       context.handle(
@@ -2702,11 +2753,39 @@ class $OrderTableTable extends OrderTable
           coefficient.isAcceptableOrUnknown(
               data['coefficient']!, _coefficientMeta));
     }
-    if (data.containsKey('service_name')) {
+    if (data.containsKey('delivery_number')) {
       context.handle(
-          _serviceNameMeta,
-          serviceName.isAcceptableOrUnknown(
-              data['service_name']!, _serviceNameMeta));
+          _deliveryNumberMeta,
+          deliveryNumber.isAcceptableOrUnknown(
+              data['delivery_number']!, _deliveryNumberMeta));
+    }
+    if (data.containsKey('total_paid_distance')) {
+      context.handle(
+          _totalPaidDistanceMeta,
+          totalPaidDistance.isAcceptableOrUnknown(
+              data['total_paid_distance']!, _totalPaidDistanceMeta));
+    }
+    if (data.containsKey('total_income')) {
+      context.handle(
+          _totalIncomeMeta,
+          totalIncome.isAcceptableOrUnknown(
+              data['total_income']!, _totalIncomeMeta));
+    }
+    if (data.containsKey('total_expenses')) {
+      context.handle(
+          _totalExpensesMeta,
+          totalExpenses.isAcceptableOrUnknown(
+              data['total_expenses']!, _totalExpensesMeta));
+    }
+    if (data.containsKey('net_profit')) {
+      context.handle(_netProfitMeta,
+          netProfit.isAcceptableOrUnknown(data['net_profit']!, _netProfitMeta));
+    }
+    if (data.containsKey('total_time_seconds')) {
+      context.handle(
+          _totalTimeSecondsMeta,
+          totalTimeSeconds.isAcceptableOrUnknown(
+              data['total_time_seconds']!, _totalTimeSecondsMeta));
     }
     if (data.containsKey('status')) {
       context.handle(_statusMeta,
@@ -2741,12 +2820,22 @@ class $OrderTableTable extends OrderTable
           .read(DriftSqlType.int, data['${effectivePrefix}server_id']),
       shiftId: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}shift_id']),
-      deliveryNumber: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}delivery_number']),
-      coefficient: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}coefficient']),
       serviceName: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}service_name']),
+          .read(DriftSqlType.string, data['${effectivePrefix}service_name'])!,
+      coefficient: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}coefficient'])!,
+      deliveryNumber: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}delivery_number'])!,
+      totalPaidDistance: attachedDatabase.typeMapping.read(
+          DriftSqlType.double, data['${effectivePrefix}total_paid_distance'])!,
+      totalIncome: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}total_income'])!,
+      totalExpenses: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}total_expenses'])!,
+      netProfit: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}net_profit'])!,
+      totalTimeSeconds: attachedDatabase.typeMapping.read(
+          DriftSqlType.int, data['${effectivePrefix}total_time_seconds'])!,
       status: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}status'])!,
       isSynced: attachedDatabase.typeMapping
@@ -2768,9 +2857,14 @@ class OrderTableData extends DataClass implements Insertable<OrderTableData> {
   final int id;
   final int? serverId;
   final int? shiftId;
-  final int? deliveryNumber;
-  final double? coefficient;
-  final String? serviceName;
+  final String serviceName;
+  final double coefficient;
+  final int deliveryNumber;
+  final double totalPaidDistance;
+  final double totalIncome;
+  final double totalExpenses;
+  final double netProfit;
+  final int totalTimeSeconds;
   final String status;
   final bool isSynced;
   final DateTime createdAt;
@@ -2779,9 +2873,14 @@ class OrderTableData extends DataClass implements Insertable<OrderTableData> {
       {required this.id,
       this.serverId,
       this.shiftId,
-      this.deliveryNumber,
-      this.coefficient,
-      this.serviceName,
+      required this.serviceName,
+      required this.coefficient,
+      required this.deliveryNumber,
+      required this.totalPaidDistance,
+      required this.totalIncome,
+      required this.totalExpenses,
+      required this.netProfit,
+      required this.totalTimeSeconds,
       required this.status,
       required this.isSynced,
       required this.createdAt,
@@ -2796,15 +2895,14 @@ class OrderTableData extends DataClass implements Insertable<OrderTableData> {
     if (!nullToAbsent || shiftId != null) {
       map['shift_id'] = Variable<int>(shiftId);
     }
-    if (!nullToAbsent || deliveryNumber != null) {
-      map['delivery_number'] = Variable<int>(deliveryNumber);
-    }
-    if (!nullToAbsent || coefficient != null) {
-      map['coefficient'] = Variable<double>(coefficient);
-    }
-    if (!nullToAbsent || serviceName != null) {
-      map['service_name'] = Variable<String>(serviceName);
-    }
+    map['service_name'] = Variable<String>(serviceName);
+    map['coefficient'] = Variable<double>(coefficient);
+    map['delivery_number'] = Variable<int>(deliveryNumber);
+    map['total_paid_distance'] = Variable<double>(totalPaidDistance);
+    map['total_income'] = Variable<double>(totalIncome);
+    map['total_expenses'] = Variable<double>(totalExpenses);
+    map['net_profit'] = Variable<double>(netProfit);
+    map['total_time_seconds'] = Variable<int>(totalTimeSeconds);
     map['status'] = Variable<String>(status);
     map['is_synced'] = Variable<bool>(isSynced);
     map['created_at'] = Variable<DateTime>(createdAt);
@@ -2823,15 +2921,14 @@ class OrderTableData extends DataClass implements Insertable<OrderTableData> {
       shiftId: shiftId == null && nullToAbsent
           ? const Value.absent()
           : Value(shiftId),
-      deliveryNumber: deliveryNumber == null && nullToAbsent
-          ? const Value.absent()
-          : Value(deliveryNumber),
-      coefficient: coefficient == null && nullToAbsent
-          ? const Value.absent()
-          : Value(coefficient),
-      serviceName: serviceName == null && nullToAbsent
-          ? const Value.absent()
-          : Value(serviceName),
+      serviceName: Value(serviceName),
+      coefficient: Value(coefficient),
+      deliveryNumber: Value(deliveryNumber),
+      totalPaidDistance: Value(totalPaidDistance),
+      totalIncome: Value(totalIncome),
+      totalExpenses: Value(totalExpenses),
+      netProfit: Value(netProfit),
+      totalTimeSeconds: Value(totalTimeSeconds),
       status: Value(status),
       isSynced: Value(isSynced),
       createdAt: Value(createdAt),
@@ -2848,9 +2945,14 @@ class OrderTableData extends DataClass implements Insertable<OrderTableData> {
       id: serializer.fromJson<int>(json['id']),
       serverId: serializer.fromJson<int?>(json['serverId']),
       shiftId: serializer.fromJson<int?>(json['shiftId']),
-      deliveryNumber: serializer.fromJson<int?>(json['deliveryNumber']),
-      coefficient: serializer.fromJson<double?>(json['coefficient']),
-      serviceName: serializer.fromJson<String?>(json['serviceName']),
+      serviceName: serializer.fromJson<String>(json['serviceName']),
+      coefficient: serializer.fromJson<double>(json['coefficient']),
+      deliveryNumber: serializer.fromJson<int>(json['deliveryNumber']),
+      totalPaidDistance: serializer.fromJson<double>(json['totalPaidDistance']),
+      totalIncome: serializer.fromJson<double>(json['totalIncome']),
+      totalExpenses: serializer.fromJson<double>(json['totalExpenses']),
+      netProfit: serializer.fromJson<double>(json['netProfit']),
+      totalTimeSeconds: serializer.fromJson<int>(json['totalTimeSeconds']),
       status: serializer.fromJson<String>(json['status']),
       isSynced: serializer.fromJson<bool>(json['isSynced']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -2864,9 +2966,14 @@ class OrderTableData extends DataClass implements Insertable<OrderTableData> {
       'id': serializer.toJson<int>(id),
       'serverId': serializer.toJson<int?>(serverId),
       'shiftId': serializer.toJson<int?>(shiftId),
-      'deliveryNumber': serializer.toJson<int?>(deliveryNumber),
-      'coefficient': serializer.toJson<double?>(coefficient),
-      'serviceName': serializer.toJson<String?>(serviceName),
+      'serviceName': serializer.toJson<String>(serviceName),
+      'coefficient': serializer.toJson<double>(coefficient),
+      'deliveryNumber': serializer.toJson<int>(deliveryNumber),
+      'totalPaidDistance': serializer.toJson<double>(totalPaidDistance),
+      'totalIncome': serializer.toJson<double>(totalIncome),
+      'totalExpenses': serializer.toJson<double>(totalExpenses),
+      'netProfit': serializer.toJson<double>(netProfit),
+      'totalTimeSeconds': serializer.toJson<int>(totalTimeSeconds),
       'status': serializer.toJson<String>(status),
       'isSynced': serializer.toJson<bool>(isSynced),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -2878,9 +2985,14 @@ class OrderTableData extends DataClass implements Insertable<OrderTableData> {
           {int? id,
           Value<int?> serverId = const Value.absent(),
           Value<int?> shiftId = const Value.absent(),
-          Value<int?> deliveryNumber = const Value.absent(),
-          Value<double?> coefficient = const Value.absent(),
-          Value<String?> serviceName = const Value.absent(),
+          String? serviceName,
+          double? coefficient,
+          int? deliveryNumber,
+          double? totalPaidDistance,
+          double? totalIncome,
+          double? totalExpenses,
+          double? netProfit,
+          int? totalTimeSeconds,
           String? status,
           bool? isSynced,
           DateTime? createdAt,
@@ -2889,10 +3001,14 @@ class OrderTableData extends DataClass implements Insertable<OrderTableData> {
         id: id ?? this.id,
         serverId: serverId.present ? serverId.value : this.serverId,
         shiftId: shiftId.present ? shiftId.value : this.shiftId,
-        deliveryNumber:
-            deliveryNumber.present ? deliveryNumber.value : this.deliveryNumber,
-        coefficient: coefficient.present ? coefficient.value : this.coefficient,
-        serviceName: serviceName.present ? serviceName.value : this.serviceName,
+        serviceName: serviceName ?? this.serviceName,
+        coefficient: coefficient ?? this.coefficient,
+        deliveryNumber: deliveryNumber ?? this.deliveryNumber,
+        totalPaidDistance: totalPaidDistance ?? this.totalPaidDistance,
+        totalIncome: totalIncome ?? this.totalIncome,
+        totalExpenses: totalExpenses ?? this.totalExpenses,
+        netProfit: netProfit ?? this.netProfit,
+        totalTimeSeconds: totalTimeSeconds ?? this.totalTimeSeconds,
         status: status ?? this.status,
         isSynced: isSynced ?? this.isSynced,
         createdAt: createdAt ?? this.createdAt,
@@ -2903,13 +3019,25 @@ class OrderTableData extends DataClass implements Insertable<OrderTableData> {
       id: data.id.present ? data.id.value : this.id,
       serverId: data.serverId.present ? data.serverId.value : this.serverId,
       shiftId: data.shiftId.present ? data.shiftId.value : this.shiftId,
+      serviceName:
+          data.serviceName.present ? data.serviceName.value : this.serviceName,
+      coefficient:
+          data.coefficient.present ? data.coefficient.value : this.coefficient,
       deliveryNumber: data.deliveryNumber.present
           ? data.deliveryNumber.value
           : this.deliveryNumber,
-      coefficient:
-          data.coefficient.present ? data.coefficient.value : this.coefficient,
-      serviceName:
-          data.serviceName.present ? data.serviceName.value : this.serviceName,
+      totalPaidDistance: data.totalPaidDistance.present
+          ? data.totalPaidDistance.value
+          : this.totalPaidDistance,
+      totalIncome:
+          data.totalIncome.present ? data.totalIncome.value : this.totalIncome,
+      totalExpenses: data.totalExpenses.present
+          ? data.totalExpenses.value
+          : this.totalExpenses,
+      netProfit: data.netProfit.present ? data.netProfit.value : this.netProfit,
+      totalTimeSeconds: data.totalTimeSeconds.present
+          ? data.totalTimeSeconds.value
+          : this.totalTimeSeconds,
       status: data.status.present ? data.status.value : this.status,
       isSynced: data.isSynced.present ? data.isSynced.value : this.isSynced,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -2923,9 +3051,14 @@ class OrderTableData extends DataClass implements Insertable<OrderTableData> {
           ..write('id: $id, ')
           ..write('serverId: $serverId, ')
           ..write('shiftId: $shiftId, ')
-          ..write('deliveryNumber: $deliveryNumber, ')
-          ..write('coefficient: $coefficient, ')
           ..write('serviceName: $serviceName, ')
+          ..write('coefficient: $coefficient, ')
+          ..write('deliveryNumber: $deliveryNumber, ')
+          ..write('totalPaidDistance: $totalPaidDistance, ')
+          ..write('totalIncome: $totalIncome, ')
+          ..write('totalExpenses: $totalExpenses, ')
+          ..write('netProfit: $netProfit, ')
+          ..write('totalTimeSeconds: $totalTimeSeconds, ')
           ..write('status: $status, ')
           ..write('isSynced: $isSynced, ')
           ..write('createdAt: $createdAt, ')
@@ -2935,8 +3068,22 @@ class OrderTableData extends DataClass implements Insertable<OrderTableData> {
   }
 
   @override
-  int get hashCode => Object.hash(id, serverId, shiftId, deliveryNumber,
-      coefficient, serviceName, status, isSynced, createdAt, updatedAt);
+  int get hashCode => Object.hash(
+      id,
+      serverId,
+      shiftId,
+      serviceName,
+      coefficient,
+      deliveryNumber,
+      totalPaidDistance,
+      totalIncome,
+      totalExpenses,
+      netProfit,
+      totalTimeSeconds,
+      status,
+      isSynced,
+      createdAt,
+      updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2944,9 +3091,14 @@ class OrderTableData extends DataClass implements Insertable<OrderTableData> {
           other.id == this.id &&
           other.serverId == this.serverId &&
           other.shiftId == this.shiftId &&
-          other.deliveryNumber == this.deliveryNumber &&
-          other.coefficient == this.coefficient &&
           other.serviceName == this.serviceName &&
+          other.coefficient == this.coefficient &&
+          other.deliveryNumber == this.deliveryNumber &&
+          other.totalPaidDistance == this.totalPaidDistance &&
+          other.totalIncome == this.totalIncome &&
+          other.totalExpenses == this.totalExpenses &&
+          other.netProfit == this.netProfit &&
+          other.totalTimeSeconds == this.totalTimeSeconds &&
           other.status == this.status &&
           other.isSynced == this.isSynced &&
           other.createdAt == this.createdAt &&
@@ -2957,9 +3109,14 @@ class OrderTableCompanion extends UpdateCompanion<OrderTableData> {
   final Value<int> id;
   final Value<int?> serverId;
   final Value<int?> shiftId;
-  final Value<int?> deliveryNumber;
-  final Value<double?> coefficient;
-  final Value<String?> serviceName;
+  final Value<String> serviceName;
+  final Value<double> coefficient;
+  final Value<int> deliveryNumber;
+  final Value<double> totalPaidDistance;
+  final Value<double> totalIncome;
+  final Value<double> totalExpenses;
+  final Value<double> netProfit;
+  final Value<int> totalTimeSeconds;
   final Value<String> status;
   final Value<bool> isSynced;
   final Value<DateTime> createdAt;
@@ -2968,9 +3125,14 @@ class OrderTableCompanion extends UpdateCompanion<OrderTableData> {
     this.id = const Value.absent(),
     this.serverId = const Value.absent(),
     this.shiftId = const Value.absent(),
-    this.deliveryNumber = const Value.absent(),
-    this.coefficient = const Value.absent(),
     this.serviceName = const Value.absent(),
+    this.coefficient = const Value.absent(),
+    this.deliveryNumber = const Value.absent(),
+    this.totalPaidDistance = const Value.absent(),
+    this.totalIncome = const Value.absent(),
+    this.totalExpenses = const Value.absent(),
+    this.netProfit = const Value.absent(),
+    this.totalTimeSeconds = const Value.absent(),
     this.status = const Value.absent(),
     this.isSynced = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -2980,21 +3142,32 @@ class OrderTableCompanion extends UpdateCompanion<OrderTableData> {
     this.id = const Value.absent(),
     this.serverId = const Value.absent(),
     this.shiftId = const Value.absent(),
-    this.deliveryNumber = const Value.absent(),
+    required String serviceName,
     this.coefficient = const Value.absent(),
-    this.serviceName = const Value.absent(),
+    this.deliveryNumber = const Value.absent(),
+    this.totalPaidDistance = const Value.absent(),
+    this.totalIncome = const Value.absent(),
+    this.totalExpenses = const Value.absent(),
+    this.netProfit = const Value.absent(),
+    this.totalTimeSeconds = const Value.absent(),
     this.status = const Value.absent(),
     this.isSynced = const Value.absent(),
     required DateTime createdAt,
     this.updatedAt = const Value.absent(),
-  }) : createdAt = Value(createdAt);
+  })  : serviceName = Value(serviceName),
+        createdAt = Value(createdAt);
   static Insertable<OrderTableData> custom({
     Expression<int>? id,
     Expression<int>? serverId,
     Expression<int>? shiftId,
-    Expression<int>? deliveryNumber,
-    Expression<double>? coefficient,
     Expression<String>? serviceName,
+    Expression<double>? coefficient,
+    Expression<int>? deliveryNumber,
+    Expression<double>? totalPaidDistance,
+    Expression<double>? totalIncome,
+    Expression<double>? totalExpenses,
+    Expression<double>? netProfit,
+    Expression<int>? totalTimeSeconds,
     Expression<String>? status,
     Expression<bool>? isSynced,
     Expression<DateTime>? createdAt,
@@ -3004,9 +3177,14 @@ class OrderTableCompanion extends UpdateCompanion<OrderTableData> {
       if (id != null) 'id': id,
       if (serverId != null) 'server_id': serverId,
       if (shiftId != null) 'shift_id': shiftId,
-      if (deliveryNumber != null) 'delivery_number': deliveryNumber,
-      if (coefficient != null) 'coefficient': coefficient,
       if (serviceName != null) 'service_name': serviceName,
+      if (coefficient != null) 'coefficient': coefficient,
+      if (deliveryNumber != null) 'delivery_number': deliveryNumber,
+      if (totalPaidDistance != null) 'total_paid_distance': totalPaidDistance,
+      if (totalIncome != null) 'total_income': totalIncome,
+      if (totalExpenses != null) 'total_expenses': totalExpenses,
+      if (netProfit != null) 'net_profit': netProfit,
+      if (totalTimeSeconds != null) 'total_time_seconds': totalTimeSeconds,
       if (status != null) 'status': status,
       if (isSynced != null) 'is_synced': isSynced,
       if (createdAt != null) 'created_at': createdAt,
@@ -3018,9 +3196,14 @@ class OrderTableCompanion extends UpdateCompanion<OrderTableData> {
       {Value<int>? id,
       Value<int?>? serverId,
       Value<int?>? shiftId,
-      Value<int?>? deliveryNumber,
-      Value<double?>? coefficient,
-      Value<String?>? serviceName,
+      Value<String>? serviceName,
+      Value<double>? coefficient,
+      Value<int>? deliveryNumber,
+      Value<double>? totalPaidDistance,
+      Value<double>? totalIncome,
+      Value<double>? totalExpenses,
+      Value<double>? netProfit,
+      Value<int>? totalTimeSeconds,
       Value<String>? status,
       Value<bool>? isSynced,
       Value<DateTime>? createdAt,
@@ -3029,9 +3212,14 @@ class OrderTableCompanion extends UpdateCompanion<OrderTableData> {
       id: id ?? this.id,
       serverId: serverId ?? this.serverId,
       shiftId: shiftId ?? this.shiftId,
-      deliveryNumber: deliveryNumber ?? this.deliveryNumber,
-      coefficient: coefficient ?? this.coefficient,
       serviceName: serviceName ?? this.serviceName,
+      coefficient: coefficient ?? this.coefficient,
+      deliveryNumber: deliveryNumber ?? this.deliveryNumber,
+      totalPaidDistance: totalPaidDistance ?? this.totalPaidDistance,
+      totalIncome: totalIncome ?? this.totalIncome,
+      totalExpenses: totalExpenses ?? this.totalExpenses,
+      netProfit: netProfit ?? this.netProfit,
+      totalTimeSeconds: totalTimeSeconds ?? this.totalTimeSeconds,
       status: status ?? this.status,
       isSynced: isSynced ?? this.isSynced,
       createdAt: createdAt ?? this.createdAt,
@@ -3051,14 +3239,29 @@ class OrderTableCompanion extends UpdateCompanion<OrderTableData> {
     if (shiftId.present) {
       map['shift_id'] = Variable<int>(shiftId.value);
     }
-    if (deliveryNumber.present) {
-      map['delivery_number'] = Variable<int>(deliveryNumber.value);
+    if (serviceName.present) {
+      map['service_name'] = Variable<String>(serviceName.value);
     }
     if (coefficient.present) {
       map['coefficient'] = Variable<double>(coefficient.value);
     }
-    if (serviceName.present) {
-      map['service_name'] = Variable<String>(serviceName.value);
+    if (deliveryNumber.present) {
+      map['delivery_number'] = Variable<int>(deliveryNumber.value);
+    }
+    if (totalPaidDistance.present) {
+      map['total_paid_distance'] = Variable<double>(totalPaidDistance.value);
+    }
+    if (totalIncome.present) {
+      map['total_income'] = Variable<double>(totalIncome.value);
+    }
+    if (totalExpenses.present) {
+      map['total_expenses'] = Variable<double>(totalExpenses.value);
+    }
+    if (netProfit.present) {
+      map['net_profit'] = Variable<double>(netProfit.value);
+    }
+    if (totalTimeSeconds.present) {
+      map['total_time_seconds'] = Variable<int>(totalTimeSeconds.value);
     }
     if (status.present) {
       map['status'] = Variable<String>(status.value);
@@ -3081,9 +3284,14 @@ class OrderTableCompanion extends UpdateCompanion<OrderTableData> {
           ..write('id: $id, ')
           ..write('serverId: $serverId, ')
           ..write('shiftId: $shiftId, ')
-          ..write('deliveryNumber: $deliveryNumber, ')
-          ..write('coefficient: $coefficient, ')
           ..write('serviceName: $serviceName, ')
+          ..write('coefficient: $coefficient, ')
+          ..write('deliveryNumber: $deliveryNumber, ')
+          ..write('totalPaidDistance: $totalPaidDistance, ')
+          ..write('totalIncome: $totalIncome, ')
+          ..write('totalExpenses: $totalExpenses, ')
+          ..write('netProfit: $netProfit, ')
+          ..write('totalTimeSeconds: $totalTimeSeconds, ')
           ..write('status: $status, ')
           ..write('isSynced: $isSynced, ')
           ..write('createdAt: $createdAt, ')
@@ -5605,9 +5813,14 @@ typedef $$OrderTableTableCreateCompanionBuilder = OrderTableCompanion Function({
   Value<int> id,
   Value<int?> serverId,
   Value<int?> shiftId,
-  Value<int?> deliveryNumber,
-  Value<double?> coefficient,
-  Value<String?> serviceName,
+  required String serviceName,
+  Value<double> coefficient,
+  Value<int> deliveryNumber,
+  Value<double> totalPaidDistance,
+  Value<double> totalIncome,
+  Value<double> totalExpenses,
+  Value<double> netProfit,
+  Value<int> totalTimeSeconds,
   Value<String> status,
   Value<bool> isSynced,
   required DateTime createdAt,
@@ -5617,9 +5830,14 @@ typedef $$OrderTableTableUpdateCompanionBuilder = OrderTableCompanion Function({
   Value<int> id,
   Value<int?> serverId,
   Value<int?> shiftId,
-  Value<int?> deliveryNumber,
-  Value<double?> coefficient,
-  Value<String?> serviceName,
+  Value<String> serviceName,
+  Value<double> coefficient,
+  Value<int> deliveryNumber,
+  Value<double> totalPaidDistance,
+  Value<double> totalIncome,
+  Value<double> totalExpenses,
+  Value<double> netProfit,
+  Value<int> totalTimeSeconds,
   Value<String> status,
   Value<bool> isSynced,
   Value<DateTime> createdAt,
@@ -5644,15 +5862,32 @@ class $$OrderTableTableFilterComposer
   ColumnFilters<int> get shiftId => $composableBuilder(
       column: $table.shiftId, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<int> get deliveryNumber => $composableBuilder(
-      column: $table.deliveryNumber,
-      builder: (column) => ColumnFilters(column));
+  ColumnFilters<String> get serviceName => $composableBuilder(
+      column: $table.serviceName, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<double> get coefficient => $composableBuilder(
       column: $table.coefficient, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<String> get serviceName => $composableBuilder(
-      column: $table.serviceName, builder: (column) => ColumnFilters(column));
+  ColumnFilters<int> get deliveryNumber => $composableBuilder(
+      column: $table.deliveryNumber,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get totalPaidDistance => $composableBuilder(
+      column: $table.totalPaidDistance,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get totalIncome => $composableBuilder(
+      column: $table.totalIncome, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get totalExpenses => $composableBuilder(
+      column: $table.totalExpenses, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get netProfit => $composableBuilder(
+      column: $table.netProfit, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get totalTimeSeconds => $composableBuilder(
+      column: $table.totalTimeSeconds,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get status => $composableBuilder(
       column: $table.status, builder: (column) => ColumnFilters(column));
@@ -5685,15 +5920,33 @@ class $$OrderTableTableOrderingComposer
   ColumnOrderings<int> get shiftId => $composableBuilder(
       column: $table.shiftId, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<int> get deliveryNumber => $composableBuilder(
-      column: $table.deliveryNumber,
-      builder: (column) => ColumnOrderings(column));
+  ColumnOrderings<String> get serviceName => $composableBuilder(
+      column: $table.serviceName, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<double> get coefficient => $composableBuilder(
       column: $table.coefficient, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<String> get serviceName => $composableBuilder(
-      column: $table.serviceName, builder: (column) => ColumnOrderings(column));
+  ColumnOrderings<int> get deliveryNumber => $composableBuilder(
+      column: $table.deliveryNumber,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get totalPaidDistance => $composableBuilder(
+      column: $table.totalPaidDistance,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get totalIncome => $composableBuilder(
+      column: $table.totalIncome, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get totalExpenses => $composableBuilder(
+      column: $table.totalExpenses,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get netProfit => $composableBuilder(
+      column: $table.netProfit, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get totalTimeSeconds => $composableBuilder(
+      column: $table.totalTimeSeconds,
+      builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get status => $composableBuilder(
       column: $table.status, builder: (column) => ColumnOrderings(column));
@@ -5726,14 +5979,29 @@ class $$OrderTableTableAnnotationComposer
   GeneratedColumn<int> get shiftId =>
       $composableBuilder(column: $table.shiftId, builder: (column) => column);
 
-  GeneratedColumn<int> get deliveryNumber => $composableBuilder(
-      column: $table.deliveryNumber, builder: (column) => column);
+  GeneratedColumn<String> get serviceName => $composableBuilder(
+      column: $table.serviceName, builder: (column) => column);
 
   GeneratedColumn<double> get coefficient => $composableBuilder(
       column: $table.coefficient, builder: (column) => column);
 
-  GeneratedColumn<String> get serviceName => $composableBuilder(
-      column: $table.serviceName, builder: (column) => column);
+  GeneratedColumn<int> get deliveryNumber => $composableBuilder(
+      column: $table.deliveryNumber, builder: (column) => column);
+
+  GeneratedColumn<double> get totalPaidDistance => $composableBuilder(
+      column: $table.totalPaidDistance, builder: (column) => column);
+
+  GeneratedColumn<double> get totalIncome => $composableBuilder(
+      column: $table.totalIncome, builder: (column) => column);
+
+  GeneratedColumn<double> get totalExpenses => $composableBuilder(
+      column: $table.totalExpenses, builder: (column) => column);
+
+  GeneratedColumn<double> get netProfit =>
+      $composableBuilder(column: $table.netProfit, builder: (column) => column);
+
+  GeneratedColumn<int> get totalTimeSeconds => $composableBuilder(
+      column: $table.totalTimeSeconds, builder: (column) => column);
 
   GeneratedColumn<String> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
@@ -5777,9 +6045,14 @@ class $$OrderTableTableTableManager extends RootTableManager<
             Value<int> id = const Value.absent(),
             Value<int?> serverId = const Value.absent(),
             Value<int?> shiftId = const Value.absent(),
-            Value<int?> deliveryNumber = const Value.absent(),
-            Value<double?> coefficient = const Value.absent(),
-            Value<String?> serviceName = const Value.absent(),
+            Value<String> serviceName = const Value.absent(),
+            Value<double> coefficient = const Value.absent(),
+            Value<int> deliveryNumber = const Value.absent(),
+            Value<double> totalPaidDistance = const Value.absent(),
+            Value<double> totalIncome = const Value.absent(),
+            Value<double> totalExpenses = const Value.absent(),
+            Value<double> netProfit = const Value.absent(),
+            Value<int> totalTimeSeconds = const Value.absent(),
             Value<String> status = const Value.absent(),
             Value<bool> isSynced = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
@@ -5789,9 +6062,14 @@ class $$OrderTableTableTableManager extends RootTableManager<
             id: id,
             serverId: serverId,
             shiftId: shiftId,
-            deliveryNumber: deliveryNumber,
-            coefficient: coefficient,
             serviceName: serviceName,
+            coefficient: coefficient,
+            deliveryNumber: deliveryNumber,
+            totalPaidDistance: totalPaidDistance,
+            totalIncome: totalIncome,
+            totalExpenses: totalExpenses,
+            netProfit: netProfit,
+            totalTimeSeconds: totalTimeSeconds,
             status: status,
             isSynced: isSynced,
             createdAt: createdAt,
@@ -5801,9 +6079,14 @@ class $$OrderTableTableTableManager extends RootTableManager<
             Value<int> id = const Value.absent(),
             Value<int?> serverId = const Value.absent(),
             Value<int?> shiftId = const Value.absent(),
-            Value<int?> deliveryNumber = const Value.absent(),
-            Value<double?> coefficient = const Value.absent(),
-            Value<String?> serviceName = const Value.absent(),
+            required String serviceName,
+            Value<double> coefficient = const Value.absent(),
+            Value<int> deliveryNumber = const Value.absent(),
+            Value<double> totalPaidDistance = const Value.absent(),
+            Value<double> totalIncome = const Value.absent(),
+            Value<double> totalExpenses = const Value.absent(),
+            Value<double> netProfit = const Value.absent(),
+            Value<int> totalTimeSeconds = const Value.absent(),
             Value<String> status = const Value.absent(),
             Value<bool> isSynced = const Value.absent(),
             required DateTime createdAt,
@@ -5813,9 +6096,14 @@ class $$OrderTableTableTableManager extends RootTableManager<
             id: id,
             serverId: serverId,
             shiftId: shiftId,
-            deliveryNumber: deliveryNumber,
-            coefficient: coefficient,
             serviceName: serviceName,
+            coefficient: coefficient,
+            deliveryNumber: deliveryNumber,
+            totalPaidDistance: totalPaidDistance,
+            totalIncome: totalIncome,
+            totalExpenses: totalExpenses,
+            netProfit: netProfit,
+            totalTimeSeconds: totalTimeSeconds,
             status: status,
             isSynced: isSynced,
             createdAt: createdAt,

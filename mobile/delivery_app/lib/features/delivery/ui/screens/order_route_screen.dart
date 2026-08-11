@@ -13,6 +13,7 @@ import 'package:delivery_app/features/delivery/providers/settings_provider.dart'
 import 'package:delivery_app/features/delivery/providers/shift_provider.dart';
 import 'package:delivery_app/features/delivery/providers/daily_stats_provider.dart';
 import 'package:delivery_app/features/delivery/models/pricing_config.dart';
+import 'package:delivery_app/core/database/database_provider.dart';
 
 class OrderRouteScreen extends ConsumerStatefulWidget {
   final String serviceName;
@@ -170,7 +171,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
           totalDistance: totalDistance,
         ),
       ),
-    ).then((result) {
+    ).then((result) async {
       _isSummaryShown = false;
       if (result == true) {
         logMessage('🟢 Добавление ещё доставки');
@@ -179,6 +180,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
         logMessage('🟢 Завершение заказа');
         final shiftNotifier = ref.read(shiftProvider.notifier);
         final orderDuration = Duration(seconds: _calculateTotalTime(state));
+        final shiftState = ref.read(shiftProvider);
+        final db = ref.read(appDatabaseProvider);
         
         logMessage('   Вызов shiftNotifier.finishOrder()');
         shiftNotifier.finishOrder(
@@ -187,6 +190,45 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
           expenses: totalExpenses,
           orderDuration: orderDuration,
         );
+        
+        // ===== СОХРАНЯЕМ ЗАКАЗ В БД =====
+        try {
+          final orderId = await db.orderDao.insertOrder(
+            serviceName: widget.serviceName,
+            coefficient: state.coefficient,
+            deliveryNumber: state.deliveryNumber,
+            totalPaidDistance: totalAllDistance,
+            totalIncome: totalCost,
+            totalExpenses: totalExpenses,
+            netProfit: totalCost - totalExpenses,
+            totalTimeSeconds: _calculateTotalTime(state),
+            shiftId: shiftState.localShiftId,
+            status: 'completed',
+          );
+          logMessage('💾 Заказ сохранён в БД (id=$orderId)', category: 'ORDER');
+          
+          // Сохраняем доставки
+          for (final delivery in state.completedDeliveries) {
+            await db.deliveryDao.insertDelivery(
+              number: delivery.number,
+              clientAddress: delivery.clientAddress,
+              apartment: delivery.apartment,
+              weight: delivery.weight,
+              timeToShop: delivery.timeToShop,
+              distanceToShop: delivery.distanceToShop,
+              timeReceiving: delivery.timeReceiving,
+              timeToClient: delivery.timeToClient,
+              distanceToClient: delivery.distanceToClient,
+              timeDelivery: delivery.timeDelivery,
+              orderId: orderId,
+              status: 'completed',
+            );
+            logMessage('💾 Доставка #${delivery.number} сохранена', category: 'ORDER');
+          }
+          logMessage('✅ Заказ сохранён в БД (доставок: ${state.completedDeliveries.length})', category: 'ORDER');
+        } catch (e) {
+          logMessage('❌ Ошибка сохранения заказа в БД: $e', category: 'ORDER', level: LogLevel.error);
+        }
         
         // ===== ОБНОВЛЯЕМ СТАТИСТИКУ =====
         ref.invalidate(dailyStatsProvider);
