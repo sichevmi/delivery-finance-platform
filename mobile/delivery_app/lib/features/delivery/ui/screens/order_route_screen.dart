@@ -48,9 +48,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
     notifier.init(
       coefficient: widget.coefficient,
       segmentIndex: widget.segmentIndex,
-      serviceName: widget.serviceName, // <-- ПЕРЕДАЁМ serviceName
+      serviceName: widget.serviceName,
     );
-    // Запускаем заказ
     ref.read(shiftProvider.notifier).startOrder();
   }
 
@@ -64,17 +63,14 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
     final state = ref.watch(orderRouteProvider);
     final notifier = ref.read(orderRouteProvider.notifier);
 
-    // Если заказ завершён — переходим на главный экран
     if (state.shouldNavigateToHome) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         notifier.resetNavigationFlag();
-        // Обновляем статистику перед выходом
         ref.invalidate(dailyStatsProvider);
         Navigator.of(context).popUntil((route) => route.isFirst);
       });
     }
 
-    // Если нужно показать итоги
     if (state.showSummary && !_isSummaryShown) {
       _isSummaryShown = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -197,7 +193,6 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
           orderDuration: orderDuration,
         );
         
-        // Вызываем finishOrder, который сохранит заказ в БД
         logMessage('   Вызов notifier.finishOrder()');
         await notifier.finishOrder();
         
