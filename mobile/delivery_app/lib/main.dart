@@ -7,33 +7,31 @@ import 'package:delivery_app/features/delivery/ui/screens/home_screen.dart';
 import 'package:delivery_app/features/delivery/services/permission_service.dart';
 import 'package:delivery_app/features/auth/providers/auth_provider.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
-import 'package:delivery_app/simple_logger.dart';
+import 'package:delivery_app/core/database/database_provider.dart';
+import 'package:delivery_app/logger_simple.dart';
 
 void main() async {
-  // Инициализируем простой логгер
-  await SimpleLogger.init();
-  SimpleLogger.log('🚀 ПРИЛОЖЕНИЕ ЗАПУСКАЕТСЯ');
+  // Инициализируем логгер
+  await AppLogger.init();
+  AppLogger.log('🚀 APP STARTED');
   
   WidgetsFlutterBinding.ensureInitialized();
-  SimpleLogger.log('✅ Flutter инициализирован');
+  AppLogger.log('✅ Flutter initialized');
   
-  // Инициализируем старый логгер для совместимости
-  // await LoggerService().init();
-  // logMessage('🚀 Приложение запущено', category: 'SYSTEM');
-  
-  // Создаём контейнер для провайдеров
   final container = ProviderContainer();
-  SimpleLogger.log('✅ Контейнер создан');
+  AppLogger.log('✅ Container created');
   
-  // Инициализируем базу данных
   try {
     final db = container.read(appDatabaseProvider);
-    SimpleLogger.log('✅ База данных инициализирована');
+    AppLogger.log('📁 Database initialized');
   } catch (e) {
-    SimpleLogger.log('❌ Ошибка БД: $e');
+    AppLogger.log('⚠️ DB error: $e');
   }
   
-  SimpleLogger.log('🚀 ЗАПУСК APP');
+  ref.read(gpsInitProvider);
+  AppLogger.log('🟢 GPS initialized');
+  
+  AppLogger.log('🚀 RUNNING APP');
   
   runApp(
     UncontrolledProviderScope(
@@ -42,7 +40,7 @@ void main() async {
     ),
   );
   
-  SimpleLogger.log('✅ APP ЗАПУЩЕН');
+  AppLogger.log('✅ APP RUNNING');
 }
 
 class DeliveryApp extends ConsumerStatefulWidget {
@@ -64,10 +62,10 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
   }
 
   Future<void> _initializeApp() async {
-    SimpleLogger.log('🔐 DeliveryApp: инициализация...');
+    AppLogger.log('🔐 DeliveryApp init...');
     
     final hasPermission = await PermissionService.requestLocationPermission(context);
-    SimpleLogger.log('🔐 DeliveryApp: разрешение на геолокацию = $hasPermission');
+    AppLogger.log('🔐 Permission: $hasPermission');
     
     if (!hasPermission) {
       setState(() {
@@ -80,10 +78,10 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
     try {
       final authNotifier = ref.read(authProvider.notifier);
       final isAuthenticated = await authNotifier.autoLogin();
-      SimpleLogger.log('🔐 DeliveryApp: isAuthenticated = $isAuthenticated');
+      AppLogger.log('🔐 Authenticated: $isAuthenticated');
       
       ref.read(gpsInitProvider);
-      SimpleLogger.log('🟢 GPS провайдер инициализирован');
+      AppLogger.log('🟢 GPS provider ready');
       
       setState(() {
         _hasPermission = true;
@@ -91,7 +89,7 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
         _isLoading = false;
       });
     } catch (e) {
-      SimpleLogger.log('🔐 DeliveryApp: ошибка: $e');
+      AppLogger.log('🔐 Error: $e');
       setState(() {
         _hasPermission = true;
         _isAuthenticated = false;
