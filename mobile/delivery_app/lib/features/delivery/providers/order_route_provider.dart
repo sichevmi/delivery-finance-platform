@@ -9,7 +9,9 @@ import 'package:delivery_app/features/delivery/providers/pricing_provider.dart';
 import 'package:delivery_app/features/delivery/providers/tab_provider.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 import 'package:delivery_app/features/delivery/providers/shift_provider.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;  // <-- ДОБАВИТЬ ЭТОТ ИМПОРТ
+import 'package:delivery_app/features/delivery/providers/daily_stats_provider.dart';
+import 'package:delivery_app/core/database/database_provider.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 final orderRouteProvider = StateNotifierProvider<OrderRouteNotifier, OrderRouteState>((ref) {
   return OrderRouteNotifier(ref);
@@ -43,6 +45,13 @@ class OrderRouteState {
   final bool showSummary;
   final bool shouldNavigateToHome;
   final double manualDistance;
+  
+  // Новые поля для сохранения
+  final String? serviceName;
+  final double? totalAllDistance;
+  final double? totalCost;
+  final double? totalExpenses;
+  final int? totalTime;
 
   const OrderRouteState({
     required this.currentSegment,
@@ -72,9 +81,14 @@ class OrderRouteState {
     this.showSummary = false,
     this.shouldNavigateToHome = false,
     this.manualDistance = 0.0,
+    this.serviceName,
+    this.totalAllDistance,
+    this.totalCost,
+    this.totalExpenses,
+    this.totalTime,
   });
 
-  factory OrderRouteState.initial({required double coefficient, required int segmentIndex}) {
+  factory OrderRouteState.initial({required double coefficient, required int segmentIndex, String? serviceName}) {
     return OrderRouteState(
       currentSegment: segmentIndex,
       useGps: true,
@@ -103,6 +117,11 @@ class OrderRouteState {
       showSummary: false,
       shouldNavigateToHome: false,
       manualDistance: 0.0,
+      serviceName: serviceName,
+      totalAllDistance: null,
+      totalCost: null,
+      totalExpenses: null,
+      totalTime: null,
     );
   }
 
@@ -134,6 +153,11 @@ class OrderRouteState {
     bool? showSummary,
     bool? shouldNavigateToHome,
     double? manualDistance,
+    String? serviceName,
+    double? totalAllDistance,
+    double? totalCost,
+    double? totalExpenses,
+    int? totalTime,
   }) {
     return OrderRouteState(
       currentSegment: currentSegment ?? this.currentSegment,
@@ -163,6 +187,11 @@ class OrderRouteState {
       showSummary: showSummary ?? this.showSummary,
       shouldNavigateToHome: shouldNavigateToHome ?? this.shouldNavigateToHome,
       manualDistance: manualDistance ?? this.manualDistance,
+      serviceName: serviceName ?? this.serviceName,
+      totalAllDistance: totalAllDistance ?? this.totalAllDistance,
+      totalCost: totalCost ?? this.totalCost,
+      totalExpenses: totalExpenses ?? this.totalExpenses,
+      totalTime: totalTime ?? this.totalTime,
     );
   }
 }
@@ -174,7 +203,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   bool _isGpsInitialized = false;
   bool _gpsTrackingStarted = false;
 
-  OrderRouteNotifier(this.ref) : super(OrderRouteState.initial(coefficient: 1.0, segmentIndex: 0)) {
+  OrderRouteNotifier(this.ref) : super(OrderRouteState.initial(coefficient: 1.0, segmentIndex: 0, serviceName: null)) {
     logMessage('🟢 OrderRouteNotifier: создан');
   }
 
@@ -182,8 +211,8 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     state = state.copyWith(shouldNavigateToHome: false);
   }
 
-  void init({required double coefficient, required int segmentIndex}) {
-    logMessage('🟢 OrderRouteNotifier.init(): coefficient=$coefficient, segmentIndex=$segmentIndex');
+  void init({required double coefficient, required int segmentIndex, required String serviceName}) {
+    logMessage('🟢 OrderRouteNotifier.init(): coefficient=$coefficient, segmentIndex=$segmentIndex, serviceName=$serviceName');
     
     try {
       _gpsService = ref.read(gpsServiceProvider);
@@ -196,7 +225,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     }
     
     _isGpsInitialized = true;
-    state = OrderRouteState.initial(coefficient: coefficient, segmentIndex: segmentIndex);
+    state = OrderRouteState.initial(coefficient: coefficient, segmentIndex: segmentIndex, serviceName: serviceName);
     _initGps();
     _startGpsTracking();
     _startSegment();
@@ -456,29 +485,82 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     _startSegment();
   }
 
-  // ===== ИСПРАВЛЕННЫЙ finishOrder =====
-  void finishOrder() {
-    if (!mounted) return;
-    logMessage('🟢 finishOrder() - завершаем заказ');
+  // ===== ИСПРАВЛЕННЫЙ finishOrder с сохранением в БД =====
+ // В order_route_provider.dart
+Future<void> finishOrder() async {
+  if (!mounted) return;
+  logMessage('🟢 finishOrder() - завершаем заказ', category: 'ORDER');
+  
+  try {
+    final db = ref.read(appDatabaseProvider);
+    final shiftState = ref.read(shiftProvider);
     
-    // НЕ ОСТАНАВЛИВАЕМ GPS - он должен продолжать работать для холостого пробега
-    // _gpsService.stopTracking(); // <-- УДАЛЕНО
+    // Проверяем, не был ли уже сохранён этот заказ
+    final existingOrders = await db.orderDao.getOrdersForDate(DateTime.now());
+    final alreadyExists = existingOrders.any((o) => 
+      o.deliveryNumber == state.deliveryNumber && 
+      o.shiftId == shiftState.localShiftId
+    );
     
-    // Сбрасываем расстояние
-    _gpsService.resetDistance();
-    state = state.copyWith(distance: 0.0);
-    state = state.copyWith(manualDistance: 0.0);
-    
-    // Отписываемся от стрима, но GPS продолжает работать
-    _gpsSubscription?.cancel();
-    _gpsSubscription = null;
-    _gpsTrackingStarted = false;
-    
-    // Сбрасываем состояние
-    state = OrderRouteState.initial(coefficient: state.coefficient, segmentIndex: 0);
-    
-    logMessage('🟢 finishOrder() - GPS продолжает работу для холостого пробега');
+    if (!alreadyExists && state.totalAllDistance != null && state.totalCost != null) {
+      // Сохраняем заказ
+      final orderId = await db.orderDao.insertOrder(
+        serviceName: state.serviceName ?? 'Доставка',
+        coefficient: state.coefficient,
+        deliveryNumber: state.deliveryNumber,
+        totalPaidDistance: state.totalAllDistance!,
+        totalIncome: state.totalCost!,
+        totalExpenses: state.totalExpenses ?? 0,
+        netProfit: state.totalCost! - (state.totalExpenses ?? 0),
+        totalTimeSeconds: state.totalTime ?? 0,
+        shiftId: shiftState.localShiftId,
+        status: 'completed',
+      );
+      logMessage('💾 Заказ сохранён в БД (id=$orderId)', category: 'ORDER');
+      
+      // Сохраняем доставки
+      for (final delivery in state.completedDeliveries) {
+        await db.deliveryDao.insertDelivery(
+          number: delivery.number,
+          clientAddress: delivery.clientAddress,
+          apartment: delivery.apartment,
+          weight: delivery.weight,
+          timeToShop: delivery.timeToShop,
+          distanceToShop: delivery.distanceToShop,
+          timeReceiving: delivery.timeReceiving,
+          timeToClient: delivery.timeToClient,
+          distanceToClient: delivery.distanceToClient,
+          timeDelivery: delivery.timeDelivery,
+          orderId: orderId,
+          status: 'completed',
+        );
+        logMessage('💾 Доставка #${delivery.number} сохранена', category: 'ORDER');
+      }
+      logMessage('✅ Заказ сохранён в БД (доставок: ${state.completedDeliveries.length})', category: 'ORDER');
+    } else {
+      logMessage('⚠️ Заказ уже существует в БД или данные неполные, пропускаем сохранение', category: 'ORDER');
+    }
+  } catch (e) {
+    logMessage('❌ Ошибка сохранения заказа в БД: $e', category: 'ORDER', level: LogLevel.error);
   }
+  
+  // Сбрасываем расстояние
+  _gpsService.resetDistance();
+  state = state.copyWith(distance: 0.0, manualDistance: 0.0);
+  
+  // Отписываемся от стрима, но GPS продолжает работать
+  _gpsSubscription?.cancel();
+  _gpsSubscription = null;
+  _gpsTrackingStarted = false;
+  
+  // Сбрасываем состояние
+  state = OrderRouteState.initial(coefficient: state.coefficient, segmentIndex: 0, serviceName: state.serviceName);
+  
+  // Обновляем статистику
+  ref.invalidate(dailyStatsProvider);
+  logMessage('📊 Статистика обновлена', category: 'STATS');
+  logMessage('🟢 finishOrder() - GPS продолжает работу для холостого пробега');
+}
 
   void resetToInitial() {
     if (!mounted) return;
@@ -489,6 +571,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     state = OrderRouteState.initial(
       coefficient: state.coefficient,
       segmentIndex: 0,
+      serviceName: state.serviceName,
     );
   }
 
@@ -501,12 +584,8 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     final shiftNotifier = ref.read(shiftProvider.notifier);
     shiftNotifier.cancelOrder();
     
-    // НЕ ОСТАНАВЛИВАЕМ GPS
-    // _gpsService.stopTracking(); // <-- УДАЛЕНО
-    
     _gpsService.resetDistance();
-    state = state.copyWith(distance: 0.0);
-    state = state.copyWith(manualDistance: 0.0);
+    state = state.copyWith(distance: 0.0, manualDistance: 0.0);
     
     _gpsSubscription?.cancel();
     _gpsSubscription = null;
@@ -515,6 +594,7 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     state = OrderRouteState.initial(
       coefficient: state.coefficient,
       segmentIndex: 0,
+      serviceName: state.serviceName,
     );
     state = state.copyWith(shouldNavigateToHome: true);
     
@@ -525,8 +605,6 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
   void dispose() {
     logMessage('🛑 OrderRouteNotifier.dispose()');
     _gpsSubscription?.cancel();
-    // НЕ останавливаем GPS, он нужен для холостого пробега
-    // _gpsService.stopTracking(); // <-- УДАЛЕНО
     super.dispose();
   }
 }
