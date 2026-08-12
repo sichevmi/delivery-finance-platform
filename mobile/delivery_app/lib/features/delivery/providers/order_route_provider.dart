@@ -88,7 +88,12 @@ class OrderRouteState {
     this.totalTime,
   });
 
-  factory OrderRouteState.initial({required double coefficient, required int segmentIndex, String? serviceName}) {
+  factory OrderRouteState.initial({
+    required double coefficient, 
+    required int segmentIndex, 
+    String? serviceName,
+    int deliveryNumber = 1,
+  }) {
     return OrderRouteState(
       currentSegment: segmentIndex,
       useGps: true,
@@ -109,7 +114,7 @@ class OrderRouteState {
       isWeightValid: false,
       shopAddress: null,
       clientAddress: null,
-      deliveryNumber: 1,
+      deliveryNumber: deliveryNumber,
       completedDeliveries: [],
       apartment: '',
       isApartmentValid: false,
@@ -211,7 +216,21 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     state = state.copyWith(shouldNavigateToHome: false);
   }
 
-  void init({required double coefficient, required int segmentIndex, required String serviceName}) {
+  Future<int> _getNextDeliveryNumber() async {
+    try {
+      final db = ref.read(appDatabaseProvider);
+      final today = DateTime.now();
+      final orders = await db.orderDao.getOrdersForDate(today);
+      if (orders.isEmpty) return 1;
+      final maxNumber = orders.map((o) => o.deliveryNumber).reduce((a, b) => a > b ? a : b);
+      return maxNumber + 1;
+    } catch (e) {
+      logMessage('⚠️ Ошибка получения следующего номера доставки: $e', category: 'ORDER');
+      return 1;
+    }
+  }
+
+  void init({required double coefficient, required int segmentIndex, required String serviceName}) async {
     logMessage('🟢 OrderRouteNotifier.init(): coefficient=$coefficient, segmentIndex=$segmentIndex, serviceName=$serviceName');
     
     try {
@@ -225,7 +244,17 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
     }
     
     _isGpsInitialized = true;
-    state = OrderRouteState.initial(coefficient: coefficient, segmentIndex: segmentIndex, serviceName: serviceName);
+    
+    // Получаем следующий номер доставки
+    final nextDeliveryNumber = await _getNextDeliveryNumber();
+    logMessage('🟢 Следующий номер доставки: $nextDeliveryNumber', category: 'ORDER');
+    
+    state = OrderRouteState.initial(
+      coefficient: coefficient, 
+      segmentIndex: segmentIndex, 
+      serviceName: serviceName,
+      deliveryNumber: nextDeliveryNumber,
+    );
     _initGps();
     _startGpsTracking();
     _startSegment();
@@ -487,99 +516,89 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
 
   // ===== ИСПРАВЛЕННЫЙ finishOrder =====
   Future<void> finishOrder() async {
-  if (!mounted) return;
-  logMessage('🟢 finishOrder() - завершаем заказ', category: 'ORDER');
-  
-  // СОХРАНЯЕМ ВСЕ ДАННЫЕ ДО СБРОСА
-  final serviceName = state.serviceName ?? 'Доставка';
-  final coefficient = state.coefficient;
-  final deliveryNumber = state.deliveryNumber;
-  final totalAllDistance = state.totalAllDistance ?? 0.0;
-  final totalCost = state.totalCost ?? 0.0;
-  final totalExpenses = state.totalExpenses ?? 0.0;
-  final totalTime = state.totalTime ?? 0;
-  final completedDeliveries = List<Delivery>.from(state.completedDeliveries);
-  final shiftState = ref.read(shiftProvider);
-  
-  logMessage('📦 Данные для сохранения:', category: 'ORDER');
-  logMessage('   deliveryNumber: $deliveryNumber', category: 'ORDER');
-  logMessage('   totalAllDistance: $totalAllDistance', category: 'ORDER');
-  logMessage('   totalCost: $totalCost', category: 'ORDER');
-  logMessage('   totalExpenses: $totalExpenses', category: 'ORDER');
-  logMessage('   shiftId: ${shiftState.localShiftId}', category: 'ORDER');
-  logMessage('   completedDeliveries count: ${completedDeliveries.length}', category: 'ORDER');
-  
-  try {
-    final db = ref.read(appDatabaseProvider);
+    if (!mounted) return;
+    logMessage('🟢 finishOrder() - завершаем заказ', category: 'ORDER');
     
-    // Проверяем дублирование
-    final existingOrders = await db.orderDao.getOrdersForDate(DateTime.now());
-    logMessage('📊 Существующих заказов за сегодня: ${existingOrders.length}', category: 'ORDER');
+    // СОХРАНЯЕМ ВСЕ ДАННЫЕ ДО СБРОСА
+    final serviceName = state.serviceName ?? 'Доставка';
+    final coefficient = state.coefficient;
+    final deliveryNumber = state.deliveryNumber;
+    final totalAllDistance = state.totalAllDistance ?? 0.0;
+    final totalCost = state.totalCost ?? 0.0;
+    final totalExpenses = state.totalExpenses ?? 0.0;
+    final totalTime = state.totalTime ?? 0;
+    final completedDeliveries = List<Delivery>.from(state.completedDeliveries);
+    final shiftState = ref.read(shiftProvider);
     
-    final alreadyExists = existingOrders.any((o) => 
-      o.deliveryNumber == deliveryNumber && 
-      o.shiftId == shiftState.localShiftId
-    );
+    logMessage('📦 Сохраняем заказ #$deliveryNumber: пробег=$totalAllDistance, доход=$totalCost', category: 'ORDER');
     
-    logMessage('🔍 Заказ #$deliveryNumber уже существует: $alreadyExists', category: 'ORDER');
-    
-    if (!alreadyExists) {
-      final orderId = await db.orderDao.insertOrder(
-        serviceName: serviceName,
-        coefficient: coefficient,
-        deliveryNumber: deliveryNumber,
-        totalPaidDistance: totalAllDistance,
-        totalIncome: totalCost,
-        totalExpenses: totalExpenses,
-        netProfit: totalCost - totalExpenses,
-        totalTimeSeconds: totalTime,
-        shiftId: shiftState.localShiftId,
-        status: 'completed',
-      );
-      logMessage('💾 Заказ #$deliveryNumber сохранён в БД (id=$orderId)', category: 'ORDER');
+    try {
+      final db = ref.read(appDatabaseProvider);
       
-      for (final delivery in completedDeliveries) {
-        final deliveryId = await db.deliveryDao.insertDelivery(
-          number: delivery.number,
-          clientAddress: delivery.clientAddress,
-          apartment: delivery.apartment,
-          weight: delivery.weight,
-          timeToShop: delivery.timeToShop,
-          distanceToShop: delivery.distanceToShop,
-          timeReceiving: delivery.timeReceiving,
-          timeToClient: delivery.timeToClient,
-          distanceToClient: delivery.distanceToClient,
-          timeDelivery: delivery.timeDelivery,
-          orderId: orderId,
+      // Проверяем дублирование
+      final existingOrders = await db.orderDao.getOrdersForDate(DateTime.now());
+      final alreadyExists = existingOrders.any((o) => 
+        o.deliveryNumber == deliveryNumber && 
+        o.shiftId == shiftState.localShiftId
+      );
+      
+      if (!alreadyExists) {
+        final orderId = await db.orderDao.insertOrder(
+          serviceName: serviceName,
+          coefficient: coefficient,
+          deliveryNumber: deliveryNumber,
+          totalPaidDistance: totalAllDistance,
+          totalIncome: totalCost,
+          totalExpenses: totalExpenses,
+          netProfit: totalCost - totalExpenses,
+          totalTimeSeconds: totalTime,
+          shiftId: shiftState.localShiftId,
           status: 'completed',
         );
-        logMessage('💾 Доставка #${delivery.number} сохранена (id=$deliveryId)', category: 'ORDER');
+        logMessage('💾 Заказ #$deliveryNumber сохранён в БД (id=$orderId)', category: 'ORDER');
+        
+        for (final delivery in completedDeliveries) {
+          await db.deliveryDao.insertDelivery(
+            number: delivery.number,
+            clientAddress: delivery.clientAddress,
+            apartment: delivery.apartment,
+            weight: delivery.weight,
+            timeToShop: delivery.timeToShop,
+            distanceToShop: delivery.distanceToShop,
+            timeReceiving: delivery.timeReceiving,
+            timeToClient: delivery.timeToClient,
+            distanceToClient: delivery.distanceToClient,
+            timeDelivery: delivery.timeDelivery,
+            orderId: orderId,
+            status: 'completed',
+          );
+          logMessage('💾 Доставка #${delivery.number} сохранена', category: 'ORDER');
+        }
+        logMessage('✅ Заказ #$deliveryNumber сохранён в БД (доставок: ${completedDeliveries.length})', category: 'ORDER');
+      } else {
+        logMessage('⚠️ Заказ #$deliveryNumber уже существует в БД', category: 'ORDER');
       }
-      logMessage('✅ Заказ #$deliveryNumber сохранён в БД', category: 'ORDER');
-    } else {
-      logMessage('⚠️ Заказ #$deliveryNumber уже существует в БД', category: 'ORDER');
+    } catch (e) {
+      logMessage('❌ Ошибка сохранения заказа #$deliveryNumber: $e', category: 'ORDER', level: LogLevel.error);
     }
-  } catch (e) {
-    logMessage('❌ Ошибка сохранения заказа #$deliveryNumber: $e', category: 'ORDER', level: LogLevel.error);
-    logMessage('❌ Stack trace: ${StackTrace.current}', category: 'ORDER', level: LogLevel.error);
+    
+    // СБРАСЫВАЕМ СОСТОЯНИЕ
+    _gpsService.resetDistance();
+    state = state.copyWith(distance: 0.0, manualDistance: 0.0);
+    _gpsSubscription?.cancel();
+    _gpsSubscription = null;
+    _gpsTrackingStarted = false;
+    
+    state = OrderRouteState.initial(
+      coefficient: state.coefficient, 
+      segmentIndex: 0, 
+      serviceName: state.serviceName,
+      deliveryNumber: deliveryNumber,
+    );
+    
+    ref.invalidate(dailyStatsProvider);
+    logMessage('🟢 finishOrder() - завершено', category: 'ORDER');
   }
-  
-  // СБРАСЫВАЕМ СОСТОЯНИЕ
-  _gpsService.resetDistance();
-  state = state.copyWith(distance: 0.0, manualDistance: 0.0);
-  _gpsSubscription?.cancel();
-  _gpsSubscription = null;
-  _gpsTrackingStarted = false;
-  
-  state = OrderRouteState.initial(
-    coefficient: state.coefficient, 
-    segmentIndex: 0, 
-    serviceName: state.serviceName,
-  );
-  
-  ref.invalidate(dailyStatsProvider);
-  logMessage('🟢 finishOrder() - завершено', category: 'ORDER');
-}
 
   void resetToInitial() {
     if (!mounted) return;
