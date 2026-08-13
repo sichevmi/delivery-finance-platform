@@ -1,4 +1,3 @@
-// lib/features/delivery/providers/shift_provider.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,6 +7,7 @@ import 'package:delivery_app/features/delivery/services/gps_service.dart';
 import 'package:delivery_app/core/database/database_provider.dart';
 import 'package:drift/drift.dart';
 import 'package:delivery_app/features/delivery/providers/daily_stats_provider.dart';
+import 'package:delivery_app/features/delivery/providers/sync_provider.dart';
 
 class ShiftState {
   final bool isActive;
@@ -455,6 +455,23 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     _saveState();
     _stopGpsTracking();
     _saveShiftToDatabase();
+    
+    // ===== 🔄 СИНХРОНИЗАЦИЯ ПОСЛЕ ЗАВЕРШЕНИЯ СМЕНЫ =====
+    _syncAfterShift();
+  }
+  
+  // ===== НОВЫЙ МЕТОД ДЛЯ СИНХРОНИЗАЦИИ =====
+  void _syncAfterShift() {
+    try {
+      final syncService = _ref.read(syncServiceProvider);
+      syncService.syncAll().then((_) {
+        logMessage('✅ Синхронизация после завершения смены выполнена', category: 'SHIFT');
+      }).catchError((e) {
+        logMessage('⚠️ Ошибка синхронизации после завершения смены: $e', category: 'SHIFT', level: LogLevel.error);
+      });
+    } catch (e) {
+      logMessage('⚠️ Ошибка вызова синхронизации: $e', category: 'SHIFT', level: LogLevel.error);
+    }
   }
 
   void startOrder() {

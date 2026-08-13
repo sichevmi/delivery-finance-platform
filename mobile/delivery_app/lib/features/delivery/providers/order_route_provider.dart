@@ -11,6 +11,7 @@ import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 import 'package:delivery_app/features/delivery/providers/shift_provider.dart';
 import 'package:delivery_app/features/delivery/providers/daily_stats_provider.dart';
 import 'package:delivery_app/core/database/database_provider.dart';
+import 'package:delivery_app/features/delivery/providers/sync_provider.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 final orderRouteProvider = StateNotifierProvider<OrderRouteNotifier, OrderRouteState>((ref) {
@@ -575,6 +576,16 @@ class OrderRouteNotifier extends StateNotifier<OrderRouteState> {
           logMessage('💾 Доставка #${delivery.number} сохранена', category: 'ORDER');
         }
         logMessage('✅ Заказ #$deliveryNumber сохранён в БД (доставок: ${completedDeliveries.length})', category: 'ORDER');
+        
+        // ===== 🔄 СИНХРОНИЗАЦИЯ ПОСЛЕ ЗАВЕРШЕНИЯ ЗАКАЗА =====
+        try {
+          final syncService = ref.read(syncServiceProvider);
+          await syncService.syncAll();
+          logMessage('✅ Синхронизация после завершения заказа выполнена', category: 'ORDER');
+        } catch (syncError) {
+          logMessage('⚠️ Ошибка синхронизации после завершения заказа: $syncError', category: 'ORDER', level: LogLevel.error);
+        }
+        
       } else {
         logMessage('⚠️ Заказ #$deliveryNumber уже существует в БД', category: 'ORDER');
       }
