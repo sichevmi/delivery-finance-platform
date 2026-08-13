@@ -67,46 +67,54 @@ class SyncService {
   // ===== ЗАГРУЗКА ДАННЫХ ЗА СЕГОДНЯ =====
 
   Future<void> _loadTodayData() async {
-    try {
-      logMessage('📥 Загрузка данных за сегодня...', category: 'SYNC');
-      final response = await _apiClient.getTodayData();
-      
-      if (response['status'] != 'success') {
-        logMessage('⚠️ Ошибка загрузки данных за сегодня', category: 'SYNC');
-        return;
-      }
-
-      final today = DateTime.now();
-      final startOfDay = DateTime(today.year, today.month, today.day);
-      final endOfDay = startOfDay.add(const Duration(days: 1));
-      
-      await _db.shiftDao.deleteShiftsForDate(startOfDay, endOfDay);
-      await _db.orderDao.deleteOrdersForDate(startOfDay, endOfDay);
-
-      final shifts = response['shifts'] as List;
-      for (final shiftData in shifts) {
-        await _db.shiftDao.insertShiftFromServer(shiftData);
-        logMessage('💾 Смена ${shiftData['id']} загружена с сервера', category: 'SYNC');
-      }
-
-      final orders = response['orders'] as List;
-      for (final orderData in orders) {
-        final orderId = await _db.orderDao.insertOrderFromServer(orderData);
-        logMessage('💾 Заказ ${orderData['id']} загружен с сервера', category: 'SYNC');
-        
-        final deliveries = orderData['deliveries'] as List;
-        for (final deliveryData in deliveries) {
-          await _db.deliveryDao.insertDeliveryFromServer(deliveryData, orderId: orderId);
-        }
-        logMessage('💾 ${deliveries.length} доставок загружено для заказа ${orderData['id']}', category: 'SYNC');
-      }
-
-      logMessage('✅ Загружено ${shifts.length} смен и ${orders.length} заказов', category: 'SYNC');
-      
-    } catch (e) {
-      logMessage('⚠️ Ошибка загрузки данных за сегодня: $e', category: 'SYNC', level: LogLevel.error);
+  try {
+    logMessage('📥 Загрузка данных за сегодня...', category: 'SYNC');
+    final response = await _apiClient.getTodayData();
+    
+    if (response['status'] != 'success') {
+      logMessage('⚠️ Ошибка загрузки данных за сегодня', category: 'SYNC');
+      return;
     }
+
+    final shifts = response['shifts'] as List;
+    final orders = response['orders'] as List;
+    
+    // 🔥 Собираем serverId для удаления
+    final shiftIds = shifts.map((s) => s['id'] as int).toList();
+    final orderIds = orders.map((o) => o['id'] as int).toList();
+    
+    // 🔥 Удаляем старые записи по serverId (а не по createdAt)
+    if (shiftIds.isNotEmpty) {
+      await _db.shiftDao.deleteShiftsByServerIds(shiftIds);
+    }
+    if (orderIds.isNotEmpty) {
+      await _db.orderDao.deleteOrdersByServerIds(orderIds);
+    }
+
+    // Загружаем смены
+    for (final shiftData in shifts) {
+      await _db.shiftDao.insertShiftFromServer(shiftData);
+      logMessage('💾 Смена ${shiftData['id']} загружена с сервера', category: 'SYNC');
+    }
+
+    // Загружаем заказы с доставками
+    for (final orderData in orders) {
+      final orderId = await _db.orderDao.insertOrderFromServer(orderData);
+      logMessage('💾 Заказ ${orderData['id']} загружен с сервера', category: 'SYNC');
+      
+      final deliveries = orderData['deliveries'] as List;
+      for (final deliveryData in deliveries) {
+        await _db.deliveryDao.insertDeliveryFromServer(deliveryData, orderId: orderId);
+      }
+      logMessage('💾 ${deliveries.length} доставок загружено для заказа ${orderData['id']}', category: 'SYNC');
+    }
+
+    logMessage('✅ Загружено ${shifts.length} смен и ${orders.length} заказов', category: 'SYNC');
+    
+  } catch (e) {
+    logMessage('⚠️ Ошибка загрузки данных за сегодня: $e', category: 'SYNC', level: LogLevel.error);
   }
+}
 
   // ===== СИНХРОНИЗАЦИЯ НАСТРОЕК (ОТПРАВКА) =====
 

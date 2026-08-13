@@ -142,31 +142,63 @@ class DeliveryDao {
   // ===== МЕТОДЫ ДЛЯ ЗАГРУЗКИ С СЕРВЕРА =====
 
   Future<int> insertDeliveryFromServer(Map<String, dynamic> data, {required int orderId}) async {
-    try {
-      final companion = DeliveryTableCompanion(
-        serverId: Value(data['id']),
-        orderId: Value(orderId),
-        number: Value(data['number'] ?? 0),
-        clientAddress: Value(data['clientAddress'] ?? ''),
-        apartment: Value(data['apartment'] ?? ''),
-        weight: Value(data['weight'] ?? 0.0),
-        timeToShop: Value(data['timeToShop'] ?? 0),
-        distanceToShop: Value(data['distanceToShop'] ?? 0.0),
-        timeReceiving: Value(data['timeReceiving'] ?? 0),
-        timeToClient: Value(data['timeToClient'] ?? 0),
-        distanceToClient: Value(data['distanceToClient'] ?? 0.0),
-        timeDelivery: Value(data['timeDelivery'] ?? 0),
-        status: Value(data['status'] ?? 'completed'),
-        isSynced: const Value(true),
-        createdAt: Value(DateTime.now()),
-        updatedAt: Value(DateTime.now()),
+  try {
+    // Проверяем, есть ли уже такая доставка
+    final existing = await (db.select(db.deliveryTable)
+      ..where((t) => t.serverId.equals(data['id']))
+      ..where((t) => t.orderId.equals(orderId))
+    ).getSingleOrNull();
+    
+    if (existing != null) {
+      // Обновляем существующую
+      await (db.update(db.deliveryTable)
+        ..where((t) => t.id.equals(existing.id))
+      ).write(
+        DeliveryTableCompanion(
+          number: Value(data['number'] ?? 0),
+          clientAddress: Value(data['clientAddress'] ?? ''),
+          apartment: Value(data['apartment'] ?? ''),
+          weight: Value(data['weight'] ?? 0.0),
+          timeToShop: Value(data['timeToShop'] ?? 0),
+          distanceToShop: Value(data['distanceToShop'] ?? 0.0),
+          timeReceiving: Value(data['timeReceiving'] ?? 0),
+          timeToClient: Value(data['timeToClient'] ?? 0),
+          distanceToClient: Value(data['distanceToClient'] ?? 0.0),
+          timeDelivery: Value(data['timeDelivery'] ?? 0),
+          status: Value(data['status'] ?? 'completed'),
+          isSynced: const Value(true),
+          updatedAt: Value(DateTime.now()),
+        ),
       );
-      final id = await db.into(db.deliveryTable).insert(companion);
-      logMessage('💾 Доставка с сервера сохранена, id=$id', category: 'DATABASE');
-      return id;
-    } catch (e) {
-      logMessage('❌ Ошибка сохранения доставки с сервера: $e', category: 'DATABASE', level: LogLevel.error);
-      rethrow;
+      logMessage('🔄 Доставка ${data['id']} обновлена с сервера', category: 'DATABASE');
+      return existing.id;
     }
+    
+    // Создаём новую
+    final companion = DeliveryTableCompanion(
+      serverId: Value(data['id']),
+      orderId: Value(orderId),
+      number: Value(data['number'] ?? 0),
+      clientAddress: Value(data['clientAddress'] ?? ''),
+      apartment: Value(data['apartment'] ?? ''),
+      weight: Value(data['weight'] ?? 0.0),
+      timeToShop: Value(data['timeToShop'] ?? 0),
+      distanceToShop: Value(data['distanceToShop'] ?? 0.0),
+      timeReceiving: Value(data['timeReceiving'] ?? 0),
+      timeToClient: Value(data['timeToClient'] ?? 0),
+      distanceToClient: Value(data['distanceToClient'] ?? 0.0),
+      timeDelivery: Value(data['timeDelivery'] ?? 0),
+      status: Value(data['status'] ?? 'completed'),
+      isSynced: const Value(true),
+      createdAt: Value(DateTime.now()),
+      updatedAt: Value(DateTime.now()),
+    );
+    final id = await db.into(db.deliveryTable).insert(companion);
+    logMessage('💾 Доставка ${data['id']} сохранена с сервера', category: 'DATABASE');
+    return id;
+  } catch (e) {
+    logMessage('❌ Ошибка сохранения доставки с сервера: $e', category: 'DATABASE', level: LogLevel.error);
+    rethrow;
   }
+}
 }
