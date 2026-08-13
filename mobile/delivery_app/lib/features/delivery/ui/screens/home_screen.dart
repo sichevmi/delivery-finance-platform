@@ -12,7 +12,8 @@ import 'package:delivery_app/features/delivery/ui/tabs/analytics_tab.dart';
 import 'package:delivery_app/features/delivery/ui/tabs/directories_tab.dart';
 import 'package:delivery_app/features/delivery/ui/tabs/more_tab.dart';
 import 'package:delivery_app/features/delivery/providers/sync_provider.dart';
-import 'package:delivery_app/core/services/connectivity_service.dart';
+import 'package:delivery_app/core/services/connectivity_service.dart';\
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
