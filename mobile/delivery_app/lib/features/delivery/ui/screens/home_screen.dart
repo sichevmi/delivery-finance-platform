@@ -74,10 +74,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   void _listenToConnectivity() {
     final connectivity = ref.read(connectivityServiceProvider);
     connectivity.connectivityStream.listen((result) {
-      if (result != ConnectivityResult.none && !_isInitialSyncDone) {
+      // Запускаем автосинхронизацию ТОЛЬКО если первичная синхронизация уже завершена
+      if (result != ConnectivityResult.none && _isInitialSyncDone) {
         final syncService = ref.read(syncServiceProvider);
         syncService.syncAll().then((_) {
-          setState(() => _isInitialSyncDone = true);
           logMessage('✅ Автосинхронизация выполнена', category: 'SYNC');
         }).catchError((e) {
           logMessage('⚠️ Автосинхронизация: $e', category: 'SYNC', level: LogLevel.error);
@@ -96,15 +96,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         // Потом отправляем свои данные
         await syncService.syncAll();
         
-        setState(() {
-          _isInitialSyncDone = true;
-          _isLoading = false;
-        });
+        // Проверяем, что виджет ещё существует
+        if (mounted) {
+          setState(() {
+            _isInitialSyncDone = true;
+            _isLoading = false;
+          });
+        }
         
         logMessage('✅ Первичная синхронизация выполнена', category: 'SYNC');
       } catch (e) {
         logMessage('⚠️ Первичная синхронизация: $e', category: 'SYNC', level: LogLevel.error);
-        setState(() => _isLoading = false);
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
       }
     });
   }
