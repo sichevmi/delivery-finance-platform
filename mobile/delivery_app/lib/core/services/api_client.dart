@@ -3,7 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:delivery_app/logger.dart';
 
 class ApiClient {
-  static const String baseUrl = 'https://тест.финфлоу.рф/api'; // TODO: заменить на реальный URL
+  static const String baseUrl = 'http://195.19.20.178:8001/api/v1'; // TODO: заменить на реальный URL
   
   
   final Dio _dio = Dio();
