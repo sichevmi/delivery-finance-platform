@@ -48,6 +48,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   ];
 
   bool _isInitialSyncDone = false;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -86,22 +87,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   }
 
   void _syncOnStart() {
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    final syncService = ref.read(syncServiceProvider);
-    // Сначала загружаем данные с сервера, потом синхронизируем свои
-    syncService.loadFromServer().then((_) {
-      return syncService.syncAll();
-    }).then((_) {
-      setState(() => _isInitialSyncDone = true);
-      logMessage('✅ Первичная синхронизация выполнена', category: 'SYNC');
-    }).catchError((e) {
-      logMessage('⚠️ Первичная синхронизация: $e', category: 'SYNC', level: LogLevel.error);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final syncService = ref.read(syncServiceProvider);
+      
+      try {
+        // Сначала загружаем данные с сервера
+        await syncService.loadFromServer();
+        // Потом отправляем свои данные
+        await syncService.syncAll();
+        
+        setState(() {
+          _isInitialSyncDone = true;
+          _isLoading = false;
+        });
+        
+        logMessage('✅ Первичная синхронизация выполнена', category: 'SYNC');
+      } catch (e) {
+        logMessage('⚠️ Первичная синхронизация: $e', category: 'SYNC', level: LogLevel.error);
+        setState(() => _isLoading = false);
+      }
     });
-  });
-}
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Если идёт загрузка — показываем индикатор
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF121212),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: Color(0xFF6C63FF)),
+              SizedBox(height: 16),
+              Text(
+                'Загрузка данных...',
+                style: TextStyle(color: Color(0xFF888888)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final authState = ref.watch(authProvider);
     final shiftState = ref.watch(shiftProvider);
     final selectedTab = ref.watch(selectedTabProvider);
