@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart';
 import 'package:delivery_app/core/database/database_provider.dart';
 import 'package:delivery_app/core/services/api_client.dart';
 import 'package:delivery_app/core/services/connectivity_service.dart';
