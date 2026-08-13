@@ -57,10 +57,7 @@ class SyncService {
 
     try {
       logMessage('📥 Загрузка данных с сервера...', category: 'SYNC');
-      
-      // 1. Загружаем данные за сегодня
       await _loadTodayData();
-      
       logMessage('✅ Загрузка с сервера завершена', category: 'SYNC');
     } catch (e) {
       logMessage('❌ Ошибка загрузки с сервера: $e', category: 'SYNC', level: LogLevel.error);
@@ -79,7 +76,6 @@ class SyncService {
         return;
       }
 
-      // Очищаем сегодняшние данные перед загрузкой
       final today = DateTime.now();
       final startOfDay = DateTime(today.year, today.month, today.day);
       final endOfDay = startOfDay.add(const Duration(days: 1));
@@ -87,14 +83,12 @@ class SyncService {
       await _db.shiftDao.deleteShiftsForDate(startOfDay, endOfDay);
       await _db.orderDao.deleteOrdersForDate(startOfDay, endOfDay);
 
-      // Загружаем смены
       final shifts = response['shifts'] as List;
       for (final shiftData in shifts) {
         await _db.shiftDao.insertShiftFromServer(shiftData);
         logMessage('💾 Смена ${shiftData['id']} загружена с сервера', category: 'SYNC');
       }
 
-      // Загружаем заказы с доставками
       final orders = response['orders'] as List;
       for (final orderData in orders) {
         final orderId = await _db.orderDao.insertOrderFromServer(orderData);
@@ -185,16 +179,16 @@ class SyncService {
   Future<void> _syncOrders() async {
     logMessage('📤 Синхронизация заказов...', category: 'SYNC');
     try {
-      final orders = await _db.orderDao.getUnsyncedOrders();
-      if (orders.isEmpty) {
+      final unsyncedOrders = await _db.orderDao.getUnsyncedOrders();
+      if (unsyncedOrders.isEmpty) {
         logMessage('✅ Нет несинхронизированных заказов', category: 'SYNC');
         return;
       }
 
-      logMessage('📊 Найдено ${orders.length} заказов', category: 'SYNC');
+      logMessage('📊 Найдено ${unsyncedOrders.length} заказов', category: 'SYNC');
 
       final ordersWithDeliveries = <Map<String, dynamic>>[];
-      for (final order in orders) {
+      for (final order in unsyncedOrders) {
         final deliveries = await _db.deliveryDao.getDeliveriesByOrder(order.id);
         ordersWithDeliveries.add({
           'localId': order.id,
