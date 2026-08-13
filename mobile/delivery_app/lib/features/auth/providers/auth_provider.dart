@@ -3,7 +3,8 @@ import 'package:delivery_app/logger.dart';
 import 'package:dio/dio.dart';
 import 'package:delivery_app/core/services/storage_service.dart';
 import 'package:delivery_app/features/auth/models/user.dart';
-import 'package:delivery_app/core/providers/api_provider.dart';
+import 'package:delivery_app/core/services/api_client.dart';
+import 'package:delivery_app/features/delivery/providers/sync_provider.dart';
 
 class AuthState {
   final User? user;
@@ -35,16 +36,16 @@ class AuthState {
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final Ref ref;
-  final Dio dio;
+  final ApiClient apiClient;
   final StorageService storage;
 
-  AuthNotifier(this.ref, this.dio, this.storage) : super(AuthState());
+  AuthNotifier(this.ref, this.apiClient, this.storage) : super(AuthState());
 
   Future<void> register(String email, String password, String name) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      await dio.post(
-        '/api/v1/auth/register',
+      await apiClient.dio.post(
+        '/auth/register',
         data: {'email': email, 'password': password, 'name': name},
       );
       await login(email, password);
@@ -69,20 +70,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> login(String email, String password) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final response = await dio.post(
-        '/api/v1/auth/login',
-        data: {'email': email, 'password': password},
-      );
-      logMessage('🔐 Login response status: ${response.statusCode}');
-      logMessage('🔐 Login response data: ${response.data}');
-
-      final access = response.data['access_token'];
-      final refresh = response.data['refresh_token'];
-      await storage.saveTokens(access, refresh);
-
-      final userResponse = await dio.get('/api/v1/auth/hello');
-      logMessage('👤 User response: ${userResponse.data}');
+      final response = await apiClient.login(email, password);
       
+      final access = response['access_token'];
+      final refresh = response['refresh_token'];
+      await storage.saveTokens(access, refresh);
+      await apiClient.setTokens(access, refresh);
+
+      // Проверяем, что токен сохранился
+      final savedToken = await apiClient.getAccessToken();
+      logMessage('🔑 Токен сохранён: ${savedToken != null ? savedToken.substring(0, 20) + "..." : "null"}', category: 'AUTH');
+
+      final userResponse = await apiClient.dio.get('/auth/hello');
       dynamic userData;
       if (userResponse.data is Map && userResponse.data.containsKey('user')) {
         userData = userResponse.data['user'];
@@ -136,7 +135,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
 
       final refreshToken = await storage.getRefreshToken();
-      logMessage('🔄 Refresh token: ${refreshToken != null ? refreshToken.substring(0, 20) + "..." : "null"}');
       
       if (refreshToken == null || refreshToken.isEmpty) {
         logMessage('🔄 Refresh token is empty');
@@ -146,16 +144,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       logMessage('🔄 Trying to refresh token...');
       try {
-        final refreshResponse = await dio.post(
-          '/api/v1/auth/refresh',
-          data: {'refresh_token': refreshToken},
-        );
+        final refreshResponse = await apiClient.refreshToken(refreshToken);
         
-        final newAccessToken = refreshResponse.data['access_token'];
-        await storage.updateAccessToken(newAccessToken);
-        logMessage('🔄 Token refreshed successfully');
+        final newAccessToken = refreshResponse['access_token'];
+        if (newAccessToken != null && newAccessToken.isNotEmpty) {
+          await storage.updateAccessToken(newAccessToken);
+          await apiClient.setTokens(newAccessToken, refreshToken);
+          logMessage('🔄 Token refreshed successfully');
+        }
         
-        final userResponse = await dio.get('/api/v1/auth/hello');
+        final userResponse = await apiClient.dio.get('/auth/hello');
         dynamic userData;
         if (userResponse.data is Map && userResponse.data.containsKey('user')) {
           userData = userResponse.data['user'];
@@ -178,6 +176,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         logMessage('🔄 Refresh failed: ${e.response?.statusCode} - ${e.response?.data}');
         if (e.response?.statusCode == 401) {
           await storage.clearTokens();
+          await apiClient.clearTokens();
           state = state.copyWith(
             isLoading: false,
             isAuthenticated: false,
@@ -210,65 +209,37 @@ class AuthNotifier extends StateNotifier<AuthState> {
         return false;
       }
 
-      final response = await dio.post(
-        '/api/v1/auth/refresh',
-        data: {'refresh_token': refreshToken},
-      );
-      
-      final newAccessToken = response.data['access_token'];
-      await storage.updateAccessToken(newAccessToken);
-      return true;
+      final response = await apiClient.refreshToken(refreshToken);
+      final newAccessToken = response['access_token'];
+      if (newAccessToken != null && newAccessToken.isNotEmpty) {
+        await storage.updateAccessToken(newAccessToken);
+        await apiClient.setTokens(newAccessToken, refreshToken);
+        return true;
+      }
+      return false;
     } catch (e) {
+      logMessage('❌ Error refreshing token: $e');
       return false;
     }
   }
 
-  // ===== ИСПРАВЛЕННЫЙ ВЫХОД =====
   Future<void> logout() async {
     try {
-      // Получаем refresh_token из хранилища
       final refreshToken = await storage.getRefreshToken();
-      
-      // Отправляем запрос на сервер с refresh_token
-      await dio.post(
-        '/api/v1/auth/logout',
-        data: {'refresh_token': refreshToken},
-      );
-      logMessage('🔐 Logout успешно на сервере');
+      if (refreshToken != null && refreshToken.isNotEmpty) {
+        await apiClient.logout(refreshToken);
+      }
     } catch (e) {
       logMessage('⚠️ Ошибка при выходе на сервере: $e');
     }
-    // В любом случае очищаем локальные токены
     await storage.clearTokens();
+    await apiClient.clearTokens();
     state = AuthState();
-  }
-
-  Future<void> checkAuth() async {
-    final token = await storage.getAccessToken();
-    if (token != null) {
-      try {
-        final response = await dio.get('/api/v1/auth/hello');
-        dynamic userData;
-        if (response.data is Map && response.data.containsKey('user')) {
-          userData = response.data['user'];
-        } else {
-          userData = response.data;
-        }
-        final user = User.fromJson(userData);
-        state = state.copyWith(
-          user: user,
-          isAuthenticated: true,
-        );
-      } catch (e) {
-        await storage.clearTokens();
-        state = AuthState();
-      }
-    }
   }
 }
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  final dio = ref.watch(dioProvider);
+  final apiClient = ref.watch(apiClientProvider);
   final storage = ref.watch(storageServiceProvider);
-  return AuthNotifier(ref, dio, storage);
+  return AuthNotifier(ref, apiClient, storage);
 });

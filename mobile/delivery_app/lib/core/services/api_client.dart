@@ -3,8 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:delivery_app/logger.dart';
 
 class ApiClient {
-  static const String baseUrl = 'http://195.19.20.178:8001/api/v1'; // TODO: заменить на реальный URL
-  
+  static const String baseUrl = 'http://195.19.20.178:8001/api/v1';
   
   final Dio _dio = Dio();
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
@@ -20,6 +19,9 @@ class ApiClient {
     _dio.interceptors.add(_AuthInterceptor(_storage));
     _dio.interceptors.add(_LoggingInterceptor());
   }
+
+  // ===== ГЕТТЕР ДЛЯ DIO =====
+  Dio get dio => _dio;
 
   // ===== АУТЕНТИФИКАЦИЯ =====
   
@@ -39,6 +41,10 @@ class ApiClient {
     return await _storage.read(key: 'access_token');
   }
 
+  Future<String?> getRefreshToken() async {
+    return await _storage.read(key: 'refresh_token');
+  }
+
   // ===== ЛОГИН =====
   
   Future<Map<String, dynamic>> login(String email, String password) async {
@@ -51,6 +57,31 @@ class ApiClient {
     } catch (e) {
       logMessage('⚠️ Ошибка логина: $e', category: 'API', level: LogLevel.error);
       rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> refreshToken(String refreshToken) async {
+    try {
+      final response = await _dio.post(
+        '/auth/refresh',
+        data: {'refresh_token': refreshToken},
+      );
+      return response.data;
+    } catch (e) {
+      logMessage('⚠️ Ошибка обновления токена: $e', category: 'API', level: LogLevel.error);
+      rethrow;
+    }
+  }
+
+  Future<void> logout(String refreshToken) async {
+    try {
+      await _dio.post(
+        '/auth/logout',
+        data: {'refresh_token': refreshToken},
+      );
+      logMessage('🚪 Выход выполнен', category: 'API');
+    } catch (e) {
+      logMessage('⚠️ Ошибка выхода: $e', category: 'API', level: LogLevel.error);
     }
   }
 
@@ -110,8 +141,11 @@ class _AuthInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
     final token = await _storage.read(key: 'access_token');
-    if (token != null) {
+    if (token != null && token.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $token';
+      logMessage('🔑 Токен добавлен: Bearer ${token.substring(0, 20)}...', category: 'API', level: LogLevel.debug);
+    } else {
+      logMessage('⚠️ Токен отсутствует!', category: 'API', level: LogLevel.debug);
     }
     handler.next(options);
   }
@@ -120,20 +154,22 @@ class _AuthInterceptor extends Interceptor {
   void onError(DioException err, ErrorInterceptorHandler handler) async {
     if (err.response?.statusCode == 401) {
       final refreshToken = await _storage.read(key: 'refresh_token');
-      if (refreshToken != null) {
+      if (refreshToken != null && refreshToken.isNotEmpty) {
         try {
+          logMessage('🔄 Обновление токена...', category: 'API');
           final response = await Dio().post(
             '${ApiClient.baseUrl}/auth/refresh',
-            data: {'refreshToken': refreshToken},
+            data: {'refresh_token': refreshToken},
             options: Options(headers: {'Content-Type': 'application/json'}),
           );
-          final newToken = response.data['accessToken'];
-          await _storage.write(key: 'access_token', value: newToken);
-          
-          err.requestOptions.headers['Authorization'] = 'Bearer $newToken';
-          final retryResponse = await Dio().fetch(err.requestOptions);
-          handler.resolve(retryResponse);
-          return;
+          final newToken = response.data['access_token'];
+          if (newToken != null && newToken.isNotEmpty) {
+            await _storage.write(key: 'access_token', value: newToken);
+            err.requestOptions.headers['Authorization'] = 'Bearer $newToken';
+            final retryResponse = await Dio().fetch(err.requestOptions);
+            handler.resolve(retryResponse);
+            return;
+          }
         } catch (_) {
           await _storage.delete(key: 'access_token');
           await _storage.delete(key: 'refresh_token');
@@ -148,6 +184,9 @@ class _LoggingInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     logMessage('🌐 ${options.method} ${options.path}', category: 'API');
+    if (options.data != null) {
+      logMessage('📦 Data: ${options.data}', category: 'API', level: LogLevel.debug);
+    }
     handler.next(options);
   }
 
@@ -161,6 +200,9 @@ class _LoggingInterceptor extends Interceptor {
   void onError(DioException err, ErrorInterceptorHandler handler) {
     logMessage('❌ ${err.response?.statusCode} ${err.requestOptions.path}: ${err.message}', 
       category: 'API', level: LogLevel.error);
+    if (err.response?.data != null) {
+      logMessage('📦 Error data: ${err.response?.data}', category: 'API', level: LogLevel.error);
+    }
     handler.next(err);
   }
 }

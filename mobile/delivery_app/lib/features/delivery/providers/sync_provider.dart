@@ -21,5 +21,4 @@ final syncServiceProvider = Provider<SyncService>((ref) {
 
 final syncStatusProvider = StateProvider<bool>((ref) => false);
 
-// 👇 ДОБАВЬТЕ ЭТУ СТРОКУ
-final lastSyncTimeProvider = StateProvider<DateTime?>((ref) => null);                   
+final lastSyncTimeProvider = StateProvider<DateTime?>((ref) => null);
