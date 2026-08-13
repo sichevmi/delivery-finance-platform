@@ -184,34 +184,65 @@ class ShiftDao {
   }
 
   Future<int> insertShiftFromServer(Map<String, dynamic> data) async {
-    try {
-      final companion = ShiftTableCompanion(
-        serverId: Value(data['id']),
-        startTime: Value(data['startTime'] ?? ''),
-        endTime: Value(data['endTime']),
-        durationSeconds: Value(data['durationSeconds'] ?? 0),
-        totalPaidDistance: Value(data['totalPaidDistance'] ?? 0.0),
-        totalIdleDistance: Value(data['totalIdleDistance'] ?? 0.0),
-        totalOrderTimeSeconds: Value(data['totalOrderTimeSeconds'] ?? 0),
-        ordersCount: Value(data['ordersCount'] ?? 0),
-        totalIncome: Value(data['totalIncome'] ?? 0.0),
-        totalExpenses: Value(data['totalExpenses'] ?? 0.0),
-        netProfit: Value(data['netProfit'] ?? 0.0),
-        status: Value(data['status'] ?? 'completed'),
-        isSynced: const Value(true),
-        createdAt: data['createdAt'] != null 
-            ? Value(DateTime.parse(data['createdAt'])) 
-            : Value(DateTime.now()),
-        updatedAt: Value(DateTime.now()),
+  try {
+    // Проверяем, есть ли уже такая смена
+    final existing = await (db.select(db.shiftTable)
+      ..where((t) => t.serverId.equals(data['id']))
+    ).getSingleOrNull();
+    
+    if (existing != null) {
+      // Обновляем существующую
+      await (db.update(db.shiftTable)
+        ..where((t) => t.id.equals(existing.id))
+      ).write(
+        ShiftTableCompanion(
+          startTime: Value(data['startTime'] ?? ''),
+          endTime: Value(data['endTime']),
+          durationSeconds: Value(data['durationSeconds'] ?? 0),
+          totalPaidDistance: Value(data['totalPaidDistance'] ?? 0.0),
+          totalIdleDistance: Value(data['totalIdleDistance'] ?? 0.0),
+          totalOrderTimeSeconds: Value(data['totalOrderTimeSeconds'] ?? 0),
+          ordersCount: Value(data['ordersCount'] ?? 0),
+          totalIncome: Value(data['totalIncome'] ?? 0.0),
+          totalExpenses: Value(data['totalExpenses'] ?? 0.0),
+          netProfit: Value(data['netProfit'] ?? 0.0),
+          status: Value(data['status'] ?? 'completed'),
+          isSynced: const Value(true),
+          updatedAt: Value(DateTime.now()),
+        ),
       );
-      final id = await db.into(db.shiftTable).insert(companion);
-      logMessage('💾 Смена с сервера сохранена, id=$id', category: 'DATABASE');
-      return id;
-    } catch (e) {
-      logMessage('❌ Ошибка сохранения смены с сервера: $e', category: 'DATABASE', level: LogLevel.error);
-      rethrow;
+      logMessage('🔄 Смена ${data['id']} обновлена с сервера', category: 'DATABASE');
+      return existing.id;
     }
+    
+    // Создаём новую
+    final companion = ShiftTableCompanion(
+      serverId: Value(data['id']),
+      startTime: Value(data['startTime'] ?? ''),
+      endTime: Value(data['endTime']),
+      durationSeconds: Value(data['durationSeconds'] ?? 0),
+      totalPaidDistance: Value(data['totalPaidDistance'] ?? 0.0),
+      totalIdleDistance: Value(data['totalIdleDistance'] ?? 0.0),
+      totalOrderTimeSeconds: Value(data['totalOrderTimeSeconds'] ?? 0),
+      ordersCount: Value(data['ordersCount'] ?? 0),
+      totalIncome: Value(data['totalIncome'] ?? 0.0),
+      totalExpenses: Value(data['totalExpenses'] ?? 0.0),
+      netProfit: Value(data['netProfit'] ?? 0.0),
+      status: Value(data['status'] ?? 'completed'),
+      isSynced: const Value(true),
+      createdAt: data['createdAt'] != null 
+          ? Value(DateTime.parse(data['createdAt'])) 
+          : Value(DateTime.now()),
+      updatedAt: Value(DateTime.now()),
+    );
+    final id = await db.into(db.shiftTable).insert(companion);
+    logMessage('💾 Смена ${data['id']} сохранена с сервера', category: 'DATABASE');
+    return id;
+  } catch (e) {
+    logMessage('❌ Ошибка сохранения смены с сервера: $e', category: 'DATABASE', level: LogLevel.error);
+    rethrow;
   }
+}
 
   Future<void> deleteAllShifts() async {
     try {

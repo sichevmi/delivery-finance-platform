@@ -49,6 +49,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
   bool _isInitialSyncDone = false;
   bool _isLoading = true;
+  bool _syncStarted = false; // ← Флаг, чтобы синхронизация запускалась только один раз
 
   @override
   void initState() {
@@ -87,6 +88,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   }
 
   void _syncOnStart() {
+    // Защита от двойного вызова
+    if (_syncStarted) {
+      logMessage('⏭️ Синхронизация уже запущена, пропускаем', category: 'SYNC');
+      return;
+    }
+    _syncStarted = true;
+    
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final syncService = ref.read(syncServiceProvider);
       
@@ -221,6 +229,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       ),
     );
   }
+
+  // ===== ОСТАЛЬНОЙ КОД БЕЗ ИЗМЕНЕНИЙ =====
+  // ... _buildHomeTab, _buildTimeCard, _buildMetricCard, _getTodayDate ...
+  // ... и все виджеты _TimeDisplay, _IdleTimeDisplay, _IdleDistanceDisplay ...
 
   Widget _buildHomeTab(ShiftState shiftState, SettingsState settings, AsyncValue<DailyStats> dailyStatsAsync) {
     final fuelCostPerKm = (settings.fuelConsumption / 100) * settings.fuelPrice;
