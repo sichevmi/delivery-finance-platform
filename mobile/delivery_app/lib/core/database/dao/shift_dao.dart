@@ -8,7 +8,6 @@ class ShiftDao {
 
   ShiftDao(this.db);
 
-  // Вставка с простыми параметрами
   Future<int> insertShift({
     required String startTime,
     String? endTime,
@@ -40,7 +39,7 @@ class ShiftDao {
         updatedAt: Value(DateTime.now()),
       );
       final id = await db.into(db.shiftTable).insert(companion);
-      logMessage('💾 Смена сохранена в БД, id=$id', category: 'DATABASE');
+      logMessage('💾 Смена сохранена, id=$id', category: 'DATABASE');
       return id;
     } catch (e) {
       logMessage('❌ Ошибка сохранения смены: $e', category: 'DATABASE', level: LogLevel.error);
@@ -70,7 +69,6 @@ class ShiftDao {
     }
   }
 
-  // НОВЫЙ МЕТОД: получить смены за указанную дату
   Future<List<ShiftTableData>> getShiftsForDate(DateTime date) async {
     try {
       final start = DateTime(date.year, date.month, date.day);
@@ -85,7 +83,17 @@ class ShiftDao {
     }
   }
 
-  // Обновление с простыми параметрами
+  Future<ShiftTableData?> getShiftById(int id) async {
+    try {
+      return await (db.select(db.shiftTable)
+        ..where((t) => t.id.equals(id))
+      ).getSingleOrNull();
+    } catch (e) {
+      logMessage('❌ Ошибка получения смены $id: $e', category: 'DATABASE', level: LogLevel.error);
+      return null;
+    }
+  }
+
   Future<bool> updateShift(
     int id, {
     required String startTime,
@@ -122,13 +130,43 @@ class ShiftDao {
       if (count > 0) {
         logMessage('🔄 Смена $id обновлена', category: 'DATABASE');
         return true;
-      } else {
-        logMessage('⚠️ Смена $id не найдена для обновления', category: 'DATABASE');
-        return false;
       }
+      return false;
     } catch (e) {
       logMessage('❌ Ошибка обновления смены $id: $e', category: 'DATABASE', level: LogLevel.error);
       return false;
+    }
+  }
+
+  // ===== МЕТОДЫ ДЛЯ СИНХРОНИЗАЦИИ =====
+
+  Future<List<ShiftTableData>> getUnsyncedShifts() async {
+    try {
+      return await (db.select(db.shiftTable)
+        ..where((t) => t.isSynced.equals(false))
+        ..orderBy([(t) => OrderingTerm.asc(t.id)])
+      ).get();
+    } catch (e) {
+      logMessage('❌ Ошибка получения несинхронизированных смен: $e', category: 'DATABASE', level: LogLevel.error);
+      return [];
+    }
+  }
+
+  Future<void> markAsSynced(int localId, int serverId) async {
+    try {
+      await (db.update(db.shiftTable)
+        ..where((t) => t.id.equals(localId))
+      ).write(
+        ShiftTableCompanion(
+          serverId: Value(serverId),
+          isSynced: const Value(true),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+      logMessage('✅ Смена $localId синхронизирована', category: 'DATABASE');
+    } catch (e) {
+      logMessage('❌ Ошибка отметки смены $localId: $e', category: 'DATABASE', level: LogLevel.error);
+      rethrow;
     }
   }
 }

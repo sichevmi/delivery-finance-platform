@@ -1,4 +1,3 @@
-// lib/core/database/dao/order_dao.dart
 import 'package:drift/drift.dart';
 import 'package:delivery_app/core/database/app_database.dart';
 import 'package:delivery_app/core/database/tables/orders.dart';
@@ -9,7 +8,6 @@ class OrderDao {
 
   OrderDao(this.db);
 
-  // Сохранить заказ
   Future<int> insertOrder({
     required String serviceName,
     required double coefficient,
@@ -39,7 +37,7 @@ class OrderDao {
         updatedAt: Value(DateTime.now()),
       );
       final id = await db.into(db.orderTable).insert(companion);
-      logMessage('💾 Заказ сохранён в БД, id=$id', category: 'DATABASE');
+      logMessage('💾 Заказ сохранён, id=$id', category: 'DATABASE');
       return id;
     } catch (e) {
       logMessage('❌ Ошибка сохранения заказа: $e', category: 'DATABASE', level: LogLevel.error);
@@ -47,7 +45,6 @@ class OrderDao {
     }
   }
 
-  // Получить заказ по ID
   Future<OrderTableData?> getOrderById(int id) async {
     try {
       return await (db.select(db.orderTable)..where((t) => t.id.equals(id))).getSingleOrNull();
@@ -57,7 +54,6 @@ class OrderDao {
     }
   }
 
-  // Получить все заказы за день
   Future<List<OrderTableData>> getOrdersForDate(DateTime date) async {
     try {
       final start = DateTime(date.year, date.month, date.day);
@@ -72,7 +68,6 @@ class OrderDao {
     }
   }
 
-  // Получить заказы по смене
   Future<List<OrderTableData>> getOrdersByShift(int shiftId) async {
     try {
       return await (db.select(db.orderTable)
@@ -85,7 +80,17 @@ class OrderDao {
     }
   }
 
-  // Обновить заказ
+  Future<List<OrderTableData>> getAllOrders() async {
+    try {
+      return await (db.select(db.orderTable)
+        ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+      ).get();
+    } catch (e) {
+      logMessage('❌ Ошибка получения всех заказов: $e', category: 'DATABASE', level: LogLevel.error);
+      return [];
+    }
+  }
+
   Future<bool> updateOrder(int id, OrderTableCompanion order) async {
     try {
       final count = await (db.update(db.orderTable)
@@ -97,17 +102,35 @@ class OrderDao {
     }
   }
 
-  // Отметить как синхронизированный
-  Future<void> markAsSynced(int id, int serverId) async {
-    await (db.update(db.orderTable)
-      ..where((t) => t.id.equals(id))).write(
+  // ===== МЕТОДЫ ДЛЯ СИНХРОНИЗАЦИИ =====
+
+  Future<List<OrderTableData>> getUnsyncedOrders() async {
+    try {
+      return await (db.select(db.orderTable)
+        ..where((t) => t.isSynced.equals(false))
+        ..orderBy([(t) => OrderingTerm.asc(t.id)])
+      ).get();
+    } catch (e) {
+      logMessage('❌ Ошибка получения несинхронизированных заказов: $e', category: 'DATABASE', level: LogLevel.error);
+      return [];
+    }
+  }
+
+  Future<void> markAsSynced(int localId, int serverId) async {
+    try {
+      await (db.update(db.orderTable)
+        ..where((t) => t.id.equals(localId))
+      ).write(
         OrderTableCompanion(
-          isSynced: const Value(true),
           serverId: Value(serverId),
-          status: const Value('synced'),
+          isSynced: const Value(true),
           updatedAt: Value(DateTime.now()),
         ),
       );
-    logMessage('✅ Заказ $id синхронизирован (serverId=$serverId)', category: 'DATABASE');
+      logMessage('✅ Заказ $localId синхронизирован', category: 'DATABASE');
+    } catch (e) {
+      logMessage('❌ Ошибка отметки заказа $localId: $e', category: 'DATABASE', level: LogLevel.error);
+      rethrow;
+    }
   }
 }

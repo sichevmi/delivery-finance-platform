@@ -1,4 +1,3 @@
-// main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:delivery_app/core/theme/app_theme.dart';
@@ -9,20 +8,18 @@ import 'package:delivery_app/features/auth/providers/auth_provider.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 import 'package:delivery_app/logger.dart';
 import 'package:delivery_app/core/database/database_provider.dart';
+import 'package:delivery_app/features/delivery/providers/sync_provider.dart';
 
 void main() async {
-  // Инициализируем логгер
   await LoggerService().init();
   logMessage('🚀 Приложение запущено', category: 'SYSTEM');
   
   WidgetsFlutterBinding.ensureInitialized();
   logMessage('✅ Flutter инициализирован', category: 'SYSTEM');
   
-  // Создаём контейнер для провайдеров
   final container = ProviderContainer();
   logMessage('✅ Контейнер создан', category: 'SYSTEM');
   
-  // Инициализируем базу данных
   try {
     final db = container.read(appDatabaseProvider);
     logMessage('📁 База данных инициализирована', category: 'DATABASE');
@@ -31,11 +28,14 @@ void main() async {
   }
   
   // Инициализируем GPS
-  final ref = container;
-  ref.read(gpsInitProvider);
+  container.read(gpsInitProvider);
   logMessage('🟢 GPS инициализирован', category: 'SYSTEM');
   
-  logMessage('🚀 ЗАПУСК APP', category: 'SYSTEM');
+  // Инициализируем синхронизацию
+  container.read(syncServiceProvider);
+  container.read(apiClientProvider);
+  container.read(connectivityServiceProvider);
+  logMessage('🔄 Синхронизация инициализирована', category: 'SYSTEM');
   
   runApp(
     UncontrolledProviderScope(
@@ -43,8 +43,6 @@ void main() async {
       child: const DeliveryApp(),
     ),
   );
-  
-  logMessage('✅ APP ЗАПУЩЕН', category: 'SYSTEM');
 }
 
 class DeliveryApp extends ConsumerStatefulWidget {
@@ -85,7 +83,6 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
       logMessage('🔐 DeliveryApp: авторизован = $isAuthenticated', category: 'SYSTEM');
       
       ref.read(gpsInitProvider);
-      logMessage('🟢 GPS провайдер инициализирован', category: 'SYSTEM');
       
       setState(() {
         _hasPermission = true;

@@ -6,6 +6,7 @@ import 'package:delivery_app/features/auth/ui/screens/login_screen.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 import 'package:delivery_app/features/delivery/services/gps_service.dart';
 import 'package:delivery_app/features/delivery/providers/logger_provider.dart';
+import 'package:delivery_app/features/delivery/providers/sync_provider.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 // Экран для просмотра логов
@@ -222,6 +223,8 @@ class _MoreTabState extends ConsumerState<MoreTab> {
     final authState = ref.watch(authProvider);
     final authNotifier = ref.read(authProvider.notifier);
     final gpsService = ref.read(gpsServiceProvider);
+    final isSyncing = ref.watch(syncStatusProvider);
+    final lastSyncTime = ref.watch(lastSyncTimeProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
@@ -244,6 +247,50 @@ class _MoreTabState extends ConsumerState<MoreTab> {
         children: [
           _buildUserCard(authState),
           const SizedBox(height: 24),
+
+          const Text(
+            'Синхронизация',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 8),
+          
+          // КНОПКА СИНХРОНИЗАЦИИ
+          Material(
+            color: const Color(0xFF1E1E1E),
+            borderRadius: BorderRadius.circular(8),
+            child: ListTile(
+              leading: Icon(
+                isSyncing ? Icons.sync : Icons.cloud_sync,
+                color: isSyncing ? Colors.green : const Color(0xFF6C63FF),
+              ),
+              title: Text(
+                isSyncing ? 'Синхронизация...' : 'Синхронизировать',
+                style: const TextStyle(color: Colors.white),
+              ),
+              subtitle: Text(
+                lastSyncTime != null 
+                    ? 'Последняя синхронизация: ${_formatTime(lastSyncTime!)}'
+                    : 'Нажмите для синхронизации',
+                style: const TextStyle(color: Color(0xFF888888), fontSize: 12),
+              ),
+              trailing: isSyncing
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xFF6C63FF),
+                      ),
+                    )
+                  : const Icon(Icons.cloud_upload, color: Color(0xFF6C63FF)),
+              onTap: isSyncing ? null : _syncData,
+            ),
+          ),
+          const SizedBox(height: 4),
 
           const Text(
             'Настройки',
@@ -526,6 +573,52 @@ class _MoreTabState extends ConsumerState<MoreTab> {
     );
   }
 
+  // ===== МЕТОД СИНХРОНИЗАЦИИ =====
+  Future<void> _syncData() async {
+    try {
+      final syncService = ref.read(syncServiceProvider);
+      final syncStatus = ref.read(syncStatusProvider.notifier);
+      final lastSyncTime = ref.read(lastSyncTimeProvider.notifier);
+      
+      syncStatus.state = true;
+      await syncService.syncAll();
+      syncStatus.state = false;
+      lastSyncTime.state = DateTime.now();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Синхронизация завершена'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      ref.read(syncStatusProvider.notifier).state = false;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Ошибка синхронизации: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      logMessage('❌ Ошибка синхронизации: $e', category: 'SYNC', level: LogLevel.error);
+    }
+  }
+
+  String _formatTime(DateTime time) {
+    final now = DateTime.now();
+    final diff = now.difference(time);
+    
+    if (diff.inMinutes < 1) return 'только что';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} мин назад';
+    if (diff.inHours < 24) return '${diff.inHours} ч назад';
+    return '${diff.inDays} д назад';
+  }
+
+  // ===== ОСТАЛЬНЫЕ МЕТОДЫ =====
+  
   void _toggleLogging(GpsService gpsService) async {
     setState(() {
       _isLoggingEnabled = !_isLoggingEnabled;

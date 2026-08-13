@@ -11,6 +11,8 @@ import 'package:delivery_app/features/delivery/ui/tabs/orders_tab.dart';
 import 'package:delivery_app/features/delivery/ui/tabs/analytics_tab.dart';
 import 'package:delivery_app/features/delivery/ui/tabs/directories_tab.dart';
 import 'package:delivery_app/features/delivery/ui/tabs/more_tab.dart';
+import 'package:delivery_app/features/delivery/providers/sync_provider.dart';
+import 'package:delivery_app/core/services/connectivity_service.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -44,10 +46,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     Icons.more_horiz,
   ];
 
+  bool _isInitialSyncDone = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _listenToConnectivity();
+    _syncOnStart();
   }
 
   @override
@@ -59,6 +65,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Ничего не делаем
+  }
+
+  // ===== АВТОМАТИЧЕСКАЯ СИНХРОНИЗАЦИЯ =====
+  
+  void _listenToConnectivity() {
+    final connectivity = ref.read(connectivityServiceProvider);
+    connectivity.connectivityStream.listen((result) {
+      if (result != ConnectivityResult.none && !_isInitialSyncDone) {
+        final syncService = ref.read(syncServiceProvider);
+        syncService.syncAll().then((_) {
+          setState(() => _isInitialSyncDone = true);
+          logMessage('✅ Автосинхронизация выполнена', category: 'SYNC');
+        }).catchError((e) {
+          logMessage('⚠️ Автосинхронизация: $e', category: 'SYNC', level: LogLevel.error);
+        });
+      }
+    });
+  }
+
+  void _syncOnStart() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final syncService = ref.read(syncServiceProvider);
+      syncService.syncAll().then((_) {
+        setState(() => _isInitialSyncDone = true);
+        logMessage('✅ Первичная синхронизация выполнена', category: 'SYNC');
+      }).catchError((e) {
+        logMessage('⚠️ Первичная синхронизация: $e', category: 'SYNC', level: LogLevel.error);
+      });
+    });
   }
 
   @override
@@ -262,7 +297,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             const SizedBox(height: 6),
             Row(
               children: [
-                // ===== ХОЛОСТОЙ ПРОБЕГ — ОТДЕЛЬНЫЙ ВИДЖЕТ =====
                 _IdleDistanceDisplay(
                   shiftState: shiftState,
                   label: 'Холостой пробег',
@@ -291,7 +325,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                   } else {
                     notifier.startShift();
                   }
-                  // Обновляем статистику после изменения смены
                   ref.invalidate(dailyStatsProvider);
                 },
                 style: ElevatedButton.styleFrom(
@@ -719,7 +752,6 @@ class _IdleDistanceDisplayState extends State<_IdleDistanceDisplay> {
   void _startTimer() {
     _timer?.cancel();
     if (widget.shiftState.isActive && !widget.shiftState.isOnOrder) {
-      // Обновляем каждую секунду, когда нет заказа
       _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
         setState(() {});
       });

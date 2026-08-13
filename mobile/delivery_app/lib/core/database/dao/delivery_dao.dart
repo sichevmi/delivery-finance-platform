@@ -1,4 +1,3 @@
-// lib/core/database/dao/delivery_dao.dart
 import 'package:drift/drift.dart';
 import 'package:delivery_app/core/database/app_database.dart';
 import 'package:delivery_app/core/database/tables/deliveries.dart';
@@ -9,7 +8,6 @@ class DeliveryDao {
 
   DeliveryDao(this.db);
 
-  // Сохранить доставку
   Future<int> insertDelivery({
     required int number,
     required String clientAddress,
@@ -43,7 +41,7 @@ class DeliveryDao {
         updatedAt: Value(DateTime.now()),
       );
       final id = await db.into(db.deliveryTable).insert(companion);
-      logMessage('💾 Доставка сохранена в БД, id=$id', category: 'DATABASE');
+      logMessage('💾 Доставка сохранена, id=$id', category: 'DATABASE');
       return id;
     } catch (e) {
       logMessage('❌ Ошибка сохранения доставки: $e', category: 'DATABASE', level: LogLevel.error);
@@ -51,7 +49,6 @@ class DeliveryDao {
     }
   }
 
-  // Получить доставки по заказу
   Future<List<DeliveryTableData>> getDeliveriesByOrder(int orderId) async {
     try {
       return await (db.select(db.deliveryTable)
@@ -64,7 +61,29 @@ class DeliveryDao {
     }
   }
 
-  // Обновить доставку
+  Future<DeliveryTableData?> getDeliveryById(int id) async {
+    try {
+      return await (db.select(db.deliveryTable)
+        ..where((t) => t.id.equals(id))
+      ).getSingleOrNull();
+    } catch (e) {
+      logMessage('❌ Ошибка получения доставки $id: $e', category: 'DATABASE', level: LogLevel.error);
+      return null;
+    }
+  }
+
+  Future<List<DeliveryTableData>> getDeliveriesByStatus(String status) async {
+    try {
+      return await (db.select(db.deliveryTable)
+        ..where((t) => t.status.equals(status))
+        ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+      ).get();
+    } catch (e) {
+      logMessage('❌ Ошибка получения доставок по статусу: $e', category: 'DATABASE', level: LogLevel.error);
+      return [];
+    }
+  }
+
   Future<bool> updateDelivery(int id, DeliveryTableCompanion delivery) async {
     try {
       final count = await (db.update(db.deliveryTable)
@@ -73,6 +92,50 @@ class DeliveryDao {
     } catch (e) {
       logMessage('❌ Ошибка обновления доставки $id: $e', category: 'DATABASE', level: LogLevel.error);
       return false;
+    }
+  }
+
+  Future<bool> deleteDelivery(int id) async {
+    try {
+      final count = await (db.delete(db.deliveryTable)
+        ..where((t) => t.id.equals(id))
+      ).go();
+      return count > 0;
+    } catch (e) {
+      logMessage('❌ Ошибка удаления доставки $id: $e', category: 'DATABASE', level: LogLevel.error);
+      return false;
+    }
+  }
+
+  // ===== МЕТОДЫ ДЛЯ СИНХРОНИЗАЦИИ =====
+
+  Future<List<DeliveryTableData>> getUnsyncedDeliveries() async {
+    try {
+      return await (db.select(db.deliveryTable)
+        ..where((t) => t.isSynced.equals(false))
+        ..orderBy([(t) => OrderingTerm.asc(t.id)])
+      ).get();
+    } catch (e) {
+      logMessage('❌ Ошибка получения несинхронизированных доставок: $e', category: 'DATABASE', level: LogLevel.error);
+      return [];
+    }
+  }
+
+  Future<void> markAsSynced(int localId, int serverId) async {
+    try {
+      await (db.update(db.deliveryTable)
+        ..where((t) => t.id.equals(localId))
+      ).write(
+        DeliveryTableCompanion(
+          serverId: Value(serverId),
+          isSynced: const Value(true),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+      logMessage('✅ Доставка $localId синхронизирована', category: 'DATABASE');
+    } catch (e) {
+      logMessage('❌ Ошибка отметки доставки $localId: $e', category: 'DATABASE', level: LogLevel.error);
+      rethrow;
     }
   }
 }
