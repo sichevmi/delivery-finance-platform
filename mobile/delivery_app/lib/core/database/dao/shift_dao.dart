@@ -138,7 +138,7 @@ class ShiftDao {
     }
   }
 
-  // ===== МЕТОДЫ ДЛЯ СИНХРОНИЗАЦИИ =====
+  // ===== МЕТОДЫ ДЛЯ СИНХРОНИЗАЦИИ (ОТПРАВКА) =====
 
   Future<List<ShiftTableData>> getUnsyncedShifts() async {
     try {
@@ -163,10 +163,62 @@ class ShiftDao {
           updatedAt: Value(DateTime.now()),
         ),
       );
-      logMessage('✅ Смена $localId синхронизирована', category: 'DATABASE');
+      logMessage('✅ Смена $localId синхронизирована (serverId=$serverId)', category: 'DATABASE');
     } catch (e) {
       logMessage('❌ Ошибка отметки смены $localId: $e', category: 'DATABASE', level: LogLevel.error);
       rethrow;
+    }
+  }
+
+  // ===== МЕТОДЫ ДЛЯ ЗАГРУЗКИ С СЕРВЕРА =====
+
+  Future<void> deleteShiftsForDate(DateTime start, DateTime end) async {
+    try {
+      await (db.delete(db.shiftTable)
+        ..where((t) => t.createdAt.isBetweenValues(start, end))
+      ).go();
+      logMessage('🗑️ Удалены смены за период', category: 'DATABASE');
+    } catch (e) {
+      logMessage('❌ Ошибка удаления смен за дату: $e', category: 'DATABASE', level: LogLevel.error);
+    }
+  }
+
+  Future<int> insertShiftFromServer(Map<String, dynamic> data) async {
+    try {
+      final companion = ShiftTableCompanion(
+        serverId: Value(data['id']),
+        startTime: Value(data['startTime'] ?? ''),
+        endTime: Value(data['endTime']),
+        durationSeconds: Value(data['durationSeconds'] ?? 0),
+        totalPaidDistance: Value(data['totalPaidDistance'] ?? 0.0),
+        totalIdleDistance: Value(data['totalIdleDistance'] ?? 0.0),
+        totalOrderTimeSeconds: Value(data['totalOrderTimeSeconds'] ?? 0),
+        ordersCount: Value(data['ordersCount'] ?? 0),
+        totalIncome: Value(data['totalIncome'] ?? 0.0),
+        totalExpenses: Value(data['totalExpenses'] ?? 0.0),
+        netProfit: Value(data['netProfit'] ?? 0.0),
+        status: Value(data['status'] ?? 'completed'),
+        isSynced: const Value(true),
+        createdAt: data['createdAt'] != null 
+            ? Value(DateTime.parse(data['createdAt'])) 
+            : Value(DateTime.now()),
+        updatedAt: Value(DateTime.now()),
+      );
+      final id = await db.into(db.shiftTable).insert(companion);
+      logMessage('💾 Смена с сервера сохранена, id=$id', category: 'DATABASE');
+      return id;
+    } catch (e) {
+      logMessage('❌ Ошибка сохранения смены с сервера: $e', category: 'DATABASE', level: LogLevel.error);
+      rethrow;
+    }
+  }
+
+  Future<void> deleteAllShifts() async {
+    try {
+      await db.delete(db.shiftTable).go();
+      logMessage('🗑️ Удалены все смены', category: 'DATABASE');
+    } catch (e) {
+      logMessage('❌ Ошибка удаления смен: $e', category: 'DATABASE', level: LogLevel.error);
     }
   }
 }

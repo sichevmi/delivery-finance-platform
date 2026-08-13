@@ -86,16 +86,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   }
 
   void _syncOnStart() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final syncService = ref.read(syncServiceProvider);
-      syncService.syncAll().then((_) {
-        setState(() => _isInitialSyncDone = true);
-        logMessage('✅ Первичная синхронизация выполнена', category: 'SYNC');
-      }).catchError((e) {
-        logMessage('⚠️ Первичная синхронизация: $e', category: 'SYNC', level: LogLevel.error);
-      });
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    final syncService = ref.read(syncServiceProvider);
+    // Сначала загружаем данные с сервера, потом синхронизируем свои
+    syncService.loadFromServer().then((_) {
+      return syncService.syncAll();
+    }).then((_) {
+      setState(() => _isInitialSyncDone = true);
+      logMessage('✅ Первичная синхронизация выполнена', category: 'SYNC');
+    }).catchError((e) {
+      logMessage('⚠️ Первичная синхронизация: $e', category: 'SYNC', level: LogLevel.error);
     });
-  }
+  });
+}
 
   @override
   Widget build(BuildContext context) {

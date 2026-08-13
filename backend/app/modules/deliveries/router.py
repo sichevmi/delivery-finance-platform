@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session  # ← ДОБАВЛЯЕМ ИМПОРТ
+from sqlalchemy.orm import Session
 from typing import Dict, List, Any
+from datetime import date, datetime
 import logging
 
 from app.core.database import get_db
-from app.modules.users.dependencies import get_current_user  # ← ПРАВИЛЬНЫЙ ИМПОРТ
+from app.modules.users.dependencies import get_current_user
 from app.modules.deliveries.services import DeliveryService
 from app.modules.deliveries.models import Shift, Order, Delivery
+from sqlalchemy import func
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -85,7 +87,6 @@ async def get_sync_status(
 ):
     """Проверка статуса синхронизации"""
     try:
-        # Подсчёт несинхронизированных записей
         unsynced_shifts = db.query(Shift).filter(
             Shift.user_id == current_user.id,
             Shift.is_synced == False
@@ -111,4 +112,98 @@ async def get_sync_status(
         }
     except Exception as e:
         logger.error(f"❌ Ошибка получения статуса: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ===== НОВЫЕ ЭНДПОИНТЫ ДЛЯ ЗАГРУЗКИ ДАННЫХ =====
+
+@router.get("/sync/today")
+async def get_today_data(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Получение данных за сегодня"""
+    try:
+        today = date.today()
+        
+        # Смены за сегодня
+        shifts = db.query(Shift).filter(
+            Shift.user_id == current_user.id,
+            func.date(Shift.created_at) == today
+        ).order_by(Shift.created_at.desc()).all()
+        
+        # Заказы за сегодня
+        orders = db.query(Order).filter(
+            Order.user_id == current_user.id,
+            func.date(Order.created_at) == today
+        ).order_by(Order.created_at.desc()).all()
+        
+        # Для каждого заказа получаем доставки
+        orders_data = []
+        for order in orders:
+            deliveries = db.query(Delivery).filter(
+                Delivery.order_id == order.id
+            ).all()
+            orders_data.append({
+                "id": order.id,
+                "localId": order.local_id,
+                "shiftId": order.shift_id,
+                "serviceName": order.service_name,
+                "coefficient": order.coefficient,
+                "deliveryNumber": order.delivery_number,
+                "totalPaidDistance": order.total_paid_distance,
+                "totalIncome": order.total_income,
+                "totalExpenses": order.total_expenses,
+                "netProfit": order.net_profit,
+                "totalTimeSeconds": order.total_time_seconds,
+                "status": order.status,
+                "isSynced": order.is_synced,
+                "createdAt": order.created_at.isoformat() if order.created_at else None,
+                "deliveries": [
+                    {
+                        "id": d.id,
+                        "localId": d.local_id,
+                        "number": d.number,
+                        "clientAddress": d.client_address,
+                        "apartment": d.apartment,
+                        "weight": d.weight,
+                        "timeToShop": d.time_to_shop,
+                        "distanceToShop": d.distance_to_shop,
+                        "timeReceiving": d.time_receiving,
+                        "timeToClient": d.time_to_client,
+                        "distanceToClient": d.distance_to_client,
+                        "timeDelivery": d.time_delivery,
+                        "status": d.status,
+                        "isSynced": d.is_synced,
+                    }
+                    for d in deliveries
+                ]
+            })
+        
+        return {
+            "status": "success",
+            "date": today.isoformat(),
+            "shifts": [
+                {
+                    "id": s.id,
+                    "localId": s.local_id,
+                    "startTime": s.start_time,
+                    "endTime": s.end_time,
+                    "durationSeconds": s.duration_seconds,
+                    "totalPaidDistance": s.total_paid_distance,
+                    "totalIdleDistance": s.total_idle_distance,
+                    "ordersCount": s.orders_count,
+                    "totalIncome": s.total_income,
+                    "totalExpenses": s.total_expenses,
+                    "netProfit": s.net_profit,
+                    "status": s.status,
+                    "isSynced": s.is_synced,
+                    "createdAt": s.created_at.isoformat() if s.created_at else None,
+                }
+                for s in shifts
+            ],
+            "orders": orders_data,
+        }
+    except Exception as e:
+        logger.error(f"❌ Ошибка получения данных за сегодня: {e}")
         raise HTTPException(status_code=500, detail=str(e))

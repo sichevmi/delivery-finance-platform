@@ -102,7 +102,7 @@ class OrderDao {
     }
   }
 
-  // ===== МЕТОДЫ ДЛЯ СИНХРОНИЗАЦИИ =====
+  // ===== МЕТОДЫ ДЛЯ СИНХРОНИЗАЦИИ (ОТПРАВКА) =====
 
   Future<List<OrderTableData>> getUnsyncedOrders() async {
     try {
@@ -127,9 +127,51 @@ class OrderDao {
           updatedAt: Value(DateTime.now()),
         ),
       );
-      logMessage('✅ Заказ $localId синхронизирован', category: 'DATABASE');
+      logMessage('✅ Заказ $localId синхронизирован (serverId=$serverId)', category: 'DATABASE');
     } catch (e) {
       logMessage('❌ Ошибка отметки заказа $localId: $e', category: 'DATABASE', level: LogLevel.error);
+      rethrow;
+    }
+  }
+
+  // ===== МЕТОДЫ ДЛЯ ЗАГРУЗКИ С СЕРВЕРА =====
+
+  Future<void> deleteOrdersForDate(DateTime start, DateTime end) async {
+    try {
+      await (db.delete(db.orderTable)
+        ..where((t) => t.createdAt.isBetweenValues(start, end))
+      ).go();
+      logMessage('🗑️ Удалены заказы за период', category: 'DATABASE');
+    } catch (e) {
+      logMessage('❌ Ошибка удаления заказов за дату: $e', category: 'DATABASE', level: LogLevel.error);
+    }
+  }
+
+  Future<int> insertOrderFromServer(Map<String, dynamic> data) async {
+    try {
+      final companion = OrderTableCompanion(
+        serverId: Value(data['id']),
+        shiftId: Value(data['shiftId']),
+        serviceName: Value(data['serviceName'] ?? 'Заказ'),
+        coefficient: Value(data['coefficient'] ?? 1.0),
+        deliveryNumber: Value(data['deliveryNumber'] ?? 1),
+        totalPaidDistance: Value(data['totalPaidDistance'] ?? 0.0),
+        totalIncome: Value(data['totalIncome'] ?? 0.0),
+        totalExpenses: Value(data['totalExpenses'] ?? 0.0),
+        netProfit: Value(data['netProfit'] ?? 0.0),
+        totalTimeSeconds: Value(data['totalTimeSeconds'] ?? 0),
+        status: Value(data['status'] ?? 'completed'),
+        isSynced: const Value(true),
+        createdAt: data['createdAt'] != null 
+            ? Value(DateTime.parse(data['createdAt'])) 
+            : Value(DateTime.now()),
+        updatedAt: Value(DateTime.now()),
+      );
+      final id = await db.into(db.orderTable).insert(companion);
+      logMessage('💾 Заказ с сервера сохранён, id=$id', category: 'DATABASE');
+      return id;
+    } catch (e) {
+      logMessage('❌ Ошибка сохранения заказа с сервера: $e', category: 'DATABASE', level: LogLevel.error);
       rethrow;
     }
   }

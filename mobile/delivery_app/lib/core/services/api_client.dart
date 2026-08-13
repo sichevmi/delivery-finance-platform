@@ -20,7 +20,6 @@ class ApiClient {
     _dio.interceptors.add(_LoggingInterceptor());
   }
 
-  // ===== ГЕТТЕР ДЛЯ DIO =====
   Dio get dio => _dio;
 
   // ===== АУТЕНТИФИКАЦИЯ =====
@@ -85,7 +84,7 @@ class ApiClient {
     }
   }
 
-  // ===== СИНХРОНИЗАЦИЯ =====
+  // ===== СИНХРОНИЗАЦИЯ (ОТПРАВКА) =====
 
   Future<Map<String, dynamic>> syncShifts(List<Map<String, dynamic>> shifts) async {
     try {
@@ -126,6 +125,19 @@ class ApiClient {
       return response.data;
     } catch (e) {
       logMessage('⚠️ Ошибка syncSettings: $e', category: 'API', level: LogLevel.error);
+      rethrow;
+    }
+  }
+
+  // ===== ЗАГРУЗКА ДАННЫХ С СЕРВЕРА =====
+
+  Future<Map<String, dynamic>> getTodayData() async {
+    try {
+      logMessage('📥 Загрузка данных за сегодня...', category: 'API');
+      final response = await _dio.get('/sync/today');
+      return response.data;
+    } catch (e) {
+      logMessage('⚠️ Ошибка getTodayData: $e', category: 'API', level: LogLevel.error);
       rethrow;
     }
   }
