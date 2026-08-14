@@ -456,11 +456,12 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     _stopGpsTracking();
     _saveShiftToDatabase();
     
-    // ===== 🔄 СИНХРОНИЗАЦИЯ ПОСЛЕ ЗАВЕРШЕНИЯ СМЕНЫ =====
+    // ===== СИНХРОНИЗАЦИЯ ПОСЛЕ ЗАВЕРШЕНИЯ СМЕНЫ =====
     _syncAfterShift();
   }
+
+  // ===== СИНХРОНИЗАЦИЯ ПОСЛЕ ЗАВЕРШЕНИЯ СМЕНЫ =====
   
-  // ===== НОВЫЙ МЕТОД ДЛЯ СИНХРОНИЗАЦИИ =====
   void _syncAfterShift() {
     try {
       final syncService = _ref.read(syncServiceProvider);
@@ -544,7 +545,7 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   
   void tick() {
   
-}
+  }
 
   void resetDay() {
     _resetDay();
