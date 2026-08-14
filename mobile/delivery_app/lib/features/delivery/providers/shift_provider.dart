@@ -390,44 +390,61 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   // ===== ОСНОВНЫЕ МЕТОДЫ =====
 
   void startShift() async {
-    if (state.isActive) return;
-    
-    final db = _ref.read(appDatabaseProvider);
-    final existingShift = await db.shiftDao.getActiveShift();
-    
-    if (existingShift != null) {
-      logMessage('⚠️ Найдена активная смена в БД (id=${existingShift.id}), восстанавливаем', category: 'SHIFT');
-      state = state.copyWith(
-        localShiftId: existingShift.id,
-        isActive: true,
-        shiftStartTime: DateTime.tryParse(existingShift.startTime),
-        shiftEndTime: existingShift.endTime != null ? DateTime.tryParse(existingShift.endTime!) : null,
-        totalWorkTime: Duration(seconds: existingShift.durationSeconds),
-        totalPaidDistance: existingShift.totalPaidDistance,
-        totalIdleDistance: existingShift.totalIdleDistance,
-        ordersCount: existingShift.ordersCount,
-        totalIncome: existingShift.totalIncome,
-        totalExpenses: existingShift.totalExpenses,
-        netProfit: existingShift.netProfit,
-        idleStartTime: DateTime.now(),
-      );
-      _saveState();
-      _startGpsTracking();
-      return;
-    }
-    
-    final now = DateTime.now();
+  if (state.isActive) return;
+  
+  final db = _ref.read(appDatabaseProvider);
+  final existingShift = await db.shiftDao.getActiveShift();
+  
+  if (existingShift != null) {
+    logMessage('⚠️ Найдена активная смена в БД (id=${existingShift.id}), восстанавливаем', category: 'SHIFT');
     state = state.copyWith(
+      localShiftId: existingShift.id,
       isActive: true,
-      shiftStartTime: now,
-      shiftEndTime: null,
-      idleStartTime: now,
-      localShiftId: null,
+      shiftStartTime: DateTime.tryParse(existingShift.startTime),
+      shiftEndTime: existingShift.endTime != null ? DateTime.tryParse(existingShift.endTime!) : null,
+      totalWorkTime: Duration(seconds: existingShift.durationSeconds),
+      totalPaidDistance: existingShift.totalPaidDistance,
+      totalIdleDistance: existingShift.totalIdleDistance,
+      ordersCount: existingShift.ordersCount,
+      totalIncome: existingShift.totalIncome,
+      totalExpenses: existingShift.totalExpenses,
+      netProfit: existingShift.netProfit,
+      idleStartTime: DateTime.now(),
     );
     _saveState();
     _startGpsTracking();
-    _saveShiftToDatabase();
+    return;
   }
+  
+  final now = DateTime.now();
+  state = state.copyWith(
+    isActive: true,
+    shiftStartTime: now,
+    shiftEndTime: null,
+    idleStartTime: now,
+    localShiftId: null,
+  );
+  _saveState();
+  _startGpsTracking();
+  
+  // 🔥 СОХРАНЯЕМ В БД
+  await _saveShiftToDatabase();
+  
+  // 🔥 СИНХРОНИЗИРУЕМ АКТИВНУЮ СМЕНУ С СЕРВЕРОМ
+  _syncActiveShift();
+}
+
+// ===== СИНХРОНИЗАЦИЯ АКТИВНОЙ СМЕНЫ =====
+
+void _syncActiveShift() async {
+  try {
+    final syncService = _ref.read(syncServiceProvider);
+    await syncService.syncActiveShift();
+    logMessage('✅ Активная смена синхронизирована с сервером', category: 'SHIFT');
+  } catch (e) {
+    logMessage('⚠️ Ошибка синхронизации активной смены: $e', category: 'SHIFT', level: LogLevel.error);
+  }
+}
 
   void stopShift() {
     logMessage('🛑 stopShift() вызван', category: 'SHIFT');

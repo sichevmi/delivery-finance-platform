@@ -20,32 +20,82 @@ class SyncService {
   // ===== ОСНОВНАЯ СИНХРОНИЗАЦИЯ =====
 
   Future<void> syncAll() async {
-    if (_isSyncing) {
-      logMessage('⚠️ Синхронизация уже выполняется', category: 'SYNC');
-      return;
-    }
-
-    final hasInternet = await _connectivity.hasInternet();
-    if (!hasInternet) {
-      logMessage('⚠️ Нет интернета, синхронизация отложена', category: 'SYNC');
-      return;
-    }
-
-    _isSyncing = true;
-    logMessage('🔄 Начинаем синхронизацию...', category: 'SYNC');
-
-    try {
-      await _syncSettings();
-      await _syncShifts();
-      await _syncOrders();
-      logMessage('✅ Синхронизация завершена', category: 'SYNC');
-    } catch (e) {
-      logMessage('❌ Ошибка синхронизации: $e', category: 'SYNC', level: LogLevel.error);
-      rethrow;
-    } finally {
-      _isSyncing = false;
-    }
+  if (_isSyncing) {
+    logMessage('⚠️ Синхронизация уже выполняется', category: 'SYNC');
+    return;
   }
+
+  final hasInternet = await _connectivity.hasInternet();
+  if (!hasInternet) {
+    logMessage('⚠️ Нет интернета, синхронизация отложена', category: 'SYNC');
+    return;
+  }
+
+  _isSyncing = true;
+  logMessage('🔄 Начинаем синхронизацию...', category: 'SYNC');
+
+  try {
+    // 1. Сначала синхронизируем активную смену (если есть)
+    await syncActiveShift();
+    
+    // 2. Потом синхронизируем настройки
+    await _syncSettings();
+    
+    // 3. Синхронизируем завершённые смены
+    await _syncCompletedShifts();
+    
+    // 4. Синхронизируем заказы (только завершённые)
+    await _syncOrders();
+    
+    logMessage('✅ Синхронизация завершена', category: 'SYNC');
+  } catch (e) {
+    logMessage('❌ Ошибка синхронизации: $e', category: 'SYNC', level: LogLevel.error);
+    rethrow;
+  } finally {
+    _isSyncing = false;
+  }
+}
+
+Future<void> _syncCompletedShifts() async {
+  logMessage('📤 Синхронизация завершённых смен...', category: 'SYNC');
+  try {
+    // 🔥 БЕРЁМ ТОЛЬКО ЗАВЕРШЁННЫЕ СМЕНЫ БЕЗ serverId
+    final allShifts = await _db.shiftDao.getAllShifts();
+    final unsyncedShifts = allShifts.where((shift) => 
+      shift.serverId == null && shift.status == 'completed'
+    ).toList();
+    
+    if (unsyncedShifts.isEmpty) {
+      logMessage('✅ Нет завершённых смен для отправки', category: 'SYNC');
+      return;
+    }
+
+    logMessage('📊 Найдено ${unsyncedShifts.length} завершённых смен', category: 'SYNC');
+
+    final shiftsData = unsyncedShifts.map((shift) => ({
+      'localId': shift.id,
+      'startTime': shift.startTime,
+      'endTime': shift.endTime,
+      'durationSeconds': shift.durationSeconds,
+      'totalPaidDistance': shift.totalPaidDistance,
+      'totalIdleDistance': shift.totalIdleDistance,
+      'ordersCount': shift.ordersCount,
+      'totalIncome': shift.totalIncome,
+      'totalExpenses': shift.totalExpenses,
+      'netProfit': shift.netProfit,
+      'status': shift.status,
+    })).toList();
+
+    final response = await _apiClient.syncShifts(shiftsData);
+    
+    for (final result in response['synced']) {
+      await _db.shiftDao.markAsSynced(result['localId'], result['serverId']);
+      logMessage('✅ Смена ${result['localId']} синхронизирована (serverId=${result['serverId']})', category: 'SYNC');
+    }
+  } catch (e) {
+    logMessage('❌ Ошибка синхронизации завершённых смен: $e', category: 'SYNC', level: LogLevel.error);
+  }
+}
 
   // ===== ЗАГРУЗКА ДАННЫХ С СЕРВЕРА =====
 
@@ -264,7 +314,7 @@ class SyncService {
       }
     }
 
-    // 🔥 НЕ УДАЛЯЕМ ЗАКАЗЫ АКТИВНОЙ СМЕНЫ
+    // 🔥 УДАЛЯЕМ ЗАКАЗЫ ЗАВЕРШЁННЫХ СМЕН
     final todayOrders = await _db.orderDao.getOrdersForDate(now);
     for (final order in todayOrders) {
       if (order.shiftId == activeShiftId) {
@@ -308,6 +358,56 @@ class SyncService {
     logMessage('✅ Загружено ${shifts.length} смен и ${orders.length} заказов', category: 'SYNC');
   } catch (e) {
     logMessage('⚠️ Ошибка загрузки данных за сегодня: $e', category: 'SYNC', level: LogLevel.error);
+  }
+}
+
+// ===== СИНХРОНИЗАЦИЯ АКТИВНОЙ СМЕНЫ =====
+
+Future<void> syncActiveShift() async {
+  final hasInternet = await _connectivity.hasInternet();
+  if (!hasInternet) {
+    logMessage('⚠️ Нет интернета, синхронизация активной смены отложена', category: 'SYNC');
+    return;
+  }
+
+  try {
+    final activeShift = await _db.shiftDao.getActiveShift();
+    if (activeShift == null) {
+      logMessage('⚠️ Нет активной смены для синхронизации', category: 'SYNC');
+      return;
+    }
+
+    // Если уже есть serverId — обновляем
+    if (activeShift.serverId != null) {
+      logMessage('📤 Обновление активной смены ${activeShift.serverId} на сервере...', category: 'SYNC');
+    } else {
+      logMessage('📤 Отправка новой активной смены на сервер...', category: 'SYNC');
+    }
+
+    final shiftData = {
+      'localId': activeShift.id,
+      'startTime': activeShift.startTime,
+      'endTime': activeShift.endTime,
+      'durationSeconds': activeShift.durationSeconds,
+      'totalPaidDistance': activeShift.totalPaidDistance,
+      'totalIdleDistance': activeShift.totalIdleDistance,
+      'ordersCount': activeShift.ordersCount,
+      'totalIncome': activeShift.totalIncome,
+      'totalExpenses': activeShift.totalExpenses,
+      'netProfit': activeShift.netProfit,
+      'status': activeShift.status,
+    };
+
+    final response = await _apiClient.syncShifts([shiftData]);
+    
+    if (response['synced'] != null && response['synced'].isNotEmpty) {
+      final result = response['synced'].first;
+      await _db.shiftDao.markAsSynced(result['localId'], result['serverId']);
+      logMessage('✅ Активная смена синхронизирована (serverId=${result['serverId']})', category: 'SYNC');
+    }
+  } catch (e) {
+    logMessage('❌ Ошибка синхронизации активной смены: $e', category: 'SYNC', level: LogLevel.error);
+    rethrow;
   }
 }
 
