@@ -60,10 +60,10 @@ class SettingsDao {
   // Обновление настроек через update (сохраняя id)
   Future<bool> updateSettings(int id, SettingsTableCompanion settings) async {
   try {
-    logMessage('🔍 Обновляем настройки id=$id:', category: 'DATABASE');
-    logMessage('  fuelConsumption: ${settings.fuelConsumption.value}', category: 'DATABASE');
-    logMessage('  fuelPrice: ${settings.fuelPrice.value}', category: 'DATABASE');
-    logMessage('  repairCost: ${settings.repairCost.value}', category: 'DATABASE');
+logMessage('🔍 Обновляем настройки id=$id:', category: 'DATABASE');
+    logMessage('  fuelConsumption: ${settings.fuelConsumption.value ?? 0.0}', category: 'DATABASE');
+    logMessage('  fuelPrice: ${settings.fuelPrice.value ?? 0.0}', category: 'DATABASE');
+        logMessage('  repairCost: ${settings.repairCost.value}', category: 'DATABASE');
     logMessage('  additionalCosts: ${settings.additionalCosts.value}', category: 'DATABASE');
 
     final count = await (db.update(db.settingsTable)

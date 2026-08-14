@@ -88,7 +88,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   }
 
   void _syncOnStart() {
-  // Защита от двойного вызова
   if (_syncStarted) {
     logMessage('⏭️ Синхронизация уже запущена, пропускаем', category: 'SYNC');
     return;
@@ -99,16 +98,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final syncService = ref.read(syncServiceProvider);
     
     try {
-      // Сначала загружаем данные с сервера
       await syncService.loadFromServer();
       
-      // 🔥 Обновляем статистику на главном экране
+      // 🔥 ПРИНУДИТЕЛЬНО ОБНОВЛЯЕМ СТАТИСТИКУ
       ref.invalidate(dailyStatsProvider);
       
-      // Потом отправляем свои данные
       await syncService.syncAll();
       
-      // Проверяем, что виджет ещё существует
       if (mounted) {
         setState(() {
           _isInitialSyncDone = true;
