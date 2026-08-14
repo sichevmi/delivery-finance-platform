@@ -88,39 +88,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   }
 
   void _syncOnStart() {
-    // Защита от двойного вызова
-    if (_syncStarted) {
-      logMessage('⏭️ Синхронизация уже запущена, пропускаем', category: 'SYNC');
-      return;
-    }
-    _syncStarted = true;
-    
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final syncService = ref.read(syncServiceProvider);
-      
-      try {
-        // Сначала загружаем данные с сервера
-        await syncService.loadFromServer();
-        // Потом отправляем свои данные
-        await syncService.syncAll();
-        
-        // Проверяем, что виджет ещё существует
-        if (mounted) {
-          setState(() {
-            _isInitialSyncDone = true;
-            _isLoading = false;
-          });
-        }
-        
-        logMessage('✅ Первичная синхронизация выполнена', category: 'SYNC');
-      } catch (e) {
-        logMessage('⚠️ Первичная синхронизация: $e', category: 'SYNC', level: LogLevel.error);
-        if (mounted) {
-          setState(() => _isLoading = false);
-        }
-      }
-    });
+  // Защита от двойного вызова
+  if (_syncStarted) {
+    logMessage('⏭️ Синхронизация уже запущена, пропускаем', category: 'SYNC');
+    return;
   }
+  _syncStarted = true;
+  
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    final syncService = ref.read(syncServiceProvider);
+    
+    try {
+      // Сначала загружаем данные с сервера
+      await syncService.loadFromServer();
+      
+      // 🔥 Обновляем статистику на главном экране
+      ref.invalidate(dailyStatsProvider);
+      
+      // Потом отправляем свои данные
+      await syncService.syncAll();
+      
+      // Проверяем, что виджет ещё существует
+      if (mounted) {
+        setState(() {
+          _isInitialSyncDone = true;
+          _isLoading = false;
+        });
+      }
+      
+      logMessage('✅ Первичная синхронизация выполнена', category: 'SYNC');
+    } catch (e) {
+      logMessage('⚠️ Первичная синхронизация: $e', category: 'SYNC', level: LogLevel.error);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  });
+}
 
   @override
   Widget build(BuildContext context) {
