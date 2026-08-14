@@ -91,6 +91,17 @@ class OrderDao {
     }
   }
 
+  Future<OrderTableData?> getOrderByServerId(int? serverId) async {
+    if (serverId == null) return null;
+    try {
+      return await (db.select(db.orderTable)
+        ..where((t) => t.serverId.equals(serverId))
+      ).getSingleOrNull();
+    } catch (e) {
+      return null;
+    }
+  }
+
   Future<bool> updateOrder(int id, OrderTableCompanion order) async {
     try {
       final count = await (db.update(db.orderTable)
@@ -136,100 +147,88 @@ class OrderDao {
 
   // ===== МЕТОДЫ ДЛЯ ЗАГРУЗКИ С СЕРВЕРА =====
 
-  // ===== МЕТОДЫ ДЛЯ ЗАГРУЗКИ С СЕРВЕРА =====
-
-/// Удаляет заказы, которые есть в списке serverId
-Future<void> deleteOrdersByServerIds(List<int> serverIds) async {
-  if (serverIds.isEmpty) return;
-  try {
-    // Сначала получаем заказы, чтобы удалить их доставки
-    final orders = await (db.select(db.orderTable)
-      ..where((t) => t.serverId.isIn(serverIds))
-    ).get();
-    
-    for (final order in orders) {
-      // Удаляем доставки этого заказа
-      await (db.delete(db.deliveryTable)
-        ..where((t) => t.orderId.equals(order.id))
-      ).go();
-    }
-    
-    // Удаляем сами заказы
-    final count = await (db.delete(db.orderTable)
-      ..where((t) => t.serverId.isIn(serverIds))
-    ).go();
-    logMessage('🗑️ Удалены заказы с serverId: $serverIds (${count} шт.)', category: 'DATABASE');
-  } catch (e) {
-    logMessage('❌ Ошибка удаления заказов: $e', category: 'DATABASE', level: LogLevel.error);
-  }
-}
-
-Future<int> insertOrderFromServer(Map<String, dynamic> data) async {
-  try {
-    // Проверяем, есть ли уже такой заказ
-    final existing = await (db.select(db.orderTable)
-      ..where((t) => t.serverId.equals(data['id']))
-    ).getSingleOrNull();
-    
-    if (existing != null) {
-      // Обновляем существующий
-      await (db.update(db.orderTable)
-        ..where((t) => t.id.equals(existing.id))
-      ).write(
-        OrderTableCompanion(
-          shiftId: Value(data['shiftId']),
-          serviceName: Value(data['serviceName'] ?? 'Заказ'),
-          coefficient: Value(data['coefficient'] ?? 1.0),
-          deliveryNumber: Value(data['deliveryNumber'] ?? 1),
-          totalPaidDistance: Value(data['totalPaidDistance'] ?? 0.0),
-          totalIncome: Value(data['totalIncome'] ?? 0.0),
-          totalExpenses: Value(data['totalExpenses'] ?? 0.0),
-          netProfit: Value(data['netProfit'] ?? 0.0),
-          totalTimeSeconds: Value(data['totalTimeSeconds'] ?? 0),
-          status: Value(data['status'] ?? 'completed'),
-          isSynced: const Value(true),
-          updatedAt: Value(DateTime.now()),
-        ),
+  Future<int> insertOrderFromServer(Map<String, dynamic> data) async {
+    try {
+      final existing = await (db.select(db.orderTable)
+        ..where((t) => t.serverId.equals(data['id']))
+      ).getSingleOrNull();
+      
+      if (existing != null) {
+        await (db.update(db.orderTable)
+          ..where((t) => t.id.equals(existing.id))
+        ).write(
+          OrderTableCompanion(
+            shiftId: Value(data['shiftId']),
+            serviceName: Value(data['serviceName'] ?? 'Заказ'),
+            coefficient: Value(data['coefficient'] ?? 1.0),
+            deliveryNumber: Value(data['deliveryNumber'] ?? 1),
+            totalPaidDistance: Value(data['totalPaidDistance'] ?? 0.0),
+            totalIncome: Value(data['totalIncome'] ?? 0.0),
+            totalExpenses: Value(data['totalExpenses'] ?? 0.0),
+            netProfit: Value(data['netProfit'] ?? 0.0),
+            totalTimeSeconds: Value(data['totalTimeSeconds'] ?? 0),
+            status: Value(data['status'] ?? 'completed'),
+            isSynced: const Value(true),
+            updatedAt: Value(DateTime.now()),
+          ),
+        );
+        logMessage('🔄 Заказ ${data['id']} обновлён с сервера', category: 'DATABASE');
+        return existing.id;
+      }
+      
+      final companion = OrderTableCompanion(
+        serverId: Value(data['id']),
+        shiftId: Value(data['shiftId']),
+        serviceName: Value(data['serviceName'] ?? 'Заказ'),
+        coefficient: Value(data['coefficient'] ?? 1.0),
+        deliveryNumber: Value(data['deliveryNumber'] ?? 1),
+        totalPaidDistance: Value(data['totalPaidDistance'] ?? 0.0),
+        totalIncome: Value(data['totalIncome'] ?? 0.0),
+        totalExpenses: Value(data['totalExpenses'] ?? 0.0),
+        netProfit: Value(data['netProfit'] ?? 0.0),
+        totalTimeSeconds: Value(data['totalTimeSeconds'] ?? 0),
+        status: Value(data['status'] ?? 'completed'),
+        isSynced: const Value(true),
+        createdAt: data['createdAt'] != null 
+            ? Value(DateTime.parse(data['createdAt'])) 
+            : Value(DateTime.now()),
+        updatedAt: Value(DateTime.now()),
       );
-      logMessage('🔄 Заказ ${data['id']} обновлён с сервера', category: 'DATABASE');
-      return existing.id;
+      final id = await db.into(db.orderTable).insert(companion);
+      logMessage('💾 Заказ ${data['id']} сохранён с сервера', category: 'DATABASE');
+      return id;
+    } catch (e) {
+      logMessage('❌ Ошибка сохранения заказа с сервера: $e', category: 'DATABASE', level: LogLevel.error);
+      rethrow;
     }
-    
-    // Создаём новый
-    final companion = OrderTableCompanion(
-      serverId: Value(data['id']),
-      shiftId: Value(data['shiftId']),
-      serviceName: Value(data['serviceName'] ?? 'Заказ'),
-      coefficient: Value(data['coefficient'] ?? 1.0),
-      deliveryNumber: Value(data['deliveryNumber'] ?? 1),
-      totalPaidDistance: Value(data['totalPaidDistance'] ?? 0.0),
-      totalIncome: Value(data['totalIncome'] ?? 0.0),
-      totalExpenses: Value(data['totalExpenses'] ?? 0.0),
-      netProfit: Value(data['netProfit'] ?? 0.0),
-      totalTimeSeconds: Value(data['totalTimeSeconds'] ?? 0),
-      status: Value(data['status'] ?? 'completed'),
-      isSynced: const Value(true),
-      createdAt: data['createdAt'] != null 
-          ? Value(DateTime.parse(data['createdAt'])) 
-          : Value(DateTime.now()),
-      updatedAt: Value(DateTime.now()),
-    );
-    final id = await db.into(db.orderTable).insert(companion);
-    logMessage('💾 Заказ ${data['id']} сохранён с сервера', category: 'DATABASE');
-    return id;
-  } catch (e) {
-    logMessage('❌ Ошибка сохранения заказа с сервера: $e', category: 'DATABASE', level: LogLevel.error);
-    rethrow;
   }
-}
-Future<OrderTableData?> getOrderByServerId(int? serverId) async {
-  if (serverId == null) return null;
-  try {
-    return await (db.select(db.orderTable)
-      ..where((t) => t.serverId.equals(serverId))
-    ).getSingleOrNull();
-  } catch (e) {
-    return null;
+
+  // ===== МЕТОДЫ ДЛЯ УДАЛЕНИЯ =====
+
+  Future<void> deleteOrder(int id) async {
+    try {
+      // Сначала удаляем доставки этого заказа
+      await (db.delete(db.deliveryTable)
+        ..where((t) => t.orderId.equals(id))
+      ).go();
+      
+      // Потом удаляем сам заказ
+      await (db.delete(db.orderTable)
+        ..where((t) => t.id.equals(id))
+      ).go();
+      logMessage('🗑️ Заказ $id удалён', category: 'DATABASE');
+    } catch (e) {
+      logMessage('❌ Ошибка удаления заказа $id: $e', category: 'DATABASE', level: LogLevel.error);
+    }
   }
-}
+
+  Future<void> deleteAllOrders() async {
+    try {
+      await db.delete(db.deliveryTable).go();
+      await db.delete(db.orderTable).go();
+      logMessage('🗑️ Удалены все заказы и доставки', category: 'DATABASE');
+    } catch (e) {
+      logMessage('❌ Ошибка удаления заказов: $e', category: 'DATABASE', level: LogLevel.error);
+    }
+  }
 }

@@ -95,15 +95,14 @@ class DeliveryDao {
     }
   }
 
-  Future<bool> deleteDelivery(int id) async {
+  Future<void> deleteDelivery(int id) async {
     try {
-      final count = await (db.delete(db.deliveryTable)
+      await (db.delete(db.deliveryTable)
         ..where((t) => t.id.equals(id))
       ).go();
-      return count > 0;
+      logMessage('🗑️ Доставка $id удалена', category: 'DATABASE');
     } catch (e) {
       logMessage('❌ Ошибка удаления доставки $id: $e', category: 'DATABASE', level: LogLevel.error);
-      return false;
     }
   }
 

@@ -94,6 +94,17 @@ class ShiftDao {
     }
   }
 
+  Future<ShiftTableData?> getShiftByServerId(int? serverId) async {
+    if (serverId == null) return null;
+    try {
+      return await (db.select(db.shiftTable)
+        ..where((t) => t.serverId.equals(serverId))
+      ).getSingleOrNull();
+    } catch (e) {
+      return null;
+    }
+  }
+
   Future<bool> updateShift(
     int id, {
     required String startTime,
@@ -172,38 +183,13 @@ class ShiftDao {
 
   // ===== МЕТОДЫ ДЛЯ ЗАГРУЗКИ С СЕРВЕРА =====
 
-  /// Удаляет смены, которые есть в списке serverId
-  Future<void> deleteShiftsByServerIds(List<int> serverIds) async {
-    if (serverIds.isEmpty) return;
-    try {
-      final count = await (db.delete(db.shiftTable)
-        ..where((t) => t.serverId.isIn(serverIds))
-      ).go();
-      logMessage('🗑️ Удалены смены с serverId: $serverIds (${count} шт.)', category: 'DATABASE');
-    } catch (e) {
-      logMessage('❌ Ошибка удаления смен: $e', category: 'DATABASE', level: LogLevel.error);
-    }
-  }
-
-  /// Удаляет все смены (для полной очистки)
-  Future<void> deleteAllShifts() async {
-    try {
-      await db.delete(db.shiftTable).go();
-      logMessage('🗑️ Удалены все смены', category: 'DATABASE');
-    } catch (e) {
-      logMessage('❌ Ошибка удаления смен: $e', category: 'DATABASE', level: LogLevel.error);
-    }
-  }
-
   Future<int> insertShiftFromServer(Map<String, dynamic> data) async {
     try {
-      // Проверяем, есть ли уже такая смена
       final existing = await (db.select(db.shiftTable)
         ..where((t) => t.serverId.equals(data['id']))
       ).getSingleOrNull();
       
       if (existing != null) {
-        // Обновляем существующую
         await (db.update(db.shiftTable)
           ..where((t) => t.id.equals(existing.id))
         ).write(
@@ -227,7 +213,6 @@ class ShiftDao {
         return existing.id;
       }
       
-      // Создаём новую
       final companion = ShiftTableCompanion(
         serverId: Value(data['id']),
         startTime: Value(data['startTime'] ?? ''),
@@ -255,14 +240,26 @@ class ShiftDao {
       rethrow;
     }
   }
-  Future<ShiftTableData?> getShiftByServerId(int? serverId) async {
-  if (serverId == null) return null;
-  try {
-    return await (db.select(db.shiftTable)
-      ..where((t) => t.serverId.equals(serverId))
-    ).getSingleOrNull();
-  } catch (e) {
-    return null;
+
+  // ===== МЕТОДЫ ДЛЯ УДАЛЕНИЯ =====
+
+  Future<void> deleteShift(int id) async {
+    try {
+      await (db.delete(db.shiftTable)
+        ..where((t) => t.id.equals(id))
+      ).go();
+      logMessage('🗑️ Смена $id удалена', category: 'DATABASE');
+    } catch (e) {
+      logMessage('❌ Ошибка удаления смены $id: $e', category: 'DATABASE', level: LogLevel.error);
+    }
   }
-}
+
+  Future<void> deleteAllShifts() async {
+    try {
+      await db.delete(db.shiftTable).go();
+      logMessage('🗑️ Удалены все смены', category: 'DATABASE');
+    } catch (e) {
+      logMessage('❌ Ошибка удаления смен: $e', category: 'DATABASE', level: LogLevel.error);
+    }
+  }
 }
