@@ -141,6 +141,61 @@ class ApiClient {
       rethrow;
     }
   }
+
+  // ===== СПРАВОЧНИКИ =====
+
+  Future<Map<String, dynamic>> getDirectories() async {
+    try {
+      logMessage('📥 Загрузка справочников с сервера...', category: 'API');
+      final response = await _dio.get('/directories');
+      return response.data;
+    } catch (e) {
+      logMessage('⚠️ Ошибка getDirectories: $e', category: 'API', level: LogLevel.error);
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> updateSettings(Map<String, dynamic> settings) async {
+    try {
+      logMessage('📤 Отправка настроек на сервер...', category: 'API');
+      final response = await _dio.post(
+        '/directories/settings',
+        data: settings,
+      );
+      return response.data;
+    } catch (e) {
+      logMessage('⚠️ Ошибка updateSettings: $e', category: 'API', level: LogLevel.error);
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> updatePricing(Map<String, dynamic> pricing) async {
+    try {
+      logMessage('📤 Отправка тарифов на сервер...', category: 'API');
+      final response = await _dio.post(
+        '/directories/pricing',
+        data: pricing,
+      );
+      return response.data;
+    } catch (e) {
+      logMessage('⚠️ Ошибка updatePricing: $e', category: 'API', level: LogLevel.error);
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> updateX5Settings(Map<String, dynamic> x5Settings) async {
+    try {
+      logMessage('📤 Отправка X5 настроек на сервер...', category: 'API');
+      final response = await _dio.post(
+        '/directories/x5',
+        data: x5Settings,
+      );
+      return response.data;
+    } catch (e) {
+      logMessage('⚠️ Ошибка updateX5Settings: $e', category: 'API', level: LogLevel.error);
+      rethrow;
+    }
+  }
 }
 
 // ===== ИНТЕРСЕПТОРЫ =====

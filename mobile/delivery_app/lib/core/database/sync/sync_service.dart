@@ -16,7 +16,7 @@ class SyncService {
 
   bool get isSyncing => _isSyncing;
 
-  // ===== ОСНОВНАЯ СИНХРОНИЗАЦИЯ (ОТПРАВКА) =====
+  // ===== ОСНОВНАЯ СИНХРОНИЗАЦИЯ =====
 
   Future<void> syncAll() async {
     if (_isSyncing) {
@@ -34,9 +34,17 @@ class SyncService {
     logMessage('🔄 Начинаем синхронизацию...', category: 'SYNC');
 
     try {
+      // 1. Сначала отправляем справочники
+      await _syncDirectories();
+      
+      // 2. Потом загружаем с сервера
+      await _loadDirectories();
+      
+      // 3. Синхронизируем смены и заказы
       await _syncSettings();
       await _syncShifts();
       await _syncOrders();
+      
       logMessage('✅ Синхронизация завершена', category: 'SYNC');
     } catch (e) {
       logMessage('❌ Ошибка синхронизации: $e', category: 'SYNC', level: LogLevel.error);
@@ -57,10 +65,269 @@ class SyncService {
 
     try {
       logMessage('📥 Загрузка данных с сервера...', category: 'SYNC');
+      
+      // 1. Загружаем справочники
+      await _loadDirectories();
+      
+      // 2. Загружаем данные за сегодня
       await _loadTodayData();
+      
       logMessage('✅ Загрузка с сервера завершена', category: 'SYNC');
     } catch (e) {
       logMessage('❌ Ошибка загрузки с сервера: $e', category: 'SYNC', level: LogLevel.error);
+    }
+  }
+
+  // ===== ЗАГРУЗКА СПРАВОЧНИКОВ =====
+
+  Future<void> _loadDirectories() async {
+    try {
+      logMessage('📥 Загрузка справочников с сервера...', category: 'SYNC');
+      final response = await _apiClient.getDirectories();
+      
+      if (response['status'] != 'success') {
+        logMessage('⚠️ Ошибка загрузки справочников', category: 'SYNC');
+        return;
+      }
+
+      // Обновляем настройки
+      final settings = response['settings'];
+      if (settings != null && settings['id'] != null) {
+        await _updateSettingsLocal(settings);
+      }
+
+      // Обновляем тарифы
+      final pricing = response['pricing'];
+      if (pricing != null && pricing['id'] != null) {
+        await _updatePricingLocal(pricing);
+      }
+
+      // Обновляем X5 настройки
+      final x5Settings = response['x5Settings'];
+      if (x5Settings != null && x5Settings['id'] != null) {
+        await _updateX5SettingsLocal(x5Settings);
+      }
+
+      logMessage('✅ Справочники загружены с сервера', category: 'SYNC');
+    } catch (e) {
+      logMessage('❌ Ошибка загрузки справочников: $e', category: 'SYNC', level: LogLevel.error);
+    }
+  }
+
+  Future<void> _updateSettingsLocal(Map<String, dynamic> data) async {
+    try {
+      final existing = await _db.settingsDao.getActiveSettings();
+      if (existing != null) {
+        if (data['version'] > existing.version) {
+          await _db.settingsDao.updateSettings(
+            existing.id,
+            SettingsTableCompanion(
+              fuelConsumption: Value(data['fuelConsumption'] ?? 10.0),
+              fuelPrice: Value(data['fuelPrice'] ?? 50.0),
+              repairCost: Value(data['repairCost'] ?? 2.0),
+              additionalCosts: Value(data['additionalCosts'] ?? 0.0),
+              version: Value(data['version'] ?? 1),
+              isSynced: const Value(true),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
+          logMessage('✅ Настройки обновлены с сервера (версия ${data['version']})', category: 'SYNC');
+        }
+      } else {
+        await _db.settingsDao.insertSettings(
+          SettingsTableCompanion(
+            fuelConsumption: Value(data['fuelConsumption'] ?? 10.0),
+            fuelPrice: Value(data['fuelPrice'] ?? 50.0),
+            repairCost: Value(data['repairCost'] ?? 2.0),
+            additionalCosts: Value(data['additionalCosts'] ?? 0.0),
+            version: Value(data['version'] ?? 1),
+            isDefault: const Value(true),
+            isActive: const Value(true),
+            isSynced: const Value(true),
+            createdAt: Value(DateTime.now()),
+          ),
+        );
+        logMessage('✅ Настройки созданы с сервера', category: 'SYNC');
+      }
+    } catch (e) {
+      logMessage('❌ Ошибка обновления настроек локально: $e', category: 'SYNC', level: LogLevel.error);
+    }
+  }
+
+  Future<void> _updatePricingLocal(Map<String, dynamic> data) async {
+    try {
+      final existing = await _db.pricingDao.getActivePricing();
+      if (existing != null) {
+        if (data['version'] > existing.version) {
+          await _db.pricingDao.updatePricing(
+            existing.id,
+            PricingTableCompanion(
+              receivingFee: Value(data['receivingFee'] ?? 50.0),
+              deliveryFee: Value(data['deliveryFee'] ?? 100.0),
+              pricePerKg: Value(data['pricePerKg'] ?? 5.0),
+              pricePerKm: Value(data['pricePerKm'] ?? 10.0),
+              baseCoefficient: Value(data['baseCoefficient'] ?? 1.0),
+              version: Value(data['version'] ?? 1),
+              isSynced: const Value(true),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
+          logMessage('✅ Тарифы обновлены с сервера (версия ${data['version']})', category: 'SYNC');
+        }
+      } else {
+        await _db.pricingDao.insertPricing(
+          PricingTableCompanion(
+            receivingFee: Value(data['receivingFee'] ?? 50.0),
+            deliveryFee: Value(data['deliveryFee'] ?? 100.0),
+            pricePerKg: Value(data['pricePerKg'] ?? 5.0),
+            pricePerKm: Value(data['pricePerKm'] ?? 10.0),
+            baseCoefficient: Value(data['baseCoefficient'] ?? 1.0),
+            version: Value(data['version'] ?? 1),
+            isDefault: const Value(true),
+            isActive: const Value(true),
+            isSynced: const Value(true),
+            createdAt: Value(DateTime.now()),
+          ),
+        );
+        logMessage('✅ Тарифы созданы с сервера', category: 'SYNC');
+      }
+    } catch (e) {
+      logMessage('❌ Ошибка обновления тарифов локально: $e', category: 'SYNC', level: LogLevel.error);
+    }
+  }
+
+  Future<void> _updateX5SettingsLocal(Map<String, dynamic> data) async {
+    try {
+      final existing = await _db.x5SettingsDao.getActiveX5Settings();
+      if (existing != null) {
+        await _db.x5SettingsDao.updateX5Settings(
+          existing.id,
+          X5SettingsTableCompanion(
+            pickupPrice: Value(data['pickupPrice'] ?? 250.0),
+            deliveryPrice: Value(data['deliveryPrice'] ?? 150.0),
+            perKmPrice: Value(data['perKmPrice'] ?? 25.0),
+            perKgPrice: Value(data['perKgPrice'] ?? 10.0),
+            isSynced: const Value(true),
+            updatedAt: Value(DateTime.now()),
+          ),
+        );
+        logMessage('✅ X5 настройки обновлены с сервера', category: 'SYNC');
+      } else {
+        await _db.x5SettingsDao.insertX5Settings(
+          X5SettingsTableCompanion(
+            pickupPrice: Value(data['pickupPrice'] ?? 250.0),
+            deliveryPrice: Value(data['deliveryPrice'] ?? 150.0),
+            perKmPrice: Value(data['perKmPrice'] ?? 25.0),
+            perKgPrice: Value(data['perKgPrice'] ?? 10.0),
+            isDefault: const Value(true),
+            isActive: const Value(true),
+            isSynced: const Value(true),
+            createdAt: Value(DateTime.now()),
+          ),
+        );
+        logMessage('✅ X5 настройки созданы с сервера', category: 'SYNC');
+      }
+    } catch (e) {
+      logMessage('❌ Ошибка обновления X5 настроек локально: $e', category: 'SYNC', level: LogLevel.error);
+    }
+  }
+
+  // ===== ОТПРАВКА СПРАВОЧНИКОВ =====
+
+  Future<void> _syncDirectories() async {
+    try {
+      logMessage('📤 Синхронизация справочников...', category: 'SYNC');
+      
+      // Синхронизируем настройки
+      final settings = await _db.settingsDao.getActiveSettings();
+      if (settings != null && !settings.isSynced) {
+        final response = await _apiClient.updateSettings({
+          'fuelConsumption': settings.fuelConsumption,
+          'fuelPrice': settings.fuelPrice,
+          'repairCost': settings.repairCost,
+          'additionalCosts': settings.additionalCosts,
+          'version': settings.version,
+        });
+        
+        if (response['status'] == 'success') {
+          final serverSettings = response['settings'];
+          await _db.settingsDao.updateSettings(
+            settings.id,
+            SettingsTableCompanion(
+              version: Value(serverSettings['version']),
+              isSynced: const Value(true),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
+          logMessage('✅ Настройки отправлены на сервер', category: 'SYNC');
+        } else if (response['status'] == 'conflict') {
+          logMessage('⚠️ Конфликт настроек, загружаем серверную версию', category: 'SYNC');
+          final serverData = response['server'];
+          await _db.settingsDao.updateSettings(
+            settings.id,
+            SettingsTableCompanion(
+              fuelConsumption: Value(serverData['fuelConsumption']),
+              fuelPrice: Value(serverData['fuelPrice']),
+              repairCost: Value(serverData['repairCost']),
+              additionalCosts: Value(serverData['additionalCosts']),
+              version: Value(serverData['version']),
+              isSynced: const Value(true),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
+        }
+      }
+
+      // Синхронизируем тарифы
+      final pricing = await _db.pricingDao.getActivePricing();
+      if (pricing != null && !pricing.isSynced) {
+        final response = await _apiClient.updatePricing({
+          'receivingFee': pricing.receivingFee,
+          'deliveryFee': pricing.deliveryFee,
+          'pricePerKg': pricing.pricePerKg,
+          'pricePerKm': pricing.pricePerKm,
+          'baseCoefficient': pricing.baseCoefficient,
+          'version': pricing.version,
+        });
+        
+        if (response['status'] == 'success') {
+          final serverPricing = response['pricing'];
+          await _db.pricingDao.updatePricing(
+            pricing.id,
+            PricingTableCompanion(
+              version: Value(serverPricing['version']),
+              isSynced: const Value(true),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
+          logMessage('✅ Тарифы отправлены на сервер', category: 'SYNC');
+        }
+      }
+
+      // Синхронизируем X5 настройки
+      final x5Settings = await _db.x5SettingsDao.getActiveX5Settings();
+      if (x5Settings != null && !x5Settings.isSynced) {
+        final response = await _apiClient.updateX5Settings({
+          'pickupPrice': x5Settings.pickupPrice,
+          'deliveryPrice': x5Settings.deliveryPrice,
+          'perKmPrice': x5Settings.perKmPrice,
+          'perKgPrice': x5Settings.perKgPrice,
+        });
+        
+        if (response['status'] == 'success') {
+          await _db.x5SettingsDao.updateX5Settings(
+            x5Settings.id,
+            X5SettingsTableCompanion(
+              isSynced: const Value(true),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
+          logMessage('✅ X5 настройки отправлены на сервер', category: 'SYNC');
+        }
+      }
+      
+    } catch (e) {
+      logMessage('❌ Ошибка синхронизации справочников: $e', category: 'SYNC', level: LogLevel.error);
     }
   }
 
@@ -79,13 +346,11 @@ class SyncService {
       final shifts = response['shifts'] as List;
       final orders = response['orders'] as List;
 
-      // Загружаем смены с сервера (метод сам проверит существование)
       for (final shiftData in shifts) {
         await _db.shiftDao.insertShiftFromServer(shiftData);
         logMessage('💾 Смена ${shiftData['id']} загружена с сервера', category: 'SYNC');
       }
 
-      // Загружаем заказы с доставками
       for (final orderData in orders) {
         final orderId = await _db.orderDao.insertOrderFromServer(orderData);
         logMessage('💾 Заказ ${orderData['id']} загружен с сервера', category: 'SYNC');
