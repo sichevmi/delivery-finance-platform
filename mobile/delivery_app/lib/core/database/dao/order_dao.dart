@@ -222,4 +222,14 @@ Future<int> insertOrderFromServer(Map<String, dynamic> data) async {
     rethrow;
   }
 }
+Future<OrderTableData?> getOrderByServerId(int? serverId) async {
+  if (serverId == null) return null;
+  try {
+    return await (db.select(db.orderTable)
+      ..where((t) => t.serverId.equals(serverId))
+    ).getSingleOrNull();
+  } catch (e) {
+    return null;
+  }
+}
 }

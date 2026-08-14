@@ -34,17 +34,9 @@ class SyncService {
     logMessage('🔄 Начинаем синхронизацию...', category: 'SYNC');
 
     try {
-      // 1. Сначала отправляем справочники
-      await _syncDirectories();
-      
-      // 2. Потом загружаем с сервера
-      await _loadDirectories();
-      
-      // 3. Синхронизируем смены и заказы
       await _syncSettings();
       await _syncShifts();
       await _syncOrders();
-      
       logMessage('✅ Синхронизация завершена', category: 'SYNC');
     } catch (e) {
       logMessage('❌ Ошибка синхронизации: $e', category: 'SYNC', level: LogLevel.error);
@@ -90,19 +82,16 @@ class SyncService {
         return;
       }
 
-      // Обновляем настройки
       final settings = response['settings'];
       if (settings != null && settings['id'] != null) {
         await _updateSettingsLocal(settings);
       }
 
-      // Обновляем тарифы
       final pricing = response['pricing'];
       if (pricing != null && pricing['id'] != null) {
         await _updatePricingLocal(pricing);
       }
 
-      // Обновляем X5 настройки
       final x5Settings = response['x5Settings'];
       if (x5Settings != null && x5Settings['id'] != null) {
         await _updateX5SettingsLocal(x5Settings);
@@ -232,13 +221,50 @@ class SyncService {
     }
   }
 
+  // ===== ЗАГРУЗКА ДАННЫХ ЗА СЕГОДНЯ =====
+
+  Future<void> _loadTodayData() async {
+    try {
+      logMessage('📥 Загрузка данных за сегодня...', category: 'SYNC');
+      final response = await _apiClient.getTodayData();
+      
+      if (response['status'] != 'success') {
+        logMessage('⚠️ Ошибка загрузки данных за сегодня', category: 'SYNC');
+        return;
+      }
+
+      final shifts = response['shifts'] as List;
+      final orders = response['orders'] as List;
+
+      for (final shiftData in shifts) {
+        await _db.shiftDao.insertShiftFromServer(shiftData);
+        logMessage('💾 Смена ${shiftData['id']} загружена с сервера', category: 'SYNC');
+      }
+
+      for (final orderData in orders) {
+        final orderId = await _db.orderDao.insertOrderFromServer(orderData);
+        logMessage('💾 Заказ ${orderData['id']} загружен с сервера', category: 'SYNC');
+        
+        final deliveries = orderData['deliveries'] as List;
+        for (final deliveryData in deliveries) {
+          await _db.deliveryDao.insertDeliveryFromServer(deliveryData, orderId: orderId);
+        }
+        logMessage('💾 ${deliveries.length} доставок загружено для заказа ${orderData['id']}', category: 'SYNC');
+      }
+
+      logMessage('✅ Загружено ${shifts.length} смен и ${orders.length} заказов', category: 'SYNC');
+      
+    } catch (e) {
+      logMessage('⚠️ Ошибка загрузки данных за сегодня: $e', category: 'SYNC', level: LogLevel.error);
+    }
+  }
+
   // ===== ОТПРАВКА СПРАВОЧНИКОВ =====
 
   Future<void> _syncDirectories() async {
     try {
       logMessage('📤 Синхронизация справочников...', category: 'SYNC');
       
-      // Синхронизируем настройки
       final settings = await _db.settingsDao.getActiveSettings();
       if (settings != null && !settings.isSynced) {
         final response = await _apiClient.updateSettings({
@@ -278,7 +304,6 @@ class SyncService {
         }
       }
 
-      // Синхронизируем тарифы
       final pricing = await _db.pricingDao.getActivePricing();
       if (pricing != null && !pricing.isSynced) {
         final response = await _apiClient.updatePricing({
@@ -304,7 +329,6 @@ class SyncService {
         }
       }
 
-      // Синхронизируем X5 настройки
       final x5Settings = await _db.x5SettingsDao.getActiveX5Settings();
       if (x5Settings != null && !x5Settings.isSynced) {
         final response = await _apiClient.updateX5Settings({
@@ -328,44 +352,6 @@ class SyncService {
       
     } catch (e) {
       logMessage('❌ Ошибка синхронизации справочников: $e', category: 'SYNC', level: LogLevel.error);
-    }
-  }
-
-  // ===== ЗАГРУЗКА ДАННЫХ ЗА СЕГОДНЯ =====
-
-  Future<void> _loadTodayData() async {
-    try {
-      logMessage('📥 Загрузка данных за сегодня...', category: 'SYNC');
-      final response = await _apiClient.getTodayData();
-      
-      if (response['status'] != 'success') {
-        logMessage('⚠️ Ошибка загрузки данных за сегодня', category: 'SYNC');
-        return;
-      }
-
-      final shifts = response['shifts'] as List;
-      final orders = response['orders'] as List;
-
-      for (final shiftData in shifts) {
-        await _db.shiftDao.insertShiftFromServer(shiftData);
-        logMessage('💾 Смена ${shiftData['id']} загружена с сервера', category: 'SYNC');
-      }
-
-      for (final orderData in orders) {
-        final orderId = await _db.orderDao.insertOrderFromServer(orderData);
-        logMessage('💾 Заказ ${orderData['id']} загружен с сервера', category: 'SYNC');
-        
-        final deliveries = orderData['deliveries'] as List;
-        for (final deliveryData in deliveries) {
-          await _db.deliveryDao.insertDeliveryFromServer(deliveryData, orderId: orderId);
-        }
-        logMessage('💾 ${deliveries.length} доставок загружено для заказа ${orderData['id']}', category: 'SYNC');
-      }
-
-      logMessage('✅ Загружено ${shifts.length} смен и ${orders.length} заказов', category: 'SYNC');
-      
-    } catch (e) {
-      logMessage('⚠️ Ошибка загрузки данных за сегодня: $e', category: 'SYNC', level: LogLevel.error);
     }
   }
 
@@ -410,19 +396,35 @@ class SyncService {
 
       logMessage('📊 Найдено ${unsyncedShifts.length} смен', category: 'SYNC');
 
-      final shiftsData = unsyncedShifts.map((shift) => ({
-        'localId': shift.id,
-        'startTime': shift.startTime,
-        'endTime': shift.endTime,
-        'durationSeconds': shift.durationSeconds,
-        'totalPaidDistance': shift.totalPaidDistance,
-        'totalIdleDistance': shift.totalIdleDistance,
-        'ordersCount': shift.ordersCount,
-        'totalIncome': shift.totalIncome,
-        'totalExpenses': shift.totalExpenses,
-        'netProfit': shift.netProfit,
-        'status': shift.status,
-      })).toList();
+      final shiftsData = <Map<String, dynamic>>[];
+      for (final shift in unsyncedShifts) {
+        // 🔥 Проверяем, есть ли уже такая смена на сервере
+        final existing = await _db.shiftDao.getShiftByServerId(shift.serverId);
+        if (existing != null) {
+          await _db.shiftDao.markAsSynced(shift.id, shift.serverId!);
+          logMessage('⏭️ Смена ${shift.id} уже существует на сервере, пропускаем', category: 'SYNC');
+          continue;
+        }
+        
+        shiftsData.add({
+          'localId': shift.id,
+          'startTime': shift.startTime,
+          'endTime': shift.endTime,
+          'durationSeconds': shift.durationSeconds,
+          'totalPaidDistance': shift.totalPaidDistance,
+          'totalIdleDistance': shift.totalIdleDistance,
+          'ordersCount': shift.ordersCount,
+          'totalIncome': shift.totalIncome,
+          'totalExpenses': shift.totalExpenses,
+          'netProfit': shift.netProfit,
+          'status': shift.status,
+        });
+      }
+
+      if (shiftsData.isEmpty) {
+        logMessage('✅ Нет новых смен для отправки', category: 'SYNC');
+        return;
+      }
 
       final response = await _apiClient.syncShifts(shiftsData);
       
@@ -450,6 +452,14 @@ class SyncService {
 
       final ordersWithDeliveries = <Map<String, dynamic>>[];
       for (final order in unsyncedOrders) {
+        // 🔥 Проверяем, есть ли уже такой заказ на сервере
+        final existing = await _db.orderDao.getOrderByServerId(order.serverId);
+        if (existing != null) {
+          await _db.orderDao.markAsSynced(order.id, order.serverId!);
+          logMessage('⏭️ Заказ ${order.id} уже существует на сервере, пропускаем', category: 'SYNC');
+          continue;
+        }
+        
         final deliveries = await _db.deliveryDao.getDeliveriesByOrder(order.id);
         ordersWithDeliveries.add({
           'localId': order.id,
@@ -476,6 +486,11 @@ class SyncService {
             'timeDelivery': d.timeDelivery,
           })).toList(),
         });
+      }
+
+      if (ordersWithDeliveries.isEmpty) {
+        logMessage('✅ Нет новых заказов для отправки', category: 'SYNC');
+        return;
       }
 
       final response = await _apiClient.syncOrders(ordersWithDeliveries);

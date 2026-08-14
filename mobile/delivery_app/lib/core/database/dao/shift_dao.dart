@@ -255,4 +255,14 @@ class ShiftDao {
       rethrow;
     }
   }
+  Future<ShiftTableData?> getShiftByServerId(int? serverId) async {
+  if (serverId == null) return null;
+  try {
+    return await (db.select(db.shiftTable)
+      ..where((t) => t.serverId.equals(serverId))
+    ).getSingleOrNull();
+  } catch (e) {
+    return null;
+  }
+}
 }
