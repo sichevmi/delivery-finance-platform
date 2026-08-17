@@ -26,14 +26,14 @@ class _OrderRouteState {
   final int currentSegment;
   final int deliveryNumber;
   final double coefficient;
-  final double distance;          // Текущее отображаемое расстояние (GPS или ручное)
-  final double gpsDistance;       // Расстояние, посчитанное GPS (всегда актуально)
+  final double distance;
+  final double gpsDistance;
   final double? weight;
   final String? shopAddress;
   final String? clientAddress;
   final String? apartment;
   final bool isPrivateHouse;
-  final bool useGps;              // true = GPS, false = ручной ввод
+  final bool useGps;
   final bool isPaused;
   final bool isWeightValid;
   final bool isApartmentValid;
@@ -187,20 +187,16 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
     super.initState();
     logMessage('🟢 OrderRouteScreen.initState()');
     
-    // Получаем GpsService
     _gpsService = ref.read(gpsServiceProvider);
     
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initOrderRoute();
       ref.read(shiftProvider.notifier).startOrder();
       
-      // Подписываемся на обновления GPS расстояния
       _gpsSubscription = _gpsService.distanceStream.listen((distance) {
         if (mounted) {
           setState(() {
-            // Обновляем GPS расстояние
             _state = _state.copyWith(gpsDistance: distance);
-            // Если используется GPS — обновляем отображаемое расстояние
             if (_state.useGps) {
               _state = _state.copyWith(distance: distance);
             }
@@ -228,7 +224,6 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
         gpsDistance: 0.0,
       );
     });
-    // Сбрасываем GPS при старте
     _gpsService.resetDistance();
     _startSegment();
   }
@@ -242,14 +237,11 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
         totalPauseDuration: Duration.zero,
         isPaused: false,
         pauseStartTime: null,
-        // Сбрасываем расстояния при старте нового сегмента
         distance: 0.0,
         gpsDistance: 0.0,
-        // По умолчанию всегда GPS
         useGps: true,
       );
     });
-    // Сбрасываем GPS при старте сегмента
     _gpsService.resetDistance();
   }
 
@@ -262,11 +254,9 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   }
 
   double _getDistance() {
-    // Если используется GPS — берём из gpsDistance
     if (_state.useGps) {
       return _state.gpsDistance;
     }
-    // Если ручной ввод — берём из distance
     return _state.distance;
   }
 
@@ -293,7 +283,12 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   }
 
   Future<void> _handleMainAction() async {
-    if (_isProcessing) return;
+    logMessage('🔵 [_handleMainAction] ВХОД, _isProcessing=$_isProcessing, сегмент=${_state.currentSegment}');
+    
+    if (_isProcessing) {
+      logMessage('⚠️ [_handleMainAction] ПРОПУСК: уже в обработке');
+      return;
+    }
     _isProcessing = true;
 
     logMessage('🟢 _handleMainAction() сегмент ${_state.currentSegment}');
@@ -316,8 +311,13 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
 
     switch (_state.currentSegment) {
       case 0:
+        logMessage('🔵 [_handleMainAction] КЕЙС 0: получение позиции');
         final pos = await _getCurrentPosition();
-        if (!mounted) { _isProcessing = false; return; }
+        if (!mounted) { 
+          logMessage('⚠️ [_handleMainAction] КЕЙС 0: виджет не смонтирован');
+          _isProcessing = false; 
+          return; 
+        }
         String? addr;
         if (pos != null) {
           addr = await GeocoderService.reverseGeocode(
@@ -333,9 +333,12 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
           );
         });
         _startSegment();
+        _isProcessing = false;
+        logMessage('🔵 [_handleMainAction] КЕЙС 0: завершён, переход на сегмент 1');
         break;
 
       case 1:
+        logMessage('🔵 [_handleMainAction] КЕЙС 1: проверка веса');
         if (_state.weight == null || _state.weight! <= 0) {
           logMessage('⚠️ Вес не введён', category: 'ORDER');
           _isProcessing = false;
@@ -348,11 +351,18 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
           );
         });
         _startSegment();
+        _isProcessing = false;
+        logMessage('🔵 [_handleMainAction] КЕЙС 1: завершён, переход на сегмент 2');
         break;
 
       case 2:
+        logMessage('🔵 [_handleMainAction] КЕЙС 2: получение позиции для адреса клиента');
         final pos = await _getCurrentPosition();
-        if (!mounted) { _isProcessing = false; return; }
+        if (!mounted) { 
+          logMessage('⚠️ [_handleMainAction] КЕЙС 2: виджет не смонтирован');
+          _isProcessing = false; 
+          return; 
+        }
         String? addr;
         if (pos != null) {
           addr = await GeocoderService.reverseGeocode(
@@ -368,14 +378,24 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
           );
         });
         _startSegment();
+        _isProcessing = false;
+        logMessage('🔵 [_handleMainAction] КЕЙС 2: завершён, переход на сегмент 3');
         break;
 
       case 3:
+        logMessage('🔵 [_handleMainAction] КЕЙС 3: завершение доставки');
         await _completeDelivery();
+        _isProcessing = false;
+        if (mounted) {
+          logMessage('🔵 [_handleMainAction] КЕЙС 3: установка showSummary=true');
+          setState(() {
+            _state = _state.copyWith(showSummary: true);
+          });
+        }
+        logMessage('🔵 [_handleMainAction] КЕЙС 3: завершён');
         break;
     }
-    
-    _isProcessing = false;
+    logMessage('🔵 [_handleMainAction] ВЫХОД, _isProcessing=$_isProcessing');
   }
 
   Future<Position?> _getCurrentPosition() async {
@@ -412,13 +432,32 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   }
 
   Future<void> _completeDelivery() async {
+    logMessage('🔵 [_completeDelivery] ВХОД, deliveryNumber=${_state.deliveryNumber}');
+    logMessage('🔵 [_completeDelivery] completedDeliveries до: ${_state.completedDeliveries.length}');
+    
+    if (_state.completedDeliveries.any((d) => d.number == _state.deliveryNumber)) {
+      logMessage('⚠️ [_completeDelivery] Доставка #${_state.deliveryNumber} уже завершена!');
+      return;
+    }
+
     String apartment = _state.apartment?.trim() ?? '';
     if (!_state.isPrivateHouse && apartment.isEmpty) {
-      logMessage('⚠️ Номер квартиры не введён', category: 'ORDER');
+      logMessage('⚠️ [_completeDelivery] Номер квартиры не введён');
       _isProcessing = false;
       return;
     }
     if (_state.isPrivateHouse) apartment = 'частный дом (1)';
+
+    logMessage('🔵 [_completeDelivery] Создание Delivery #${_state.deliveryNumber}');
+    logMessage('🔵 [_completeDelivery]   clientAddress: ${_state.clientAddress}');
+    logMessage('🔵 [_completeDelivery]   apartment: $apartment');
+    logMessage('🔵 [_completeDelivery]   weight: ${_state.weight}');
+    logMessage('🔵 [_completeDelivery]   timeToShop: ${_state.timeToShop}');
+    logMessage('🔵 [_completeDelivery]   distanceToShop: ${_state.distanceToShop}');
+    logMessage('🔵 [_completeDelivery]   timeReceiving: ${_state.timeReceiving}');
+    logMessage('🔵 [_completeDelivery]   timeToClient: ${_state.timeToClient}');
+    logMessage('🔵 [_completeDelivery]   distanceToClient: ${_state.distanceToClient}');
+    logMessage('🔵 [_completeDelivery]   timeDelivery: ${_state.timeDelivery}');
 
     final delivery = Delivery(
       id: 0,
@@ -436,29 +475,26 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
 
     final updatedList = List<Delivery>.from(_state.completedDeliveries)..add(delivery);
 
+    logMessage('✅ [_completeDelivery] Добавлена доставка #${_state.deliveryNumber}, всего: ${updatedList.length}', category: 'ORDER');
+    logMessage('🔵 [_completeDelivery] completedDeliveries после: ${updatedList.length}');
+
     setState(() {
       _state = _state.copyWith(
         completedDeliveries: updatedList,
-        showSummary: true,
       );
     });
-    
-    _isProcessing = false;
+    logMessage('🔵 [_completeDelivery] ВЫХОД');
   }
-
-  // ===== УПРАВЛЕНИЕ GPS =====
 
   void _toggleGpsMode() {
     setState(() {
       final newUseGps = !_state.useGps;
       if (newUseGps) {
-        // Переключаем на GPS — берём накопленное GPS расстояние
         _state = _state.copyWith(
           useGps: true,
           distance: _state.gpsDistance,
         );
       } else {
-        // Переключаем на ручной ввод — оставляем текущее значение
         _state = _state.copyWith(
           useGps: false,
         );
@@ -518,37 +554,74 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   }
 
   void _addDelivery() {
-    setState(() {
-      final newDelivery = Delivery(
-        id: 0,
-        number: _state.deliveryNumber + 1,
-        clientAddress: _state.clientAddress ?? 'Адрес ${_state.deliveryNumber + 1}',
-        apartment: _state.apartment ?? '',
-        weight: _state.weight ?? 0,
-        distanceToShop: 0.0,
-        distanceToClient: 0.0,
-        timeToShop: 0,
-        timeReceiving: 0,
-        timeToClient: 0,
-        timeDelivery: 0,
-      );
-      _state = _state.copyWith(
-        completedDeliveries: [..._state.completedDeliveries, newDelivery],
-        deliveryNumber: _state.deliveryNumber + 1,
-        currentSegment: 0,
-        weight: null,
-        apartment: null,
-        isWeightValid: false,
-        isApartmentValid: false,
-        distance: 0.0,
-        gpsDistance: 0.0,
-        showSummary: false,
-        useGps: true,
-      );
-    });
-    _gpsService.resetDistance();
-    _startSegment();
+  logMessage('🔵 [_addDelivery] ВХОД, deliveryNumber=${_state.deliveryNumber}');
+  logMessage('🔵 [_addDelivery] completedDeliveries до: ${_state.completedDeliveries.length}');
+  
+  final alreadyExists = _state.completedDeliveries.any((d) => d.number == _state.deliveryNumber);
+  logMessage('🔵 [_addDelivery] alreadyExists: $alreadyExists');
+  
+  List<Delivery> newCompletedDeliveries = List.from(_state.completedDeliveries);
+  
+  if (!alreadyExists && _state.clientAddress != null && _state.clientAddress != 'Адрес клиента будет определён позже') {
+    logMessage('🔵 [_addDelivery] Сохраняем текущую доставку #${_state.deliveryNumber}');
+    final currentDelivery = Delivery(
+      id: 0,
+      number: _state.deliveryNumber,
+      clientAddress: _state.clientAddress ?? 'Неизвестный адрес',
+      apartment: _state.apartment ?? '',
+      weight: _state.weight ?? 0.0,
+      timeToShop: _state.timeToShop,
+      distanceToShop: _state.distanceToShop,
+      timeReceiving: _state.timeReceiving,
+      timeToClient: _state.timeToClient,
+      distanceToClient: _state.distanceToClient,
+      timeDelivery: _state.timeDelivery,
+    );
+    newCompletedDeliveries.add(currentDelivery);
+    logMessage('📦 Сохранена доставка #${_state.deliveryNumber} перед добавлением новой', category: 'ORDER');
+  } else if (alreadyExists) {
+    logMessage('🔵 [_addDelivery] Доставка #${_state.deliveryNumber} уже сохранена, пропускаем');
+  } else {
+    logMessage('🔵 [_addDelivery] clientAddress не готов, пропускаем сохранение');
   }
+
+  logMessage('🔵 [_addDelivery] newCompletedDeliveries: ${newCompletedDeliveries.length}');
+
+  // ===== СБРАСЫВАЕМ ФЛАГ ПОКАЗА СВОДКИ =====
+  _isSummaryShown = false;
+
+  setState(() {
+    _state = _state.copyWith(
+      completedDeliveries: newCompletedDeliveries,
+      deliveryNumber: _state.deliveryNumber + 1,
+      currentSegment: 2,
+      weight: null,
+      apartment: null,
+      isWeightValid: false,
+      isApartmentValid: false,
+      isPrivateHouse: false,
+      distance: 0.0,
+      gpsDistance: 0.0,
+      showSummary: false,
+      useGps: true,
+      timeToShop: 0,
+      distanceToShop: 0.0,
+      timeReceiving: 0,
+      timeToClient: 0,
+      distanceToClient: 0.0,
+      timeDelivery: 0,
+      clientAddress: 'Адрес клиента будет определён позже',
+      shopAddress: _state.shopAddress,
+      coefficient: _state.coefficient,
+    );
+  });
+  
+  logMessage('🔵 [_addDelivery] После setState: deliveryNumber=${_state.deliveryNumber}, completedDeliveries=${_state.completedDeliveries.length}');
+  
+  _gpsService.resetDistance();
+  _startSegment();
+  logMessage('🔵 [_addDelivery] ВЫХОД');
+}
 
   void _cancelOrder() {
     _gpsSubscription?.cancel();
@@ -556,10 +629,13 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
     Navigator.of(context).pop();
   }
 
-  // ===== ПОКАЗ СВОДКИ =====
-
   void _showSummary(BuildContext context) {
-    if (_isProcessing) return;
+    logMessage('🔵 [_showSummary] ВХОД, completedDeliveries=${_state.completedDeliveries.length}');
+    
+    if (_isProcessing) {
+      logMessage('⚠️ [_showSummary] ПРОПУСК: уже в обработке');
+      return;
+    }
     _isProcessing = true;
 
     final pricing = ref.read(pricingProvider);
@@ -582,6 +658,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
     final totalExpenses = totalFuelCost + totalRepairCost;
 
     logMessage('🟢 _showSummary: завершение заказа');
+    logMessage('   доставок: ${_state.completedDeliveries.length}');
     logMessage('   paidDistance: $totalAllDistance');
     logMessage('   income: $totalCost');
     logMessage('   expenses: $totalExpenses');
@@ -599,7 +676,12 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
         ),
       ),
     ).then((result) async {
-      if (!mounted) { _isProcessing = false; return; }
+      logMessage('🔵 [_showSummary] Возврат из OrderSummaryScreen, result=$result');
+      if (!mounted) { 
+        logMessage('⚠️ [_showSummary] виджет не смонтирован');
+        _isProcessing = false; 
+        return; 
+      }
       
       if (result == true) {
         logMessage('🟢 Добавление ещё доставки');
@@ -619,8 +701,6 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
         
         try {
           final apiService = ApiService();
-          
-          // ==== ФОРМИРУЕМ ДАННЫЕ ДЛЯ ЗАКАЗА С ДОСТАВКАМИ ====
           final orderData = {
             'serviceName': widget.serviceName,
             'coefficient': _state.coefficient,
@@ -630,7 +710,6 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
             'totalExpenses': totalExpenses,
             'netProfit': totalCost - totalExpenses,
             'totalTimeSeconds': totalTime,
-            // ==== ДОБАВЛЯЕМ СПИСОК ДОСТАВОК ====
             'deliveries': _state.completedDeliveries.map((d) => {
               'number': d.number,
               'clientAddress': d.clientAddress,
@@ -646,8 +725,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
             }).toList(),
           };
           
-          logMessage('📦 Отправка заказа с ${_state.completedDeliveries.length} доставками');
-          
+          logMessage('🔵 [_showSummary] Отправка заказа с ${_state.completedDeliveries.length} доставками');
           await apiService.createOrder(orderData);
           logMessage('✅ Заказ с ${_state.completedDeliveries.length} доставками создан на сервере');
         } catch (e) {
@@ -661,10 +739,11 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
         }
         _isProcessing = false;
       }
+      logMessage('🔵 [_showSummary] ВЫХОД');
     });
   }
 
-int _calculateTotalTime() {
+  int _calculateTotalTime() {
     if (_state.completedDeliveries.isEmpty) return 0;
     final first = _state.completedDeliveries.first;
     int total = first.timeToShop + first.timeReceiving;
@@ -672,7 +751,7 @@ int _calculateTotalTime() {
       total += d.timeToClient + d.timeDelivery;
     }
     return total;
-}
+  }
 
   double _calculateTotalDistance() {
     if (_state.completedDeliveries.isEmpty) return 0.0;

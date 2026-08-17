@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Dict, List, Any
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 import logging
 
 from app.core.database import get_db
@@ -181,17 +181,15 @@ async def start_shift(
         if existing:
             raise HTTPException(status_code=400, detail="Уже есть активная смена")
 
-        # ===== ИСПРАВЛЕНО: добавляем часовой пояс к строке =====
-        now = datetime.now()
-        # Получаем смещение часового пояса и добавляем его в строку
-        start_time_iso = now.astimezone().isoformat()
-        # Результат: "2026-08-17T13:55:15.490389+03:00"
+        # Используем UTC время с часовым поясом
+        now = datetime.now(timezone.utc)
+        start_time_iso = now.isoformat()
         
         logger.info(f"🕐 [СЕРВЕР] Сохраняем время с часовым поясом: {start_time_iso}")
 
         shift = Shift(
             user_id=current_user.id,
-            start_time=start_time_iso,  # строка с +03:00
+            start_time=start_time_iso,
             status='active',
             total_paid_distance=0.0,
             total_idle_distance=0.0,
@@ -201,9 +199,9 @@ async def start_shift(
             net_profit=0.0,
             duration_seconds=0,
             is_synced=True,
-            synced_at=datetime.now(),
-            created_at=datetime.now(),
-            updated_at=datetime.now()
+            synced_at=now,
+            created_at=now,
+            updated_at=now
         )
         db.add(shift)
         db.commit()
@@ -213,7 +211,7 @@ async def start_shift(
         
         return {
             "id": shift.id,
-            "startTime": shift.start_time,  # клиент получит строку с +03:00
+            "startTime": shift.start_time,
             "status": shift.status,
             "totalPaidDistance": shift.total_paid_distance,
             "totalIdleDistance": shift.total_idle_distance,
@@ -245,20 +243,24 @@ async def complete_shift(
         if shift.status == 'completed':
             raise HTTPException(status_code=400, detail="Смена уже завершена")
 
-        now = datetime.now()
-        # ===== ИСПРАВЛЕНО: добавляем часовой пояс =====
-        end_time_iso = now.astimezone().isoformat()
+        # Используем UTC время с часовым поясом
+        now = datetime.now(timezone.utc)
+        
+        # Расчёт длительности
+        if shift.start_time:
+            try:
+                start = datetime.fromisoformat(shift.start_time)
+                # Если нет часового пояса — добавляем UTC
+                if start.tzinfo is None:
+                    start = start.replace(tzinfo=timezone.utc)
+                shift.duration_seconds = int((now - start).total_seconds())
+            except Exception as e:
+                logger.warning(f"⚠️ Ошибка парсинга start_time: {e}, используем 0")
+                shift.duration_seconds = 0
         
         shift.status = 'completed'
-        shift.end_time = end_time_iso
-        
-        # Для расчёта длительности используем datetime объекты
-        if shift.start_time:
-            # Парсим строку с часовым поясом
-            start = datetime.fromisoformat(shift.start_time)
-            shift.duration_seconds = int((now - start).total_seconds())
-        
-        shift.updated_at = datetime.now()
+        shift.end_time = now.isoformat()
+        shift.updated_at = now
         db.commit()
         db.refresh(shift)
         
@@ -289,7 +291,7 @@ async def create_order(
         if not shift:
             raise HTTPException(status_code=400, detail="Нет активной смены")
 
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         
         # Создаём заказ
         order = Order(
@@ -382,14 +384,15 @@ async def complete_order(
         if order.status == 'completed':
             raise HTTPException(status_code=400, detail="Заказ уже завершён")
 
+        now = datetime.now(timezone.utc)
         order.status = 'completed'
-        order.updated_at = datetime.now()
+        order.updated_at = now
         db.commit()
         db.refresh(order)
 
         shift = db.query(Shift).filter(Shift.id == order.shift_id).first()
         if shift:
-            shift.updated_at = datetime.now()
+            shift.updated_at = now
             db.commit()
 
         return {"status": "ok", "order": {"id": order.id, "status": "completed"}}
@@ -412,6 +415,7 @@ async def update_settings(
     try:
         from app.modules.deliveries.models import Settings
         
+        now = datetime.now(timezone.utc)
         existing = db.query(Settings).filter(
             Settings.is_active == True
         ).order_by(Settings.id.desc()).first()
@@ -422,7 +426,7 @@ async def update_settings(
             existing.repair_cost = data.get("repairCost", 2.0)
             existing.additional_costs = data.get("additionalCosts", 0.0)
             existing.version = existing.version + 1
-            existing.updated_at = datetime.now()
+            existing.updated_at = now
             db.commit()
             db.refresh(existing)
             return {
@@ -444,8 +448,8 @@ async def update_settings(
                 additional_costs=data.get("additionalCosts", 0.0),
                 version=1,
                 is_active=True,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=now,
+                updated_at=now,
             )
             db.add(new_settings)
             db.commit()
@@ -476,6 +480,7 @@ async def update_pricing(
     try:
         from app.modules.deliveries.models import Pricing
         
+        now = datetime.now(timezone.utc)
         existing = db.query(Pricing).filter(
             Pricing.is_active == True
         ).order_by(Pricing.id.desc()).first()
@@ -487,7 +492,7 @@ async def update_pricing(
             existing.price_per_km = data.get("pricePerKm", 10.0)
             existing.base_coefficient = data.get("baseCoefficient", 1.0)
             existing.version = existing.version + 1
-            existing.updated_at = datetime.now()
+            existing.updated_at = now
             db.commit()
             db.refresh(existing)
             return {
@@ -511,8 +516,8 @@ async def update_pricing(
                 base_coefficient=data.get("baseCoefficient", 1.0),
                 version=1,
                 is_active=True,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=now,
+                updated_at=now,
             )
             db.add(new_pricing)
             db.commit()
@@ -544,6 +549,7 @@ async def update_x5_settings(
     try:
         from app.modules.deliveries.models import X5Settings
         
+        now = datetime.now(timezone.utc)
         existing = db.query(X5Settings).filter(
             X5Settings.is_active == True
         ).order_by(X5Settings.id.desc()).first()
@@ -554,7 +560,7 @@ async def update_x5_settings(
             existing.per_km_price = data.get("perKmPrice", 25.0)
             existing.per_kg_price = data.get("perKgPrice", 10.0)
             existing.version = existing.version + 1
-            existing.updated_at = datetime.now()
+            existing.updated_at = now
             db.commit()
             db.refresh(existing)
             return {
@@ -576,8 +582,8 @@ async def update_x5_settings(
                 per_kg_price=data.get("perKgPrice", 10.0),
                 version=1,
                 is_active=True,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                created_at=now,
+                updated_at=now,
             )
             db.add(new_x5)
             db.commit()
