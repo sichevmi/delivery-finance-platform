@@ -205,7 +205,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             ),
             const SizedBox(height: 16),
 
-            // Блоки 2x2 — увеличенные
+            // Блоки 2x2
             Row(
               children: [
                 _buildBigMetricCard(
@@ -339,9 +339,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   }
 
   String _calculateProfitPerHour(DailyStats stats) {
+    // Если работали меньше 1 часа (3600 секунд) — не показываем
+    if (stats.totalWorkTime.inSeconds < 3600) {
+      return '—';
+    }
     if (stats.totalWorkTime.inSeconds <= 0) return '0.00 ₽/ч';
+    
     final hours = stats.totalWorkTime.inSeconds / 3600.0;
     if (hours <= 0) return '0.00 ₽/ч';
+    
     final profitPerHour = stats.netProfit / hours;
     return '${profitPerHour.toStringAsFixed(2)} ₽/ч';
   }
