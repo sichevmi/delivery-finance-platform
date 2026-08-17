@@ -9,10 +9,13 @@ class DarkTheme {
       cardColor: const Color(0xFF1E1E1E),
       dividerColor: const Color(0xFF2C2C2C),
       
-      // Используем CardTheme (не CardThemeData)
-      cardTheme: const CardTheme(
+      // Используем CardThemeData
+      cardTheme: const CardThemeData(
         color: Color(0xFF1E1E1E),
         elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(8)),
+        ),
       ),
       
       appBarTheme: const AppBarTheme(
