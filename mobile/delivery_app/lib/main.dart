@@ -7,36 +7,21 @@ import 'package:delivery_app/features/delivery/services/permission_service.dart'
 import 'package:delivery_app/features/auth/providers/auth_provider.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 import 'package:delivery_app/logger.dart';
-import 'package:delivery_app/core/database/database_provider.dart';
-import 'package:delivery_app/features/delivery/providers/sync_provider.dart';
 
 void main() async {
   await LoggerService().init();
   logMessage('🚀 Приложение запущено', category: 'SYSTEM');
-  
+
   WidgetsFlutterBinding.ensureInitialized();
   logMessage('✅ Flutter инициализирован', category: 'SYSTEM');
-  
+
   final container = ProviderContainer();
   logMessage('✅ Контейнер создан', category: 'SYSTEM');
-  
-  try {
-    final db = container.read(appDatabaseProvider);
-    logMessage('📁 База данных инициализирована', category: 'DATABASE');
-  } catch (e) {
-    logMessage('⚠️ Ошибка инициализации БД: $e', category: 'DATABASE', level: LogLevel.error);
-  }
-  
+
   // Инициализируем GPS
   container.read(gpsInitProvider);
   logMessage('🟢 GPS инициализирован', category: 'SYSTEM');
-  
-  // Инициализируем синхронизацию
-  container.read(syncServiceProvider);
-  container.read(apiClientProvider);
-  container.read(connectivityServiceProvider);
-  logMessage('🔄 Синхронизация инициализирована', category: 'SYSTEM');
-  
+
   runApp(
     UncontrolledProviderScope(
       container: container,
@@ -65,10 +50,10 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
 
   Future<void> _initializeApp() async {
     logMessage('🔐 DeliveryApp: инициализация...', category: 'SYSTEM');
-    
+
     final hasPermission = await PermissionService.requestLocationPermission(context);
     logMessage('🔐 DeliveryApp: разрешение = $hasPermission', category: 'SYSTEM');
-    
+
     if (!hasPermission) {
       setState(() {
         _hasPermission = false;
@@ -81,9 +66,9 @@ class _DeliveryAppState extends ConsumerState<DeliveryApp> {
       final authNotifier = ref.read(authProvider.notifier);
       final isAuthenticated = await authNotifier.autoLogin();
       logMessage('🔐 DeliveryApp: авторизован = $isAuthenticated', category: 'SYSTEM');
-      
+
       ref.read(gpsInitProvider);
-      
+
       setState(() {
         _hasPermission = true;
         _isAuthenticated = isAuthenticated;

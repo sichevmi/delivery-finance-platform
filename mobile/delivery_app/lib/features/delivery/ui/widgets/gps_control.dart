@@ -1,21 +1,52 @@
 import 'package:flutter/material.dart';
-import 'package:delivery_app/logger.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:delivery_app/logger.dart';
-import 'package:delivery_app/features/delivery/providers/order_route_provider.dart';
 
-class GpsControl extends ConsumerWidget {
-  final OrderRouteState state;
-  final OrderRouteNotifier notifier;
+class GpsControl extends StatefulWidget {
+  final bool useGps;
+  final double distance;
+  final bool isPaused;
+  final VoidCallback onToggleGpsMode;
+  final ValueChanged<double> onManualDistanceChanged;
+  final VoidCallback onTogglePause;
 
-  const GpsControl({super.key, required this.state, required this.notifier});
+  const GpsControl({
+    super.key,
+    required this.useGps,
+    required this.distance,
+    required this.isPaused,
+    required this.onToggleGpsMode,
+    required this.onManualDistanceChanged,
+    required this.onTogglePause,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (state.currentSegment == 1 || state.currentSegment == 3) {
-      return const SizedBox.shrink();
-    }
+  State<GpsControl> createState() => _GpsControlState();
+}
 
+class _GpsControlState extends State<GpsControl> {
+  final TextEditingController _manualController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _manualController.text = widget.distance.toStringAsFixed(2);
+  }
+
+  @override
+  void didUpdateWidget(GpsControl oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.distance != widget.distance && !widget.useGps) {
+      _manualController.text = widget.distance.toStringAsFixed(2);
+    }
+  }
+
+  @override
+  void dispose() {
+    _manualController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
@@ -25,22 +56,17 @@ class GpsControl extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          _buildToggleButton('GPS', state.useGps, () {
-            notifier.state = notifier.state.copyWith(useGps: true);
-            // перезапуск gps
-          }),
+          _buildToggleButton('GPS', widget.useGps, widget.onToggleGpsMode),
           const SizedBox(width: 6),
-          _buildToggleButton('Вручную', !state.useGps, () {
-            notifier.state = notifier.state.copyWith(useGps: false);
-          }),
+          _buildToggleButton('Вручную', !widget.useGps, widget.onToggleGpsMode),
           const Spacer(),
-          if (state.useGps)
+          if (widget.useGps)
             Row(
               children: [
                 const Icon(Icons.straighten, size: 16, color: Color(0xFF6C63FF)),
                 const SizedBox(width: 4),
                 Text(
-                  '${state.distance.toStringAsFixed(2)} км',
+                  '${widget.distance.toStringAsFixed(2)} км',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -53,6 +79,7 @@ class GpsControl extends ConsumerWidget {
             SizedBox(
               width: 60,
               child: TextField(
+                controller: _manualController,
                 keyboardType: TextInputType.numberWithOptions(decimal: true),
                 style: const TextStyle(
                   fontSize: 14,
@@ -68,24 +95,23 @@ class GpsControl extends ConsumerWidget {
                 onChanged: (value) {
                   final parsed = double.tryParse(value.replaceAll(',', '.'));
                   if (parsed != null && parsed >= 0) {
-                    // Обновляем manualDistance через специальный метод
-                    notifier.updateManualDistance(parsed);
+                    widget.onManualDistanceChanged(parsed);
                   }
                 },
               ),
             ),
           const SizedBox(width: 8),
           GestureDetector(
-            onTap: notifier.togglePause,
+            onTap: widget.onTogglePause,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: state.isPaused
+                color: widget.isPaused
                     ? Colors.green.withOpacity(0.15)
                     : Colors.orange.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                  color: state.isPaused
+                  color: widget.isPaused
                       ? Colors.green.withOpacity(0.3)
                       : Colors.orange.withOpacity(0.3),
                 ),
@@ -93,17 +119,17 @@ class GpsControl extends ConsumerWidget {
               child: Row(
                 children: [
                   Icon(
-                    state.isPaused ? Icons.play_arrow : Icons.pause,
+                    widget.isPaused ? Icons.play_arrow : Icons.pause,
                     size: 14,
-                    color: state.isPaused ? Colors.green : Colors.orange,
+                    color: widget.isPaused ? Colors.green : Colors.orange,
                   ),
                   const SizedBox(width: 2),
                   Text(
-                    state.isPaused ? 'Старт' : 'Пауза',
+                    widget.isPaused ? 'Старт' : 'Пауза',
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
-                      color: state.isPaused ? Colors.green : Colors.orange,
+                      color: widget.isPaused ? Colors.green : Colors.orange,
                     ),
                   ),
                 ],

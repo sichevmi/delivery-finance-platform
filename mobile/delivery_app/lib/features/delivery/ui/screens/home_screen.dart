@@ -11,9 +11,7 @@ import 'package:delivery_app/features/delivery/ui/tabs/orders_tab.dart';
 import 'package:delivery_app/features/delivery/ui/tabs/analytics_tab.dart';
 import 'package:delivery_app/features/delivery/ui/tabs/directories_tab.dart';
 import 'package:delivery_app/features/delivery/ui/tabs/more_tab.dart';
-import 'package:delivery_app/features/delivery/providers/sync_provider.dart';
-import 'package:delivery_app/core/services/connectivity_service.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:delivery_app/core/services/api_service.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -47,16 +45,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     Icons.more_horiz,
   ];
 
-  bool _isInitialSyncDone = false;
   bool _isLoading = true;
-  bool _syncStarted = false; // ← Флаг, чтобы синхронизация запускалась только один раз
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _listenToConnectivity();
-    _syncOnStart();
+    _loadData();
   }
 
   @override
@@ -65,70 +60,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     super.dispose();
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Ничего не делаем
-  }
-
-  // ===== АВТОМАТИЧЕСКАЯ СИНХРОНИЗАЦИЯ =====
-  
-  void _listenToConnectivity() {
-    final connectivity = ref.read(connectivityServiceProvider);
-    connectivity.connectivityStream.listen((result) {
-      // Запускаем автосинхронизацию ТОЛЬКО если первичная синхронизация уже завершена
-      if (result != ConnectivityResult.none && _isInitialSyncDone) {
-        final syncService = ref.read(syncServiceProvider);
-        syncService.syncAll().then((_) {
-          logMessage('✅ Автосинхронизация выполнена', category: 'SYNC');
-        }).catchError((e) {
-          logMessage('⚠️ Автосинхронизация: $e', category: 'SYNC', level: LogLevel.error);
-        });
-      }
-    });
-  }
-
-  void _syncOnStart() {
-  // Защита от двойного вызова
-  if (_syncStarted) {
-    logMessage('⏭️ Синхронизация уже запущена, пропускаем', category: 'SYNC');
-    return;
-  }
-  _syncStarted = true;
-  
-  WidgetsBinding.instance.addPostFrameCallback((_) async {
-    final syncService = ref.read(syncServiceProvider);
-    
+  Future<void> _loadData() async {
     try {
-      // Сначала загружаем данные с сервера
-      await syncService.loadFromServer();
-      
-      // 🔥 ПРИНУДИТЕЛЬНО ОБНОВЛЯЕМ СТАТИСТИКУ
-      ref.invalidate(dailyStatsProvider);
-      
-      // Потом отправляем свои данные
-      await syncService.syncAll();
-      
-      // Проверяем, что виджет ещё существует
-      if (mounted) {
-        setState(() {
-          _isInitialSyncDone = true;
-          _isLoading = false;
-        });
-      }
-      
-      logMessage('✅ Первичная синхронизация выполнена', category: 'SYNC');
+      final apiService = ApiService();
+      await apiService.loadAllData();
+      setState(() => _isLoading = false);
+      logMessage('✅ Данные загружены с сервера', category: 'SYSTEM');
     } catch (e) {
-      logMessage('⚠️ Первичная синхронизация: $e', category: 'SYNC', level: LogLevel.error);
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      logMessage('⚠️ Ошибка загрузки данных: $e', category: 'SYSTEM', level: LogLevel.error);
+      setState(() => _isLoading = false);
     }
-  });
-}
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Если идёт загрузка — показываем индикатор
     if (_isLoading) {
       return const Scaffold(
         backgroundColor: Color(0xFF121212),
@@ -138,10 +83,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             children: [
               CircularProgressIndicator(color: Color(0xFF6C63FF)),
               SizedBox(height: 16),
-              Text(
-                'Загрузка данных...',
-                style: TextStyle(color: Color(0xFF888888)),
-              ),
+              Text('Загрузка данных...', style: TextStyle(color: Color(0xFF888888))),
             ],
           ),
         ),
@@ -158,22 +100,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       appBar: AppBar(
         title: const Text('FinFlow Доставка'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {},
-          ),
+          IconButton(icon: const Icon(Icons.notifications_outlined), onPressed: () {}),
           CircleAvatar(
             radius: 16,
             backgroundColor: const Color(0xFF6C63FF),
             child: Text(
-              authState.user?.name.isNotEmpty == true
-                  ? authState.user!.name[0].toUpperCase()
-                  : 'К',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
+              authState.user?.name.isNotEmpty == true ? authState.user!.name[0].toUpperCase() : 'К',
+              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
             ),
           ),
           const SizedBox(width: 8),
@@ -183,34 +116,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         index: selectedTab,
         children: [
           _buildHomeTab(shiftState, settings, dailyStatsAsync),
-          Navigator(
-            key: _navigatorKeys[1],
-            onGenerateRoute: (settings) => MaterialPageRoute(
-              settings: settings,
-              builder: (context) => const OrdersTab(),
-            ),
-          ),
-          Navigator(
-            key: _navigatorKeys[2],
-            onGenerateRoute: (settings) => MaterialPageRoute(
-              settings: settings,
-              builder: (context) => const DirectoriesTab(),
-            ),
-          ),
-          Navigator(
-            key: _navigatorKeys[3],
-            onGenerateRoute: (settings) => MaterialPageRoute(
-              settings: settings,
-              builder: (context) => const AnalyticsTab(),
-            ),
-          ),
-          Navigator(
-            key: _navigatorKeys[4],
-            onGenerateRoute: (settings) => MaterialPageRoute(
-              settings: settings,
-              builder: (context) => const MoreTab(),
-            ),
-          ),
+          Navigator(key: _navigatorKeys[1], onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => const OrdersTab())),
+          Navigator(key: _navigatorKeys[2], onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => const DirectoriesTab())),
+          Navigator(key: _navigatorKeys[3], onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => const AnalyticsTab())),
+          Navigator(key: _navigatorKeys[4], onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => const MoreTab())),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -223,20 +132,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             ref.read(selectedTabProvider.notifier).state = index;
           }
         },
-        items: List.generate(
-          _tabLabels.length,
-          (index) => BottomNavigationBarItem(
-            icon: Icon(_tabIcons[index]),
-            label: _tabLabels[index],
-          ),
-        ),
+        items: List.generate(_tabLabels.length, (index) => BottomNavigationBarItem(
+          icon: Icon(_tabIcons[index]),
+          label: _tabLabels[index],
+        )),
       ),
     );
   }
-
-  // ===== ОСТАЛЬНОЙ КОД БЕЗ ИЗМЕНЕНИЙ =====
-  // ... _buildHomeTab, _buildTimeCard, _buildMetricCard, _getTodayDate ...
-  // ... и все виджеты _TimeDisplay, _IdleTimeDisplay, _IdleDistanceDisplay ...
 
   Widget _buildHomeTab(ShiftState shiftState, SettingsState settings, AsyncValue<DailyStats> dailyStatsAsync) {
     final fuelCostPerKm = (settings.fuelConsumption / 100) * settings.fuelPrice;
@@ -273,10 +175,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       const SizedBox(width: 4),
                       Text(
                         shiftState.isActive ? 'Смена активна' : 'Смена не начата',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: shiftState.isActive ? Colors.green : Colors.grey,
-                        ),
+                        style: TextStyle(fontSize: 10, color: shiftState.isActive ? Colors.green : Colors.grey),
                       ),
                     ],
                   ),
@@ -348,23 +247,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                _IdleDistanceDisplay(
-                  shiftState: shiftState,
-                  label: 'Холостой пробег',
-                  color: Colors.red,
-                ),
-                const SizedBox(width: 6),
-                _IdleTimeDisplay(
-                  shiftState: shiftState,
-                  label: 'Время простоя',
-                  color: Colors.red.shade300,
-                ),
-                const Spacer(),
-              ],
-            ),
             const Spacer(),
 
             // Кнопка начала/остановки смены
@@ -390,10 +272,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                 ),
                 child: Text(
                   shiftState.isActive ? 'Остановить работу' : 'Начать работу',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                 ),
               ),
             ),
@@ -534,7 +413,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 }
 
 // ============================================================
-// ВИДЖЕТ ДЛЯ ВРЕМЕНИ РАБОТЫ
+// ВИДЖЕТ ДЛЯ ВРЕМЕНИ РАБОТЫ (оставлен, работает без изменений)
 // ============================================================
 class _TimeDisplay extends StatefulWidget {
   final ShiftState shiftState;
@@ -646,213 +525,5 @@ class _TimeDisplayState extends State<_TimeDisplay> {
     final minutes = duration.inMinutes.remainder(60);
     final seconds = duration.inSeconds.remainder(60);
     return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-  }
-}
-
-// ============================================================
-// ВИДЖЕТ ДЛЯ ВРЕМЕНИ ПРОСТОЯ
-// ============================================================
-class _IdleTimeDisplay extends StatefulWidget {
-  final ShiftState shiftState;
-  final String label;
-  final Color color;
-
-  const _IdleTimeDisplay({
-    required this.shiftState,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  State<_IdleTimeDisplay> createState() => _IdleTimeDisplayState();
-}
-
-class _IdleTimeDisplayState extends State<_IdleTimeDisplay> {
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _startTimer();
-  }
-
-  @override
-  void didUpdateWidget(covariant _IdleTimeDisplay oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.shiftState.isActive != oldWidget.shiftState.isActive ||
-        widget.shiftState.isOnOrder != oldWidget.shiftState.isOnOrder) {
-      _startTimer();
-    }
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  void _startTimer() {
-    _timer?.cancel();
-    if (widget.shiftState.isActive && !widget.shiftState.isOnOrder) {
-      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        setState(() {});
-      });
-    } else {
-      setState(() {});
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final String formattedTime;
-    if (widget.shiftState.isActive && 
-        !widget.shiftState.isOnOrder && 
-        widget.shiftState.idleStartTime != null) {
-      final now = DateTime.now();
-      final duration = widget.shiftState.totalIdleTime + 
-          now.difference(widget.shiftState.idleStartTime!);
-      formattedTime = _formatDuration(duration);
-    } else {
-      formattedTime = _formatDuration(widget.shiftState.totalIdleTime);
-    }
-
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E1E1E),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: const Color(0xFF2C2C2C)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              formattedTime,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: widget.color,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            Text(
-              widget.label,
-              style: const TextStyle(
-                fontSize: 9,
-                color: Color(0xFF888888),
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatDuration(Duration duration) {
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60);
-    final seconds = duration.inSeconds.remainder(60);
-    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-  }
-}
-
-// ============================================================
-// ВИДЖЕТ ДЛЯ ХОЛОСТОГО ПРОБЕГА
-// ============================================================
-class _IdleDistanceDisplay extends StatefulWidget {
-  final ShiftState shiftState;
-  final String label;
-  final Color color;
-
-  const _IdleDistanceDisplay({
-    required this.shiftState,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  State<_IdleDistanceDisplay> createState() => _IdleDistanceDisplayState();
-}
-
-class _IdleDistanceDisplayState extends State<_IdleDistanceDisplay> {
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _startTimer();
-  }
-
-  @override
-  void didUpdateWidget(covariant _IdleDistanceDisplay oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.shiftState.isActive != oldWidget.shiftState.isActive ||
-        widget.shiftState.isOnOrder != oldWidget.shiftState.isOnOrder) {
-      _startTimer();
-    }
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  void _startTimer() {
-    _timer?.cancel();
-    if (widget.shiftState.isActive && !widget.shiftState.isOnOrder) {
-      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        setState(() {});
-      });
-    } else {
-      setState(() {});
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final distance = widget.shiftState.totalIdleDistance;
-    final formattedDistance = distance.toStringAsFixed(1);
-
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E1E1E),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: const Color(0xFF2C2C2C)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '${formattedDistance} км',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: widget.color,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            Text(
-              widget.label,
-              style: const TextStyle(
-                fontSize: 9,
-                color: Color(0xFF888888),
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

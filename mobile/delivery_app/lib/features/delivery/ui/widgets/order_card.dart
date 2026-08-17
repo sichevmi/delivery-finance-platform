@@ -1,25 +1,39 @@
 import 'package:flutter/material.dart';
-import 'package:delivery_app/logger.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:delivery_app/logger.dart';
-import 'package:delivery_app/features/delivery/providers/order_route_provider.dart';
 import 'package:delivery_app/features/delivery/providers/pricing_provider.dart';
 
 class OrderCard extends ConsumerWidget {
-  final OrderRouteState state;
+  final String serviceName;
+  final double coefficient;
+  final int currentSegment;
+  final int deliveryNumber;
+  final double? weight;
+  final double distance;
+  final String? shopAddress;
+  final String? clientAddress;
 
-  const OrderCard({super.key, required this.state});
+  const OrderCard({
+    super.key,
+    required this.serviceName,
+    required this.coefficient,
+    required this.currentSegment,
+    required this.deliveryNumber,
+    this.weight,
+    this.distance = 0.0,
+    this.shopAddress,
+    this.clientAddress,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final pricing = ref.watch(pricingProvider);
-    final deliveryLabel = state.deliveryNumber > 1 ? 'Доставка #${state.deliveryNumber}' : 'Заказ';
+    final deliveryLabel = deliveryNumber > 1 ? 'Доставка #$deliveryNumber' : 'Заказ';
 
     double cost = 0;
-    if (state.currentSegment >= 2 && state.weight != null) {
-      cost = (pricing.receivingFee + (state.weight! * pricing.pricePerKg)) * state.coefficient;
-      if (state.currentSegment == 3) {
-        cost += (pricing.deliveryFee + (state.distance * pricing.pricePerKm)) * state.coefficient;
+    if (currentSegment >= 2 && weight != null) {
+      cost = (pricing.receivingFee + (weight! * pricing.pricePerKg)) * coefficient;
+      if (currentSegment == 3) {
+        cost += (pricing.deliveryFee + (distance * pricing.pricePerKm)) * coefficient;
       }
     }
 
@@ -44,19 +58,19 @@ class OrderCard extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  'К: ${state.coefficient.toString()}',
+                  'К: $coefficient',
                   style: const TextStyle(fontSize: 12, color: Color(0xFF6C63FF), fontWeight: FontWeight.w600),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 6),
-          if (state.shopAddress != null)
-            _buildInfoLine(Icons.storefront, 'Магазин', state.shopAddress!),
-          if (state.clientAddress != null && state.currentSegment >= 2)
-            _buildInfoLine(Icons.location_on, 'Клиент', state.clientAddress!),
-          if (state.weight != null)
-            _buildInfoLine(Icons.fitness_center, 'Вес', '${state.weight!.toStringAsFixed(1)} кг'),
+          if (shopAddress != null)
+            _buildInfoLine(Icons.storefront, 'Магазин', shopAddress!),
+          if (clientAddress != null && currentSegment >= 2)
+            _buildInfoLine(Icons.location_on, 'Клиент', clientAddress!),
+          if (weight != null)
+            _buildInfoLine(Icons.fitness_center, 'Вес', '${weight!.toStringAsFixed(1)} кг'),
           if (cost > 0)
             _buildInfoLine(Icons.attach_money, 'Стоимость', '${cost.toStringAsFixed(0)} руб.'),
         ],

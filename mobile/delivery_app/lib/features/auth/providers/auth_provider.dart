@@ -4,7 +4,9 @@ import 'package:dio/dio.dart';
 import 'package:delivery_app/core/services/storage_service.dart';
 import 'package:delivery_app/features/auth/models/user.dart';
 import 'package:delivery_app/core/services/api_client.dart';
-import 'package:delivery_app/features/delivery/providers/sync_provider.dart';
+
+// Провайдер для ApiClient
+final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
 
 class AuthState {
   final User? user;
@@ -50,8 +52,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       await login(email, password);
     } on DioException catch (e) {
-      final errorMsg = e.response?.data['detail'] ?? 
-                       e.response?.data['message'] ?? 
+      final errorMsg = e.response?.data['detail'] ??
+                       e.response?.data['message'] ??
                        'Ошибка регистрации';
       state = state.copyWith(
         isLoading: false,
@@ -77,7 +79,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await storage.saveTokens(access, refresh);
       await apiClient.setTokens(access, refresh);
 
-      // Проверяем, что токен сохранился
       final savedToken = await apiClient.getAccessToken();
       logMessage('🔑 Токен сохранён: ${savedToken != null ? savedToken.substring(0, 20) + "..." : "null"}', category: 'AUTH');
 
@@ -100,8 +101,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
     } on DioException catch (e) {
       logMessage('❌ DioException: ${e.response?.statusCode} - ${e.response?.data}');
-      final errorMsg = e.response?.data['detail'] ?? 
-                       e.response?.data['message'] ?? 
+      final errorMsg = e.response?.data['detail'] ??
+                       e.response?.data['message'] ??
                        'Ошибка входа';
       state = state.copyWith(
         isLoading: false,

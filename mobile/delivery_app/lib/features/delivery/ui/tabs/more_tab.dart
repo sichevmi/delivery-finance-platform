@@ -6,10 +6,14 @@ import 'package:delivery_app/features/auth/ui/screens/login_screen.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 import 'package:delivery_app/features/delivery/services/gps_service.dart';
 import 'package:delivery_app/features/delivery/providers/logger_provider.dart';
-import 'package:delivery_app/features/delivery/providers/sync_provider.dart';
+import 'package:delivery_app/core/services/api_service.dart';
+import 'package:delivery_app/features/delivery/providers/daily_stats_provider.dart';
+import 'package:delivery_app/features/delivery/providers/shift_provider.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
-// Экран для просмотра логов
+// ============================================================
+// Экран для просмотра логов (без изменений)
+// ============================================================
 class LogsScreen extends ConsumerStatefulWidget {
   const LogsScreen({super.key});
 
@@ -196,6 +200,9 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
   }
 }
 
+// ============================================================
+// Основная вкладка "Ещё"
+// ============================================================
 class MoreTab extends ConsumerStatefulWidget {
   const MoreTab({super.key});
 
@@ -205,6 +212,7 @@ class MoreTab extends ConsumerStatefulWidget {
 
 class _MoreTabState extends ConsumerState<MoreTab> {
   bool _isLoggingEnabled = false;
+  bool _isLoading = false; // для индикации загрузки данных
 
   @override
   void initState() {
@@ -223,8 +231,6 @@ class _MoreTabState extends ConsumerState<MoreTab> {
     final authState = ref.watch(authProvider);
     final authNotifier = ref.read(authProvider.notifier);
     final gpsService = ref.read(gpsServiceProvider);
-    final isSyncing = ref.watch(syncStatusProvider);
-    final lastSyncTime = ref.watch(lastSyncTimeProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
@@ -248,8 +254,9 @@ class _MoreTabState extends ConsumerState<MoreTab> {
           _buildUserCard(authState),
           const SizedBox(height: 24),
 
+          // ===== НОВАЯ СЕКЦИЯ "ДАННЫЕ" =====
           const Text(
-            'Синхронизация',
+            'Данные',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -257,27 +264,23 @@ class _MoreTabState extends ConsumerState<MoreTab> {
             ),
           ),
           const SizedBox(height: 8),
-          
-          // КНОПКА СИНХРОНИЗАЦИИ
           Material(
             color: const Color(0xFF1E1E1E),
             borderRadius: BorderRadius.circular(8),
             child: ListTile(
               leading: Icon(
-                isSyncing ? Icons.sync : Icons.cloud_sync,
-                color: isSyncing ? Colors.green : const Color(0xFF6C63FF),
+                _isLoading ? Icons.sync : Icons.cloud_download,
+                color: _isLoading ? Colors.green : const Color(0xFF6C63FF),
               ),
               title: Text(
-                isSyncing ? 'Синхронизация...' : 'Синхронизировать',
+                _isLoading ? 'Загрузка...' : 'Обновить данные',
                 style: const TextStyle(color: Colors.white),
               ),
-              subtitle: Text(
-                lastSyncTime != null 
-                    ? 'Последняя синхронизация: ${_formatTime(lastSyncTime!)}'
-                    : 'Нажмите для синхронизации',
-                style: const TextStyle(color: Color(0xFF888888), fontSize: 12),
+              subtitle: const Text(
+                'Загрузить свежие данные с сервера',
+                style: TextStyle(color: Color(0xFF888888), fontSize: 12),
               ),
-              trailing: isSyncing
+              trailing: _isLoading
                   ? const SizedBox(
                       width: 20,
                       height: 20,
@@ -286,12 +289,13 @@ class _MoreTabState extends ConsumerState<MoreTab> {
                         color: Color(0xFF6C63FF),
                       ),
                     )
-                  : const Icon(Icons.cloud_upload, color: Color(0xFF6C63FF)),
-              onTap: isSyncing ? null : _syncData,
+                  : const Icon(Icons.cloud_download, color: Color(0xFF6C63FF)),
+              onTap: _isLoading ? null : _refreshData,
             ),
           ),
           const SizedBox(height: 4),
 
+          // ===== СЕКЦИЯ "НАСТРОЙКИ" (без изменений) =====
           const Text(
             'Настройки',
             style: TextStyle(
@@ -338,6 +342,7 @@ class _MoreTabState extends ConsumerState<MoreTab> {
           ),
           const SizedBox(height: 24),
 
+          // ===== СЕКЦИЯ "ЛОГИРОВАНИЕ" (без изменений) =====
           const Text(
             'Логирование',
             style: TextStyle(
@@ -456,6 +461,7 @@ class _MoreTabState extends ConsumerState<MoreTab> {
 
           const SizedBox(height: 24),
 
+          // ===== СЕКЦИЯ "О ПРИЛОЖЕНИИ" (без изменений) =====
           const Text(
             'О приложении',
             style: TextStyle(
@@ -521,6 +527,7 @@ class _MoreTabState extends ConsumerState<MoreTab> {
     );
   }
 
+  // ===== ВСПОМОГАТЕЛЬНЫЙ ВИДЖЕТ КАРТОЧКИ ПОЛЬЗОВАТЕЛЯ =====
   Widget _buildUserCard(AuthState authState) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -573,51 +580,42 @@ class _MoreTabState extends ConsumerState<MoreTab> {
     );
   }
 
-  // ===== МЕТОД СИНХРОНИЗАЦИИ =====
-  Future<void> _syncData() async {
+  // ===== МЕТОД ОБНОВЛЕНИЯ ДАННЫХ С СЕРВЕРА =====
+  Future<void> _refreshData() async {
+    setState(() => _isLoading = true);
     try {
-      final syncService = ref.read(syncServiceProvider);
-      final syncStatus = ref.read(syncStatusProvider.notifier);
-      final lastSyncTime = ref.read(lastSyncTimeProvider.notifier);
-      
-      syncStatus.state = true;
-      await syncService.syncAll();
-      syncStatus.state = false;
-      lastSyncTime.state = DateTime.now();
-      
+      final apiService = ApiService();
+      await apiService.loadAllData();
+      // Обновляем провайдеры
+      ref.invalidate(dailyStatsProvider);
+      // Принудительно обновляем смену (если есть)
+      ref.read(shiftProvider.notifier);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Синхронизация завершена'),
+            content: Text('✅ Данные обновлены'),
             backgroundColor: Colors.green,
           ),
         );
       }
     } catch (e) {
-      ref.read(syncStatusProvider.notifier).state = false;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ Ошибка синхронизации: $e'),
+            content: Text('❌ Ошибка: $e'),
             backgroundColor: Colors.red,
           ),
         );
       }
-      logMessage('❌ Ошибка синхронизации: $e', category: 'SYNC', level: LogLevel.error);
+      logMessage('Ошибка обновления данных: $e', level: LogLevel.error, category: 'UI');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
-  String _formatTime(DateTime time) {
-    final now = DateTime.now();
-    final diff = now.difference(time);
-    
-    if (diff.inMinutes < 1) return 'только что';
-    if (diff.inMinutes < 60) return '${diff.inMinutes} мин назад';
-    if (diff.inHours < 24) return '${diff.inHours} ч назад';
-    return '${diff.inDays} д назад';
-  }
-
-  // ===== ОСТАЛЬНЫЕ МЕТОДЫ =====
+  // ===== ОСТАЛЬНЫЕ МЕТОДЫ (без изменений) =====
   
   void _toggleLogging(GpsService gpsService) async {
     setState(() {

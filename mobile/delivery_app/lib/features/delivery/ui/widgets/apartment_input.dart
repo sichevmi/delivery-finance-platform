@@ -1,17 +1,55 @@
 import 'package:flutter/material.dart';
-import 'package:delivery_app/logger.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:delivery_app/logger.dart';
-import 'package:delivery_app/features/delivery/providers/order_route_provider.dart';
 
-class ApartmentInput extends ConsumerWidget {
-  final OrderRouteState state;
-  final OrderRouteNotifier notifier;
+class ApartmentInput extends StatefulWidget {
+  final String initialApartment;
+  final bool initialIsPrivateHouse;
+  final ValueChanged<String> onApartmentChanged;
+  final ValueChanged<bool> onPrivateHouseChanged;
 
-  const ApartmentInput({super.key, required this.state, required this.notifier});
+  const ApartmentInput({
+    super.key,
+    required this.initialApartment,
+    required this.initialIsPrivateHouse,
+    required this.onApartmentChanged,
+    required this.onPrivateHouseChanged,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  State<ApartmentInput> createState() => _ApartmentInputState();
+}
+
+class _ApartmentInputState extends State<ApartmentInput> {
+  late TextEditingController _controller;
+  late bool _isPrivateHouse;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialApartment);
+    _isPrivateHouse = widget.initialIsPrivateHouse;
+  }
+
+  @override
+  void didUpdateWidget(ApartmentInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialApartment != widget.initialApartment) {
+      _controller.text = widget.initialApartment;
+    }
+    if (oldWidget.initialIsPrivateHouse != widget.initialIsPrivateHouse) {
+      _isPrivateHouse = widget.initialIsPrivateHouse;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isApartmentValid = _controller.text.trim().isNotEmpty || _isPrivateHouse;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -26,7 +64,7 @@ class ApartmentInput extends ConsumerWidget {
                   color: const Color(0xFF1E1E1E),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: state.isApartmentValid || state.isPrivateHouse
+                    color: isApartmentValid || _isPrivateHouse
                         ? const Color(0xFF6C63FF)
                         : const Color(0xFF2C2C2C),
                     width: 1,
@@ -42,23 +80,21 @@ class ApartmentInput extends ConsumerWidget {
                         children: [
                           const Text('Квартира', style: TextStyle(fontSize: 11, color: Color(0xFF888888))),
                           TextField(
-                            enabled: !state.isPrivateHouse,
+                            controller: _controller,
+                            enabled: !_isPrivateHouse,
                             keyboardType: TextInputType.number,
                             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                             decoration: InputDecoration(
                               border: InputBorder.none,
                               isDense: true,
-                              hintText: state.isPrivateHouse ? 'Частный дом' : 'Введите номер',
+                              hintText: _isPrivateHouse ? 'Частный дом' : 'Введите номер',
                               hintStyle: TextStyle(
-                                color: state.isPrivateHouse ? Color(0xFF888888) : Color(0xFF666666),
+                                color: _isPrivateHouse ? const Color(0xFF888888) : const Color(0xFF666666),
                                 fontSize: 14,
                               ),
                             ),
                             onChanged: (value) {
-                              notifier.state = notifier.state.copyWith(
-                                apartment: value,
-                                isApartmentValid: value.trim().isNotEmpty,
-                              );
+                              widget.onApartmentChanged(value);
                             },
                           ),
                         ],
@@ -67,17 +103,22 @@ class ApartmentInput extends ConsumerWidget {
                     Row(
                       children: [
                         Checkbox(
-                          value: state.isPrivateHouse,
+                          value: _isPrivateHouse,
                           onChanged: (val) {
-                            notifier.state = notifier.state.copyWith(
-                              isPrivateHouse: val ?? false,
-                              apartment: (val ?? false) ? '1' : '',
-                              isApartmentValid: (val ?? false) ? true : false,
-                            );
+                            setState(() {
+                              _isPrivateHouse = val ?? false;
+                              if (_isPrivateHouse) {
+                                _controller.text = '';
+                                widget.onApartmentChanged('');
+                              } else {
+                                widget.onApartmentChanged(_controller.text);
+                              }
+                              widget.onPrivateHouseChanged(_isPrivateHouse);
+                            });
                           },
                           activeColor: const Color(0xFF6C63FF),
                           side: BorderSide(
-                            color: state.isPrivateHouse ? const Color(0xFF6C63FF) : const Color(0xFF666666),
+                            color: _isPrivateHouse ? const Color(0xFF6C63FF) : const Color(0xFF666666),
                           ),
                         ),
                         const Text('Частный дом', style: TextStyle(fontSize: 12, color: Color(0xFF888888))),

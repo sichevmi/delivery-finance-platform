@@ -4,7 +4,7 @@ import 'package:delivery_app/logger.dart';
 
 class ApiClient {
   static const String baseUrl = 'http://195.19.20.178:8001/api/v1';
-  
+
   final Dio _dio = Dio();
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
@@ -23,7 +23,7 @@ class ApiClient {
   Dio get dio => _dio;
 
   // ===== АУТЕНТИФИКАЦИЯ =====
-  
+
   Future<void> setTokens(String accessToken, String refreshToken) async {
     await _storage.write(key: 'access_token', value: accessToken);
     await _storage.write(key: 'refresh_token', value: refreshToken);
@@ -45,7 +45,7 @@ class ApiClient {
   }
 
   // ===== ЛОГИН =====
-  
+
   Future<Map<String, dynamic>> login(String email, String password) async {
     try {
       final response = await _dio.post(
@@ -84,56 +84,54 @@ class ApiClient {
     }
   }
 
-  // ===== СИНХРОНИЗАЦИЯ (ОТПРАВКА) =====
+  // ===== СМЕНЫ =====
 
-  Future<Map<String, dynamic>> syncShifts(List<Map<String, dynamic>> shifts) async {
+  Future<Map<String, dynamic>> startShift() async {
     try {
-      logMessage('📤 Отправка ${shifts.length} смен', category: 'API');
-      final response = await _dio.post(
-        '/sync/shifts',
-        data: {'shifts': shifts},
-      );
-      logMessage('✅ Смены синхронизированы', category: 'API');
+      final response = await _dio.post('/shifts/start');
       return response.data;
     } catch (e) {
-      logMessage('⚠️ Ошибка syncShifts: $e', category: 'API', level: LogLevel.error);
+      logMessage('⚠️ Ошибка начала смены: $e', category: 'API', level: LogLevel.error);
       rethrow;
     }
   }
 
-  Future<Map<String, dynamic>> syncOrders(List<Map<String, dynamic>> orders) async {
+  Future<Map<String, dynamic>> completeShift(int shiftId) async {
     try {
-      logMessage('📤 Отправка ${orders.length} заказов', category: 'API');
-      final response = await _dio.post(
-        '/sync/orders',
-        data: {'orders': orders},
-      );
-      logMessage('✅ Заказы синхронизированы', category: 'API');
+      final response = await _dio.post('/shifts/$shiftId/complete');
       return response.data;
     } catch (e) {
-      logMessage('⚠️ Ошибка syncOrders: $e', category: 'API', level: LogLevel.error);
+      logMessage('⚠️ Ошибка завершения смены: $e', category: 'API', level: LogLevel.error);
       rethrow;
     }
   }
 
-  Future<Map<String, dynamic>> syncSettings(Map<String, dynamic> settings) async {
+  // ===== ЗАКАЗЫ =====
+
+  Future<Map<String, dynamic>> createOrder(Map<String, dynamic> data) async {
     try {
-      final response = await _dio.post(
-        '/sync/settings',
-        data: settings,
-      );
+      final response = await _dio.post('/orders', data: data);
       return response.data;
     } catch (e) {
-      logMessage('⚠️ Ошибка syncSettings: $e', category: 'API', level: LogLevel.error);
+      logMessage('⚠️ Ошибка создания заказа: $e', category: 'API', level: LogLevel.error);
       rethrow;
     }
   }
 
-  // ===== ЗАГРУЗКА ДАННЫХ С СЕРВЕРА =====
+  Future<Map<String, dynamic>> completeOrder(int orderId) async {
+    try {
+      final response = await _dio.post('/orders/$orderId/complete');
+      return response.data;
+    } catch (e) {
+      logMessage('⚠️ Ошибка завершения заказа: $e', category: 'API', level: LogLevel.error);
+      rethrow;
+    }
+  }
+
+  // ===== ЗАГРУЗКА ДАННЫХ =====
 
   Future<Map<String, dynamic>> getTodayData() async {
     try {
-      logMessage('📥 Загрузка данных за сегодня...', category: 'API');
       final response = await _dio.get('/sync/today');
       return response.data;
     } catch (e) {
@@ -146,7 +144,6 @@ class ApiClient {
 
   Future<Map<String, dynamic>> getDirectories() async {
     try {
-      logMessage('📥 Загрузка справочников с сервера...', category: 'API');
       final response = await _dio.get('/directories');
       return response.data;
     } catch (e) {
@@ -157,11 +154,7 @@ class ApiClient {
 
   Future<Map<String, dynamic>> updateSettings(Map<String, dynamic> settings) async {
     try {
-      logMessage('📤 Отправка настроек на сервер...', category: 'API');
-      final response = await _dio.post(
-        '/directories/settings',
-        data: settings,
-      );
+      final response = await _dio.post('/directories/settings', data: settings);
       return response.data;
     } catch (e) {
       logMessage('⚠️ Ошибка updateSettings: $e', category: 'API', level: LogLevel.error);
@@ -171,11 +164,7 @@ class ApiClient {
 
   Future<Map<String, dynamic>> updatePricing(Map<String, dynamic> pricing) async {
     try {
-      logMessage('📤 Отправка тарифов на сервер...', category: 'API');
-      final response = await _dio.post(
-        '/directories/pricing',
-        data: pricing,
-      );
+      final response = await _dio.post('/directories/pricing', data: pricing);
       return response.data;
     } catch (e) {
       logMessage('⚠️ Ошибка updatePricing: $e', category: 'API', level: LogLevel.error);
@@ -185,11 +174,7 @@ class ApiClient {
 
   Future<Map<String, dynamic>> updateX5Settings(Map<String, dynamic> x5Settings) async {
     try {
-      logMessage('📤 Отправка X5 настроек на сервер...', category: 'API');
-      final response = await _dio.post(
-        '/directories/x5',
-        data: x5Settings,
-      );
+      final response = await _dio.post('/directories/x5', data: x5Settings);
       return response.data;
     } catch (e) {
       logMessage('⚠️ Ошибка updateX5Settings: $e', category: 'API', level: LogLevel.error);
@@ -210,7 +195,6 @@ class _AuthInterceptor extends Interceptor {
     final token = await _storage.read(key: 'access_token');
     if (token != null && token.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $token';
-      logMessage('🔑 Токен добавлен: Bearer ${token.substring(0, 20)}...', category: 'API', level: LogLevel.debug);
     } else {
       logMessage('⚠️ Токен отсутствует!', category: 'API', level: LogLevel.debug);
     }
@@ -265,8 +249,8 @@ class _LoggingInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    logMessage('❌ ${err.response?.statusCode} ${err.requestOptions.path}: ${err.message}', 
-      category: 'API', level: LogLevel.error);
+    logMessage('❌ ${err.response?.statusCode} ${err.requestOptions.path}: ${err.message}',
+        category: 'API', level: LogLevel.error);
     if (err.response?.data != null) {
       logMessage('📦 Error data: ${err.response?.data}', category: 'API', level: LogLevel.error);
     }

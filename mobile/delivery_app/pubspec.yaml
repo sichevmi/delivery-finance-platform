@@ -16,24 +16,15 @@ dependencies:
   
   # ===== NETWORK =====
   dio: ^5.4.0
-  http: ^1.1.0
-  
-  # ===== STORAGE =====
   flutter_secure_storage: ^9.0.0
-  shared_preferences: ^2.2.2
-  
-  # ===== DATABASE (Drift) =====
-  drift: ^2.14.0
-  drift_flutter: ^0.1.0
-  sqlite3_flutter_libs: ^0.5.0
-  path_provider: ^2.1.0
-  path: ^1.9.0
+  http: ^1.1.0
   
   # ===== GPS & LOCATION =====
   geolocator: ^8.0.1
   permission_handler: ^10.2.0
   flutter_foreground_task: ^8.17.0
   device_info_plus: ^11.2.2
+  shared_preferences: ^2.2.2
 
     # Logging
   flutter_logs: ^2.0.10
@@ -45,9 +36,6 @@ dependencies:
   intl: ^0.19.0
   email_validator: ^2.1.17
   logger: ^2.0.2
-  
-  # ===== CONNECTIVITY =====
-  connectivity_plus: ^5.0.0
   
   # ===== JSON =====
   json_annotation: ^4.8.0

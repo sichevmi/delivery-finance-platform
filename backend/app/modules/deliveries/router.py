@@ -14,7 +14,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-# ===== НОВЫЕ ЭНДПОИНТЫ ДЛЯ СИНХРОНИЗАЦИИ =====
+# ============================================================
+# 1. ЭНДПОИНТЫ ДЛЯ СИНХРОНИЗАЦИИ (ОСТАЮТСЯ)
+# ============================================================
 
 @router.post("/sync/shifts")
 async def sync_shifts(
@@ -115,7 +117,9 @@ async def get_sync_status(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ===== НОВЫЕ ЭНДПОИНТЫ ДЛЯ ЗАГРУЗКИ ДАННЫХ =====
+# ============================================================
+# 2. ЭНДПОИНТЫ ДЛЯ ЗАГРУЗКИ ДАННЫХ ЗА СЕГОДНЯ (ОСТАЮТСЯ)
+# ============================================================
 
 @router.get("/sync/today")
 async def get_today_data(
@@ -209,7 +213,9 @@ async def get_today_data(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ===== НОВЫЕ ЭНДПОИНТЫ ДЛЯ СПРАВОЧНИКОВ =====
+# ============================================================
+# 3. ЭНДПОИНТЫ ДЛЯ СПРАВОЧНИКОВ (ОСТАЮТСЯ)
+# ============================================================
 
 @router.get("/directories")
 async def get_directories(
@@ -492,4 +498,190 @@ async def update_x5_settings(
             }
     except Exception as e:
         logger.error(f"❌ Ошибка обновления X5 настроек: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
+# 4. НОВЫЕ ЭНДПОИНТЫ ДЛЯ УПРАВЛЕНИЯ СМЕНАМИ И ЗАКАЗАМИ
+# ============================================================
+
+@router.post("/shifts/start")
+async def start_shift(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Начать новую смену"""
+    try:
+        # Проверяем, нет ли уже активной смены
+        existing = db.query(Shift).filter(
+            Shift.user_id == current_user.id,
+            Shift.status == 'active'
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Уже есть активная смена")
+
+        shift = Shift(
+            user_id=current_user.id,
+            start_time=datetime.utcnow().isoformat(),
+            status='active',
+            total_paid_distance=0.0,
+            total_idle_distance=0.0,
+            orders_count=0,
+            total_income=0.0,
+            total_expenses=0.0,
+            net_profit=0.0,
+            duration_seconds=0,
+            is_synced=True,
+            synced_at=datetime.utcnow(),
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        db.add(shift)
+        db.commit()
+        db.refresh(shift)
+        return {
+            "id": shift.id,
+            "startTime": shift.start_time,
+            "status": shift.status,
+            "totalPaidDistance": shift.total_paid_distance,
+            "totalIdleDistance": shift.total_idle_distance,
+            "ordersCount": shift.orders_count,
+            "totalIncome": shift.total_income,
+            "totalExpenses": shift.total_expenses,
+            "netProfit": shift.net_profit,
+            "durationSeconds": shift.duration_seconds
+        }
+    except Exception as e:
+        logger.error(f"❌ Ошибка начала смены: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/shifts/{shift_id}/complete")
+async def complete_shift(
+    shift_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Завершить смену"""
+    try:
+        shift = db.query(Shift).filter(
+            Shift.id == shift_id,
+            Shift.user_id == current_user.id
+        ).first()
+        if not shift:
+            raise HTTPException(status_code=404, detail="Смена не найдена")
+        if shift.status == 'completed':
+            raise HTTPException(status_code=400, detail="Смена уже завершена")
+
+        shift.status = 'completed'
+        shift.end_time = datetime.utcnow().isoformat()
+        # Пересчитываем длительность
+        if shift.start_time:
+            start = datetime.fromisoformat(shift.start_time)
+            end = datetime.fromisoformat(shift.end_time)
+            shift.duration_seconds = int((end - start).total_seconds())
+        shift.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(shift)
+        return {"status": "ok", "shift": {"id": shift.id, "status": "completed"}}
+    except Exception as e:
+        logger.error(f"❌ Ошибка завершения смены: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/orders")
+async def create_order(
+    data: Dict[str, Any],
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Создать новый заказ"""
+    try:
+        # Проверяем активную смену
+        shift = db.query(Shift).filter(
+            Shift.user_id == current_user.id,
+            Shift.status == 'active'
+        ).first()
+        if not shift:
+            raise HTTPException(status_code=400, detail="Нет активной смены")
+
+        order = Order(
+            user_id=current_user.id,
+            shift_id=shift.id,
+            service_name=data.get("serviceName", "Заказ"),
+            coefficient=data.get("coefficient", 1.0),
+            delivery_number=data.get("deliveryNumber", 1),
+            total_paid_distance=data.get("totalPaidDistance", 0.0),
+            total_income=data.get("totalIncome", 0.0),
+            total_expenses=data.get("totalExpenses", 0.0),
+            net_profit=data.get("netProfit", 0.0),
+            total_time_seconds=data.get("totalTimeSeconds", 0),
+            status='active',
+            is_synced=True,
+            synced_at=datetime.utcnow(),
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        db.add(order)
+        db.commit()
+        db.refresh(order)
+
+        # Обновляем счётчики в смене
+        shift.orders_count += 1
+        shift.total_income += order.total_income
+        shift.total_expenses += order.total_expenses
+        shift.net_profit += order.net_profit
+        shift.total_paid_distance += order.total_paid_distance
+        shift.updated_at = datetime.utcnow()
+        db.commit()
+
+        return {
+            "id": order.id,
+            "shiftId": order.shift_id,
+            "serviceName": order.service_name,
+            "coefficient": order.coefficient,
+            "deliveryNumber": order.delivery_number,
+            "totalPaidDistance": order.total_paid_distance,
+            "totalIncome": order.total_income,
+            "totalExpenses": order.total_expenses,
+            "netProfit": order.net_profit,
+            "totalTimeSeconds": order.total_time_seconds,
+            "status": order.status,
+        }
+    except Exception as e:
+        logger.error(f"❌ Ошибка создания заказа: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/orders/{order_id}/complete")
+async def complete_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Завершить заказ"""
+    try:
+        order = db.query(Order).filter(
+            Order.id == order_id,
+            Order.user_id == current_user.id
+        ).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Заказ не найден")
+        if order.status == 'completed':
+            raise HTTPException(status_code=400, detail="Заказ уже завершён")
+
+        order.status = 'completed'
+        order.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(order)
+
+        # Пересчитываем смену (можно оставить как есть)
+        shift = db.query(Shift).filter(Shift.id == order.shift_id).first()
+        if shift:
+            shift.updated_at = datetime.utcnow()
+            db.commit()
+
+        return {"status": "ok", "order": {"id": order.id, "status": "completed"}}
+    except Exception as e:
+        logger.error(f"❌ Ошибка завершения заказа: {e}")
         raise HTTPException(status_code=500, detail=str(e))
