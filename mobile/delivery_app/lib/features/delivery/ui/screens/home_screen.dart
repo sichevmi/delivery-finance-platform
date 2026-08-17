@@ -247,6 +247,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                 ),
               ],
             ),
+            const SizedBox(height: 6),
+
+            // Нижняя строка: Холостой пробег и Время простоя
+            Row(
+              children: [
+                _IdleDistanceDisplay(
+                  shiftState: shiftState,
+                  label: 'Холостой пробег',
+                  color: Colors.red,
+                ),
+                const SizedBox(width: 6),
+                _IdleTimeDisplay(
+                  shiftState: shiftState,
+                  label: 'Время простоя',
+                  color: Colors.red.shade300,
+                ),
+                const Spacer(),
+              ],
+            ),
             const Spacer(),
 
             // Кнопка начала/остановки смены
@@ -413,7 +432,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 }
 
 // ============================================================
-// ВИДЖЕТ ДЛЯ ВРЕМЕНИ РАБОТЫ (оставлен, работает без изменений)
+// ВИДЖЕТ ДЛЯ ВРЕМЕНИ РАБОТЫ
 // ============================================================
 class _TimeDisplay extends StatefulWidget {
   final ShiftState shiftState;
@@ -525,5 +544,213 @@ class _TimeDisplayState extends State<_TimeDisplay> {
     final minutes = duration.inMinutes.remainder(60);
     final seconds = duration.inSeconds.remainder(60);
     return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+}
+
+// ============================================================
+// ВИДЖЕТ ДЛЯ ВРЕМЕНИ ПРОСТОЯ
+// ============================================================
+class _IdleTimeDisplay extends StatefulWidget {
+  final ShiftState shiftState;
+  final String label;
+  final Color color;
+
+  const _IdleTimeDisplay({
+    required this.shiftState,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  State<_IdleTimeDisplay> createState() => _IdleTimeDisplayState();
+}
+
+class _IdleTimeDisplayState extends State<_IdleTimeDisplay> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant _IdleTimeDisplay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.shiftState.isActive != oldWidget.shiftState.isActive ||
+        widget.shiftState.isOnOrder != oldWidget.shiftState.isOnOrder) {
+      _startTimer();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    if (widget.shiftState.isActive && !widget.shiftState.isOnOrder) {
+      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        setState(() {});
+      });
+    } else {
+      setState(() {});
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String formattedTime;
+    if (widget.shiftState.isActive && 
+        !widget.shiftState.isOnOrder && 
+        widget.shiftState.idleStartTime != null) {
+      final now = DateTime.now();
+      final duration = widget.shiftState.totalIdleTime + 
+          now.difference(widget.shiftState.idleStartTime!);
+      formattedTime = _formatDuration(duration);
+    } else {
+      formattedTime = _formatDuration(widget.shiftState.totalIdleTime);
+    }
+
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E1E),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFF2C2C2C)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              formattedTime,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: widget.color,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              widget.label,
+              style: const TextStyle(
+                fontSize: 9,
+                color: Color(0xFF888888),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDuration(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+}
+
+// ============================================================
+// ВИДЖЕТ ДЛЯ ХОЛОСТОГО ПРОБЕГА
+// ============================================================
+class _IdleDistanceDisplay extends StatefulWidget {
+  final ShiftState shiftState;
+  final String label;
+  final Color color;
+
+  const _IdleDistanceDisplay({
+    required this.shiftState,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  State<_IdleDistanceDisplay> createState() => _IdleDistanceDisplayState();
+}
+
+class _IdleDistanceDisplayState extends State<_IdleDistanceDisplay> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant _IdleDistanceDisplay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.shiftState.isActive != oldWidget.shiftState.isActive ||
+        widget.shiftState.isOnOrder != oldWidget.shiftState.isOnOrder) {
+      _startTimer();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    if (widget.shiftState.isActive && !widget.shiftState.isOnOrder) {
+      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        setState(() {});
+      });
+    } else {
+      setState(() {});
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final distance = widget.shiftState.totalIdleDistance;
+    final formattedDistance = distance.toStringAsFixed(1);
+
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E1E),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFF2C2C2C)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${formattedDistance} км',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: widget.color,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              widget.label,
+              style: const TextStyle(
+                fontSize: 9,
+                color: Color(0xFF888888),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

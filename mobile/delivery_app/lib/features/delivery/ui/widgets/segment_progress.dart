@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:delivery_app/logger.dart';
 
 class SegmentProgress extends StatelessWidget {
   final int currentSegment;
   final List<String> segments = const ['В магазин', 'Получение', 'К клиенту', 'Выдача'];
 
-  SegmentProgress({required this.currentSegment});
+  const SegmentProgress({super.key, required this.currentSegment});
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +21,7 @@ class SegmentProgress extends StatelessWidget {
                     child: Container(
                       height: 2,
                       decoration: BoxDecoration(
-                        color: isCompleted || isActive ? Color(0xFF6C63FF) : Color(0xFF2C2C2C),
+                        color: isCompleted || isActive ? const Color(0xFF6C63FF) : const Color(0xFF2C2C2C),
                       ),
                     ),
                   ),
@@ -38,10 +37,10 @@ class SegmentProgress extends StatelessWidget {
                     height: 22,
                     decoration: BoxDecoration(
                       color: isActive
-                          ? Color(0xFF6C63FF)
+                          ? const Color(0xFF6C63FF)
                           : isCompleted
-                              ? Color(0xFF6C63FF).withOpacity(0.3)
-                              : Color(0xFF2C2C2C),
+                              ? const Color(0xFF6C63FF).withOpacity(0.3)
+                              : const Color(0xFF2C2C2C),
                       shape: BoxShape.circle,
                     ),
                     child: Center(
@@ -50,7 +49,7 @@ class SegmentProgress extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: isActive || isCompleted ? Colors.white : Color(0xFF888888),
+                          color: isActive || isCompleted ? Colors.white : const Color(0xFF888888),
                         ),
                       ),
                     ),
@@ -60,7 +59,7 @@ class SegmentProgress extends StatelessWidget {
                     segments[index],
                     style: TextStyle(
                       fontSize: 10,
-                      color: isActive || isCompleted ? Colors.white : Color(0xFF888888),
+                      color: isActive || isCompleted ? Colors.white : const Color(0xFF888888),
                       fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
                     ),
                   ),

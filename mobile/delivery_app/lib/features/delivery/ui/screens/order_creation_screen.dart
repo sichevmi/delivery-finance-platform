@@ -255,25 +255,24 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
   }
 
   void _goToRoute() {
-  final coefficient = _isCustomCoefficient
-      ? double.tryParse(_customCoefficientController.text) ?? 1.0
-      : _selectedCoefficient;
+    final coefficient = _isCustomCoefficient
+        ? double.tryParse(_customCoefficientController.text) ?? 1.0
+        : _selectedCoefficient;
 
-  logMessage('🟢 OrderCreationScreen: переход с coefficient=$coefficient, segmentIndex=0');
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => OrderRouteScreen(
-        serviceName: widget.serviceName,
-        coefficient: coefficient,
-        segmentIndex: 0, // <-- ДОЛЖНО БЫТЬ 0
+    logMessage('🟢 OrderCreationScreen: переход с coefficient=$coefficient, segmentIndex=0');
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => OrderRouteScreen(
+          serviceName: widget.serviceName,
+          coefficient: coefficient,
+          segmentIndex: 0,
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   void _cancelOrder() {
-    // Возврат на вкладку "Заказы"
     Navigator.pop(context);
   }
 }

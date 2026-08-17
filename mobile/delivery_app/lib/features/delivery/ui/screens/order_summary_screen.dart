@@ -323,7 +323,6 @@ class OrderSummaryScreen extends ConsumerWidget {
                       child: ElevatedButton(
                         onPressed: () {
                           logMessage('🟢 Нажата кнопка "Завершить заказ"');
-                          // ===== ОБНОВЛЯЕМ СТАТИСТИКУ =====
                           ref.invalidate(dailyStatsProvider);
                           logMessage('📊 Статистика обновлена', category: 'STATS');
                           Navigator.pop(context, false);

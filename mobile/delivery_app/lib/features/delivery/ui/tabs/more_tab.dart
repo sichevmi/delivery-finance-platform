@@ -11,9 +11,6 @@ import 'package:delivery_app/features/delivery/providers/daily_stats_provider.da
 import 'package:delivery_app/features/delivery/providers/shift_provider.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
-// ============================================================
-// Экран для просмотра логов (без изменений)
-// ============================================================
 class LogsScreen extends ConsumerStatefulWidget {
   const LogsScreen({super.key});
 
@@ -200,9 +197,6 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
   }
 }
 
-// ============================================================
-// Основная вкладка "Ещё"
-// ============================================================
 class MoreTab extends ConsumerStatefulWidget {
   const MoreTab({super.key});
 
@@ -212,7 +206,7 @@ class MoreTab extends ConsumerStatefulWidget {
 
 class _MoreTabState extends ConsumerState<MoreTab> {
   bool _isLoggingEnabled = false;
-  bool _isLoading = false; // для индикации загрузки данных
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -222,9 +216,7 @@ class _MoreTabState extends ConsumerState<MoreTab> {
     });
   }
 
-  void _checkLoggingStatus() {
-    // Статус логирования в GpsService
-  }
+  void _checkLoggingStatus() {}
 
   @override
   Widget build(BuildContext context) {
@@ -254,7 +246,6 @@ class _MoreTabState extends ConsumerState<MoreTab> {
           _buildUserCard(authState),
           const SizedBox(height: 24),
 
-          // ===== НОВАЯ СЕКЦИЯ "ДАННЫЕ" =====
           const Text(
             'Данные',
             style: TextStyle(
@@ -293,9 +284,8 @@ class _MoreTabState extends ConsumerState<MoreTab> {
               onTap: _isLoading ? null : _refreshData,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 24),
 
-          // ===== СЕКЦИЯ "НАСТРОЙКИ" (без изменений) =====
           const Text(
             'Настройки',
             style: TextStyle(
@@ -342,7 +332,6 @@ class _MoreTabState extends ConsumerState<MoreTab> {
           ),
           const SizedBox(height: 24),
 
-          // ===== СЕКЦИЯ "ЛОГИРОВАНИЕ" (без изменений) =====
           const Text(
             'Логирование',
             style: TextStyle(
@@ -461,7 +450,6 @@ class _MoreTabState extends ConsumerState<MoreTab> {
 
           const SizedBox(height: 24),
 
-          // ===== СЕКЦИЯ "О ПРИЛОЖЕНИИ" (без изменений) =====
           const Text(
             'О приложении',
             style: TextStyle(
@@ -527,7 +515,6 @@ class _MoreTabState extends ConsumerState<MoreTab> {
     );
   }
 
-  // ===== ВСПОМОГАТЕЛЬНЫЙ ВИДЖЕТ КАРТОЧКИ ПОЛЬЗОВАТЕЛЯ =====
   Widget _buildUserCard(AuthState authState) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -580,16 +567,13 @@ class _MoreTabState extends ConsumerState<MoreTab> {
     );
   }
 
-  // ===== МЕТОД ОБНОВЛЕНИЯ ДАННЫХ С СЕРВЕРА =====
   Future<void> _refreshData() async {
     setState(() => _isLoading = true);
     try {
       final apiService = ApiService();
       await apiService.loadAllData();
-      // Обновляем провайдеры
       ref.invalidate(dailyStatsProvider);
-      // Принудительно обновляем смену (если есть)
-      ref.read(shiftProvider.notifier);
+      ref.read(shiftProvider.notifier).loadFromCache();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -615,8 +599,6 @@ class _MoreTabState extends ConsumerState<MoreTab> {
     }
   }
 
-  // ===== ОСТАЛЬНЫЕ МЕТОДЫ (без изменений) =====
-  
   void _toggleLogging(GpsService gpsService) async {
     setState(() {
       _isLoggingEnabled = !_isLoggingEnabled;

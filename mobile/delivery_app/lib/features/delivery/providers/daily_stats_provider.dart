@@ -2,6 +2,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:delivery_app/logger.dart';
 import 'package:delivery_app/core/services/api_service.dart';
+import 'package:delivery_app/features/delivery/providers/shift_provider.dart';
 
 class DailyStats {
   final double totalPaidDistance;
@@ -95,7 +96,9 @@ final dailyStatsProvider = FutureProvider<DailyStats>((ref) {
 });
 
 Future<DailyStats> _calculateDailyStats(Ref ref) async {
-  final cache = ApiService().cache;
+  final apiService = ApiService();
+  final cache = apiService.cache;
+  final shiftState = ref.watch(shiftProvider);
 
   // Считаем из кэша
   int ordersCount = cache.todayOrders.length;
@@ -118,10 +121,16 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
   double totalIdle = 0.0;
   Duration totalIdleTime = Duration.zero;
 
-  if (cache.activeShift != null) {
-    totalWorkTime = cache.activeShift!.duration ?? Duration.zero;
-    totalIdle = cache.activeShift!.totalIdleDistance;
-    // Время простоя пока не хранится отдельно, можно добавить позже
+  if (shiftState.isActive) {
+    totalWorkTime = shiftState.workTime;
+    totalIdle = shiftState.totalIdleDistance;
+    totalIdleTime = shiftState.totalIdleTimeDisplay;
+  } else {
+    // Если смена не активна, берём данные из кэша
+    if (cache.activeShift != null) {
+      totalWorkTime = cache.activeShift!.duration ?? Duration.zero;
+      totalIdle = cache.activeShift!.totalIdleDistance;
+    }
   }
 
   logMessage('📊 Дневная статистика: заказов=$ordersCount, пробег=$totalPaid, доход=$totalIncome', category: 'STATS');

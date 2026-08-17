@@ -16,18 +16,24 @@ class WeightInput extends StatefulWidget {
 
 class _WeightInputState extends State<WeightInput> {
   late TextEditingController _controller;
+  bool _isTyping = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.initialWeight.toString());
+    // Не устанавливаем значение по умолчанию — оставляем пустым
+    _controller = TextEditingController(text: '');
   }
 
   @override
   void didUpdateWidget(WeightInput oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.initialWeight != widget.initialWeight) {
-      _controller.text = widget.initialWeight.toString();
+    // Обновляем только если не в процессе ввода
+    if (!_isTyping && widget.initialWeight > 0) {
+      final newText = widget.initialWeight.toString();
+      if (_controller.text != newText) {
+        _controller.text = newText;
+      }
     }
   }
 
@@ -39,8 +45,6 @@ class _WeightInputState extends State<WeightInput> {
 
   @override
   Widget build(BuildContext context) {
-    final isValid = double.tryParse(_controller.text.replaceAll(',', '.')) != null;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -55,7 +59,7 @@ class _WeightInputState extends State<WeightInput> {
                   color: const Color(0xFF1E1E1E),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: isValid ? const Color(0xFF6C63FF) : const Color(0xFF2C2C2C),
+                    color: _controller.text.isNotEmpty ? const Color(0xFF6C63FF) : const Color(0xFF2C2C2C),
                     width: 1,
                   ),
                 ),
@@ -79,16 +83,20 @@ class _WeightInputState extends State<WeightInput> {
                               hintStyle: TextStyle(color: Color(0xFF666666)),
                             ),
                             onChanged: (value) {
+                              _isTyping = true;
                               final parsed = double.tryParse(value.replaceAll(',', '.'));
                               if (parsed != null && parsed > 0) {
                                 widget.onWeightChanged(parsed);
                               }
+                              Future.delayed(const Duration(milliseconds: 500), () {
+                                _isTyping = false;
+                              });
                             },
                           ),
                         ],
                       ),
                     ),
-                    if (isValid)
+                    if (_controller.text.isNotEmpty)
                       const Icon(Icons.check_circle, size: 16, color: Colors.green),
                   ],
                 ),

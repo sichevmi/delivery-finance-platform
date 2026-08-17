@@ -15,6 +15,7 @@ class SettingsState {
   final double pricePerKm;
   final double baseCoefficient;
   final bool isSynced;
+  final int version;
 
   SettingsState({
     this.fuelConsumption = 10.0,
@@ -27,6 +28,7 @@ class SettingsState {
     this.pricePerKm = 10.0,
     this.baseCoefficient = 1.0,
     this.isSynced = true,
+    this.version = 1,
   });
 
   SettingsState copyWith({
@@ -40,6 +42,7 @@ class SettingsState {
     double? pricePerKm,
     double? baseCoefficient,
     bool? isSynced,
+    int? version,
   }) {
     return SettingsState(
       fuelConsumption: fuelConsumption ?? this.fuelConsumption,
@@ -52,6 +55,7 @@ class SettingsState {
       pricePerKm: pricePerKm ?? this.pricePerKm,
       baseCoefficient: baseCoefficient ?? this.baseCoefficient,
       isSynced: isSynced ?? this.isSynced,
+      version: version ?? this.version,
     );
   }
 }
@@ -80,6 +84,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       pricePerKg: cache.pricing.pricePerKg,
       pricePerKm: cache.pricing.pricePerKm,
       baseCoefficient: cache.pricing.baseCoefficient,
+      version: cache.settings.version,
       isSynced: true,
     );
   }
@@ -87,32 +92,32 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   Future<void> saveSettings() async {
     try {
       // Сохраняем настройки
-      final settingsResponse = await _apiService.apiClient.updateSettings({
+      await _apiService.apiClient.updateSettings({
         'fuelConsumption': state.fuelConsumption,
         'fuelPrice': state.fuelPrice,
         'repairCost': state.repairCost,
         'additionalCosts': state.additionalCosts,
+        'version': state.version,
       });
-      if (settingsResponse['status'] == 'success') {
-        _apiService.cache.settings = Settings.fromJson(settingsResponse['settings']);
-      }
 
       // Сохраняем тарифы
-      final pricingResponse = await _apiService.apiClient.updatePricing({
+      await _apiService.apiClient.updatePricing({
         'receivingFee': state.receivingFee,
         'deliveryFee': state.deliveryFee,
         'pricePerKg': state.pricePerKg,
         'pricePerKm': state.pricePerKm,
         'baseCoefficient': state.baseCoefficient,
       });
-      if (pricingResponse['status'] == 'success') {
-        _apiService.cache.pricing = PricingConfig.fromJson(pricingResponse['pricing']);
-      }
+
+      // Перезагружаем данные
+      await _apiService.loadAllData();
+      _loadFromCache();
 
       state = state.copyWith(isSynced: true);
       logMessage('✅ Настройки сохранены на сервере', category: 'SETTINGS');
     } catch (e) {
       logMessage('❌ Ошибка сохранения настроек: $e', category: 'SETTINGS', level: LogLevel.error);
+      state = state.copyWith(isSynced: false);
     }
   }
 

@@ -55,11 +55,13 @@ class _ExpensesDirectoryState extends ConsumerState<ExpensesDirectory> {
     final settings = ref.watch(settingsProvider);
     final notifier = ref.read(settingsProvider.notifier);
 
+    // Обновляем текст только если контроллер не в фокусе
     _updateControllerIfNeeded(_fuelPriceController, _fuelPriceFocusNode, settings.fuelPrice.toStringAsFixed(2));
     _updateControllerIfNeeded(_fuelConsumptionController, _fuelConsumptionFocusNode, settings.fuelConsumption.toStringAsFixed(1));
     _updateControllerIfNeeded(_repairCostController, _repairCostFocusNode, settings.repairCost.toStringAsFixed(2));
     _updateControllerIfNeeded(_additionalCostsController, _additionalCostsFocusNode, settings.additionalCosts.toStringAsFixed(2));
 
+    // Вычисляемые значения
     final consumptionPerKm = settings.fuelConsumption / 100;
     final fuelCostPerKm = consumptionPerKm * settings.fuelPrice;
 
@@ -165,7 +167,7 @@ class _ExpensesDirectoryState extends ConsumerState<ExpensesDirectory> {
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('✅ Данные сохранены в БД'),
+                    content: Text('✅ Данные сохранены на сервере'),
                     backgroundColor: Colors.green,
                   ),
                 );
@@ -219,7 +221,14 @@ class _ExpensesDirectoryState extends ConsumerState<ExpensesDirectory> {
                     fontSize: 11,
                   ),
                 ),
-                // Убрана строка с ID, так как в SettingsState нет поля settingsId
+                const Spacer(),
+                Text(
+                  'Версия: ${settings.version ?? 1}',
+                  style: const TextStyle(
+                    color: Color(0xFF666666),
+                    fontSize: 10,
+                  ),
+                ),
               ],
             ),
           ),
@@ -270,7 +279,7 @@ class _ExpensesDirectoryState extends ConsumerState<ExpensesDirectory> {
                   if (success && mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('✅ Сохранено в БД'),
+                        content: Text('✅ Сохранено на сервере'),
                         duration: Duration(seconds: 1),
                         backgroundColor: Colors.green,
                       ),
@@ -304,7 +313,7 @@ class _ExpensesDirectoryState extends ConsumerState<ExpensesDirectory> {
                     if (success && mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('✅ Сохранено в БД'),
+                          content: Text('✅ Сохранено на сервере'),
                           duration: Duration(seconds: 1),
                           backgroundColor: Colors.green,
                         ),

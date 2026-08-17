@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 class GpsControl extends StatefulWidget {
   final bool useGps;
   final double distance;
+  final double gpsDistance; // <-- НОВОЕ: расстояние от GPS
   final bool isPaused;
   final VoidCallback onToggleGpsMode;
   final ValueChanged<double> onManualDistanceChanged;
@@ -12,6 +13,7 @@ class GpsControl extends StatefulWidget {
     super.key,
     required this.useGps,
     required this.distance,
+    required this.gpsDistance,
     required this.isPaused,
     required this.onToggleGpsMode,
     required this.onManualDistanceChanged,
@@ -24,18 +26,38 @@ class GpsControl extends StatefulWidget {
 
 class _GpsControlState extends State<GpsControl> {
   final TextEditingController _manualController = TextEditingController();
+  bool _isTyping = false;
 
   @override
   void initState() {
     super.initState();
-    _manualController.text = widget.distance.toStringAsFixed(2);
+    _manualController.text = '';
   }
 
   @override
   void didUpdateWidget(GpsControl oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.distance != widget.distance && !widget.useGps) {
-      _manualController.text = widget.distance.toStringAsFixed(2);
+    
+    // Если переключились с GPS на ручной — очищаем поле
+    if (!widget.useGps && oldWidget.useGps) {
+      _manualController.text = '';
+      _isTyping = false;
+      return;
+    }
+    
+    // Если переключились с ручного на GPS — очищаем ручное поле
+    if (widget.useGps && !oldWidget.useGps) {
+      _manualController.text = '';
+      _isTyping = false;
+      return;
+    }
+    
+    // Обновляем только если не в процессе ввода и в ручном режиме
+    if (!_isTyping && !widget.useGps && widget.distance > 0) {
+      final newText = widget.distance.toStringAsFixed(2);
+      if (_manualController.text != newText) {
+        _manualController.text = newText;
+      }
     }
   }
 
@@ -47,6 +69,9 @@ class _GpsControlState extends State<GpsControl> {
 
   @override
   Widget build(BuildContext context) {
+    // Показываем расстояние в зависимости от режима
+    final displayDistance = widget.useGps ? widget.gpsDistance : widget.distance;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
@@ -56,9 +81,23 @@ class _GpsControlState extends State<GpsControl> {
       ),
       child: Row(
         children: [
-          _buildToggleButton('GPS', widget.useGps, widget.onToggleGpsMode),
+          _buildToggleButton('GPS', widget.useGps, () {
+            widget.onToggleGpsMode();
+            // При переключении на GPS очищаем ручное поле
+            if (!widget.useGps) {
+              _manualController.text = '';
+              _isTyping = false;
+            }
+          }),
           const SizedBox(width: 6),
-          _buildToggleButton('Вручную', !widget.useGps, widget.onToggleGpsMode),
+          _buildToggleButton('Вручную', !widget.useGps, () {
+            widget.onToggleGpsMode();
+            // При переключении на ручной ввод очищаем поле
+            if (widget.useGps) {
+              _manualController.text = '';
+              _isTyping = false;
+            }
+          }),
           const Spacer(),
           if (widget.useGps)
             Row(
@@ -66,7 +105,7 @@ class _GpsControlState extends State<GpsControl> {
                 const Icon(Icons.straighten, size: 16, color: Color(0xFF6C63FF)),
                 const SizedBox(width: 4),
                 Text(
-                  '${widget.distance.toStringAsFixed(2)} км',
+                  '${displayDistance.toStringAsFixed(2)} км',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -93,10 +132,14 @@ class _GpsControlState extends State<GpsControl> {
                   hintStyle: TextStyle(color: Color(0xFF666666)),
                 ),
                 onChanged: (value) {
+                  _isTyping = true;
                   final parsed = double.tryParse(value.replaceAll(',', '.'));
                   if (parsed != null && parsed >= 0) {
                     widget.onManualDistanceChanged(parsed);
                   }
+                  Future.delayed(const Duration(milliseconds: 500), () {
+                    _isTyping = false;
+                  });
                 },
               ),
             ),

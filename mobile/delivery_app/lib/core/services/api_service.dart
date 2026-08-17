@@ -101,18 +101,27 @@ class ApiService {
   }
 
   // Заказ
-  Future<Order> createOrder(Map<String, dynamic> data) async {
-    try {
-      final response = await _apiClient.createOrder(data);
-      final order = Order.fromJson(response);
-      _cache.todayOrders.add(order);
-      logMessage('✅ Заказ создан на сервере', category: 'API');
-      return order;
-    } catch (e) {
-      logMessage('❌ Ошибка создания заказа: $e', category: 'API', level: LogLevel.error);
-      rethrow;
+  // В ApiService классе, метод createOrder:
+
+Future<Order> createOrder(Map<String, dynamic> data) async {
+  try {
+    final response = await _apiClient.createOrder(data);
+    final order = Order.fromJson(response);
+    _cache.todayOrders.add(order);
+    
+    // Если есть доставки — добавляем их в кэш (опционально)
+    final deliveries = data['deliveries'] as List?;
+    if (deliveries != null) {
+      logMessage('📦 Создано ${deliveries.length} доставок для заказа ${order.id}', category: 'API');
     }
+    
+    logMessage('✅ Заказ создан на сервере', category: 'API');
+    return order;
+  } catch (e) {
+    logMessage('❌ Ошибка создания заказа: $e', category: 'API', level: LogLevel.error);
+    rethrow;
   }
+}
 
   Future<void> completeOrder(int orderId) async {
     try {

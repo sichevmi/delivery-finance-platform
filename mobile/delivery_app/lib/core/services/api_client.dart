@@ -108,15 +108,33 @@ class ApiClient {
 
   // ===== ЗАКАЗЫ =====
 
-  Future<Map<String, dynamic>> createOrder(Map<String, dynamic> data) async {
-    try {
-      final response = await _dio.post('/orders', data: data);
-      return response.data;
-    } catch (e) {
-      logMessage('⚠️ Ошибка создания заказа: $e', category: 'API', level: LogLevel.error);
-      rethrow;
-    }
+  // В ApiClient классе, метод createOrder:
+
+Future<Map<String, dynamic>> createOrder(Map<String, dynamic> data) async {
+  try {
+    // Формируем тело запроса с доставками
+    final requestData = {
+      'serviceName': data['serviceName'],
+      'coefficient': data['coefficient'],
+      'deliveryNumber': data['deliveryNumber'],
+      'totalPaidDistance': data['totalPaidDistance'],
+      'totalIncome': data['totalIncome'],
+      'totalExpenses': data['totalExpenses'],
+      'netProfit': data['netProfit'],
+      'totalTimeSeconds': data['totalTimeSeconds'],
+      'deliveries': data['deliveries'] ?? [], // ← доставки
+    };
+    
+    final response = await _dio.post(
+      '/orders',
+      data: requestData,
+    );
+    return response.data;
+  } catch (e) {
+    logMessage('⚠️ Ошибка создания заказа: $e', category: 'API', level: LogLevel.error);
+    rethrow;
   }
+}
 
   Future<Map<String, dynamic>> completeOrder(int orderId) async {
     try {

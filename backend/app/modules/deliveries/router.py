@@ -6,7 +6,6 @@ import logging
 
 from app.core.database import get_db
 from app.modules.users.dependencies import get_current_user
-from app.modules.deliveries.services import DeliveryService
 from app.modules.deliveries.models import Shift, Order, Delivery
 from sqlalchemy import func
 
@@ -15,110 +14,7 @@ router = APIRouter()
 
 
 # ============================================================
-# 1. ЭНДПОИНТЫ ДЛЯ СИНХРОНИЗАЦИИ (ОСТАЮТСЯ)
-# ============================================================
-
-@router.post("/sync/shifts")
-async def sync_shifts(
-    data: Dict[str, List[Dict[str, Any]]],
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
-):
-    """Синхронизация смен с мобильного приложения"""
-    try:
-        service = DeliveryService(db)
-        shifts_data = data.get("shifts", [])
-        if not shifts_data:
-            return {"synced": [], "total": 0, "message": "Нет данных для синхронизации"}
-        
-        result = await service.sync_shifts(shifts_data, current_user.id)
-        return {
-            "synced": result,
-            "total": len(shifts_data),
-            "status": "success"
-        }
-    except Exception as e:
-        logger.error(f"❌ Ошибка синхронизации смен: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/sync/orders")
-async def sync_orders(
-    data: Dict[str, List[Dict[str, Any]]],
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
-):
-    """Синхронизация заказов с мобильного приложения"""
-    try:
-        service = DeliveryService(db)
-        orders_data = data.get("orders", [])
-        if not orders_data:
-            return {"synced": [], "total": 0, "message": "Нет данных для синхронизации"}
-        
-        result = await service.sync_orders(orders_data, current_user.id)
-        return {
-            "synced": result,
-            "total": len(orders_data),
-            "status": "success"
-        }
-    except Exception as e:
-        logger.error(f"❌ Ошибка синхронизации заказов: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/sync/settings")
-async def sync_settings(
-    data: Dict[str, Any],
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
-):
-    """Синхронизация настроек"""
-    try:
-        service = DeliveryService(db)
-        result = await service.sync_settings(data, current_user.id)
-        return result
-    except Exception as e:
-        logger.error(f"❌ Ошибка синхронизации настроек: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/sync/status")
-async def get_sync_status(
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
-):
-    """Проверка статуса синхронизации"""
-    try:
-        unsynced_shifts = db.query(Shift).filter(
-            Shift.user_id == current_user.id,
-            Shift.is_synced == False
-        ).count()
-        
-        unsynced_orders = db.query(Order).filter(
-            Order.user_id == current_user.id,
-            Order.is_synced == False
-        ).count()
-        
-        unsynced_deliveries = db.query(Delivery).filter(
-            Delivery.order_id.in_(
-                db.query(Order.id).filter(Order.user_id == current_user.id)
-            ),
-            Delivery.is_synced == False
-        ).count()
-        
-        return {
-            "shifts_unsynced": unsynced_shifts,
-            "orders_unsynced": unsynced_orders,
-            "deliveries_unsynced": unsynced_deliveries,
-            "status": "ok"
-        }
-    except Exception as e:
-        logger.error(f"❌ Ошибка получения статуса: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ============================================================
-# 2. ЭНДПОИНТЫ ДЛЯ ЗАГРУЗКИ ДАННЫХ ЗА СЕГОДНЯ (ОСТАЮТСЯ)
+# ЭНДПОИНТЫ ДЛЯ ЗАГРУЗКИ ДАННЫХ
 # ============================================================
 
 @router.get("/sync/today")
@@ -130,19 +26,16 @@ async def get_today_data(
     try:
         today = date.today()
         
-        # Смены за сегодня
         shifts = db.query(Shift).filter(
             Shift.user_id == current_user.id,
             func.date(Shift.created_at) == today
         ).order_by(Shift.created_at.desc()).all()
         
-        # Заказы за сегодня
         orders = db.query(Order).filter(
             Order.user_id == current_user.id,
             func.date(Order.created_at) == today
         ).order_by(Order.created_at.desc()).all()
         
-        # Для каждого заказа получаем доставки
         orders_data = []
         for order in orders:
             deliveries = db.query(Delivery).filter(
@@ -213,10 +106,6 @@ async def get_today_data(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ============================================================
-# 3. ЭНДПОИНТЫ ДЛЯ СПРАВОЧНИКОВ (ОСТАЮТСЯ)
-# ============================================================
-
 @router.get("/directories")
 async def get_directories(
     db: Session = Depends(get_db),
@@ -274,6 +163,245 @@ async def get_directories(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============================================================
+# ЭНДПОИНТЫ ДЛЯ УПРАВЛЕНИЯ СМЕНАМИ
+# ============================================================
+
+@router.post("/shifts/start")
+async def start_shift(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Начать новую смену"""
+    try:
+        existing = db.query(Shift).filter(
+            Shift.user_id == current_user.id,
+            Shift.status == 'active'
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Уже есть активная смена")
+
+        # ===== ИСПРАВЛЕНО: добавляем часовой пояс к строке =====
+        now = datetime.now()
+        # Получаем смещение часового пояса и добавляем его в строку
+        start_time_iso = now.astimezone().isoformat()
+        # Результат: "2026-08-17T13:55:15.490389+03:00"
+        
+        logger.info(f"🕐 [СЕРВЕР] Сохраняем время с часовым поясом: {start_time_iso}")
+
+        shift = Shift(
+            user_id=current_user.id,
+            start_time=start_time_iso,  # строка с +03:00
+            status='active',
+            total_paid_distance=0.0,
+            total_idle_distance=0.0,
+            orders_count=0,
+            total_income=0.0,
+            total_expenses=0.0,
+            net_profit=0.0,
+            duration_seconds=0,
+            is_synced=True,
+            synced_at=datetime.now(),
+            created_at=datetime.now(),
+            updated_at=datetime.now()
+        )
+        db.add(shift)
+        db.commit()
+        db.refresh(shift)
+        
+        logger.info(f"✅ Смена начата: id={shift.id}, time={shift.start_time}")
+        
+        return {
+            "id": shift.id,
+            "startTime": shift.start_time,  # клиент получит строку с +03:00
+            "status": shift.status,
+            "totalPaidDistance": shift.total_paid_distance,
+            "totalIdleDistance": shift.total_idle_distance,
+            "ordersCount": shift.orders_count,
+            "totalIncome": shift.total_income,
+            "totalExpenses": shift.total_expenses,
+            "netProfit": shift.net_profit,
+            "durationSeconds": shift.duration_seconds
+        }
+    except Exception as e:
+        logger.error(f"❌ Ошибка начала смены: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/shifts/{shift_id}/complete")
+async def complete_shift(
+    shift_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Завершить смену"""
+    try:
+        shift = db.query(Shift).filter(
+            Shift.id == shift_id,
+            Shift.user_id == current_user.id
+        ).first()
+        if not shift:
+            raise HTTPException(status_code=404, detail="Смена не найдена")
+        if shift.status == 'completed':
+            raise HTTPException(status_code=400, detail="Смена уже завершена")
+
+        now = datetime.now()
+        # ===== ИСПРАВЛЕНО: добавляем часовой пояс =====
+        end_time_iso = now.astimezone().isoformat()
+        
+        shift.status = 'completed'
+        shift.end_time = end_time_iso
+        
+        # Для расчёта длительности используем datetime объекты
+        if shift.start_time:
+            # Парсим строку с часовым поясом
+            start = datetime.fromisoformat(shift.start_time)
+            shift.duration_seconds = int((now - start).total_seconds())
+        
+        shift.updated_at = datetime.now()
+        db.commit()
+        db.refresh(shift)
+        
+        logger.info(f"✅ Смена завершена: id={shift_id}, duration={shift.duration_seconds} сек")
+        
+        return {"status": "ok", "shift": {"id": shift.id, "status": "completed"}}
+    except Exception as e:
+        logger.error(f"❌ Ошибка завершения смены: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
+# ЭНДПОИНТЫ ДЛЯ ЗАКАЗОВ С ДОСТАВКАМИ
+# ============================================================
+
+@router.post("/orders")
+async def create_order(
+    data: Dict[str, Any],
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Создать новый заказ с доставками"""
+    try:
+        shift = db.query(Shift).filter(
+            Shift.user_id == current_user.id,
+            Shift.status == 'active'
+        ).first()
+        if not shift:
+            raise HTTPException(status_code=400, detail="Нет активной смены")
+
+        now = datetime.now()
+        
+        # Создаём заказ
+        order = Order(
+            user_id=current_user.id,
+            shift_id=shift.id,
+            service_name=data.get("serviceName", "Заказ"),
+            coefficient=data.get("coefficient", 1.0),
+            delivery_number=data.get("deliveryNumber", 1),
+            total_paid_distance=data.get("totalPaidDistance", 0.0),
+            total_income=data.get("totalIncome", 0.0),
+            total_expenses=data.get("totalExpenses", 0.0),
+            net_profit=data.get("netProfit", 0.0),
+            total_time_seconds=data.get("totalTimeSeconds", 0),
+            status='active',
+            is_synced=True,
+            synced_at=now,
+            created_at=now,
+            updated_at=now
+        )
+        db.add(order)
+        db.commit()
+        db.refresh(order)
+
+        # Создаём доставки
+        deliveries_data = data.get("deliveries", [])
+        for d_data in deliveries_data:
+            delivery = Delivery(
+                order_id=order.id,
+                number=d_data.get("number", 0),
+                client_address=d_data.get("clientAddress", ""),
+                apartment=d_data.get("apartment", ""),
+                weight=d_data.get("weight", 0.0),
+                time_to_shop=d_data.get("timeToShop", 0),
+                distance_to_shop=d_data.get("distanceToShop", 0.0),
+                time_receiving=d_data.get("timeReceiving", 0),
+                time_to_client=d_data.get("timeToClient", 0),
+                distance_to_client=d_data.get("distanceToClient", 0.0),
+                time_delivery=d_data.get("timeDelivery", 0),
+                status='completed',
+                is_synced=True,
+                synced_at=now,
+                created_at=now,
+                updated_at=now
+            )
+            db.add(delivery)
+        
+        # Обновляем счётчики в смене
+        shift.orders_count += 1
+        shift.total_income += order.total_income
+        shift.total_expenses += order.total_expenses
+        shift.net_profit += order.net_profit
+        shift.total_paid_distance += order.total_paid_distance
+        shift.updated_at = now
+        db.commit()
+
+        logger.info(f"✅ Заказ создан: id={order.id}, доставок={len(deliveries_data)}")
+
+        return {
+            "id": order.id,
+            "shiftId": order.shift_id,
+            "serviceName": order.service_name,
+            "coefficient": order.coefficient,
+            "deliveryNumber": order.delivery_number,
+            "totalPaidDistance": order.total_paid_distance,
+            "totalIncome": order.total_income,
+            "totalExpenses": order.total_expenses,
+            "netProfit": order.net_profit,
+            "totalTimeSeconds": order.total_time_seconds,
+            "status": order.status,
+        }
+    except Exception as e:
+        logger.error(f"❌ Ошибка создания заказа: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/orders/{order_id}/complete")
+async def complete_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Завершить заказ"""
+    try:
+        order = db.query(Order).filter(
+            Order.id == order_id,
+            Order.user_id == current_user.id
+        ).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Заказ не найден")
+        if order.status == 'completed':
+            raise HTTPException(status_code=400, detail="Заказ уже завершён")
+
+        order.status = 'completed'
+        order.updated_at = datetime.now()
+        db.commit()
+        db.refresh(order)
+
+        shift = db.query(Shift).filter(Shift.id == order.shift_id).first()
+        if shift:
+            shift.updated_at = datetime.now()
+            db.commit()
+
+        return {"status": "ok", "order": {"id": order.id, "status": "completed"}}
+    except Exception as e:
+        logger.error(f"❌ Ошибка завершения заказа: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
+# ЭНДПОИНТЫ ДЛЯ СПРАВОЧНИКОВ
+# ============================================================
+
 @router.post("/directories/settings")
 async def update_settings(
     data: Dict[str, Any],
@@ -284,24 +412,9 @@ async def update_settings(
     try:
         from app.modules.deliveries.models import Settings
         
-        version = data.get("version", 0)
-        
         existing = db.query(Settings).filter(
             Settings.is_active == True
         ).order_by(Settings.id.desc()).first()
-        
-        if existing and existing.version != version:
-            return {
-                "status": "conflict",
-                "message": "Настройки были изменены на сервере",
-                "server": {
-                    "fuelConsumption": existing.fuel_consumption,
-                    "fuelPrice": existing.fuel_price,
-                    "repairCost": existing.repair_cost,
-                    "additionalCosts": existing.additional_costs,
-                    "version": existing.version,
-                }
-            }
         
         if existing:
             existing.fuel_consumption = data.get("fuelConsumption", 10.0)
@@ -309,7 +422,7 @@ async def update_settings(
             existing.repair_cost = data.get("repairCost", 2.0)
             existing.additional_costs = data.get("additionalCosts", 0.0)
             existing.version = existing.version + 1
-            existing.updated_at = datetime.utcnow()
+            existing.updated_at = datetime.now()
             db.commit()
             db.refresh(existing)
             return {
@@ -331,8 +444,8 @@ async def update_settings(
                 additional_costs=data.get("additionalCosts", 0.0),
                 version=1,
                 is_active=True,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=datetime.now(),
+                updated_at=datetime.now(),
             )
             db.add(new_settings)
             db.commit()
@@ -363,25 +476,9 @@ async def update_pricing(
     try:
         from app.modules.deliveries.models import Pricing
         
-        version = data.get("version", 0)
-        
         existing = db.query(Pricing).filter(
             Pricing.is_active == True
         ).order_by(Pricing.id.desc()).first()
-        
-        if existing and existing.version != version:
-            return {
-                "status": "conflict",
-                "message": "Тарифы были изменены на сервере",
-                "server": {
-                    "receivingFee": existing.receiving_fee,
-                    "deliveryFee": existing.delivery_fee,
-                    "pricePerKg": existing.price_per_kg,
-                    "pricePerKm": existing.price_per_km,
-                    "baseCoefficient": existing.base_coefficient,
-                    "version": existing.version,
-                }
-            }
         
         if existing:
             existing.receiving_fee = data.get("receivingFee", 50.0)
@@ -390,7 +487,7 @@ async def update_pricing(
             existing.price_per_km = data.get("pricePerKm", 10.0)
             existing.base_coefficient = data.get("baseCoefficient", 1.0)
             existing.version = existing.version + 1
-            existing.updated_at = datetime.utcnow()
+            existing.updated_at = datetime.now()
             db.commit()
             db.refresh(existing)
             return {
@@ -414,8 +511,8 @@ async def update_pricing(
                 base_coefficient=data.get("baseCoefficient", 1.0),
                 version=1,
                 is_active=True,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=datetime.now(),
+                updated_at=datetime.now(),
             )
             db.add(new_pricing)
             db.commit()
@@ -457,7 +554,7 @@ async def update_x5_settings(
             existing.per_km_price = data.get("perKmPrice", 25.0)
             existing.per_kg_price = data.get("perKgPrice", 10.0)
             existing.version = existing.version + 1
-            existing.updated_at = datetime.utcnow()
+            existing.updated_at = datetime.now()
             db.commit()
             db.refresh(existing)
             return {
@@ -479,8 +576,8 @@ async def update_x5_settings(
                 per_kg_price=data.get("perKgPrice", 10.0),
                 version=1,
                 is_active=True,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=datetime.now(),
+                updated_at=datetime.now(),
             )
             db.add(new_x5)
             db.commit()
@@ -498,190 +595,4 @@ async def update_x5_settings(
             }
     except Exception as e:
         logger.error(f"❌ Ошибка обновления X5 настроек: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ============================================================
-# 4. НОВЫЕ ЭНДПОИНТЫ ДЛЯ УПРАВЛЕНИЯ СМЕНАМИ И ЗАКАЗАМИ
-# ============================================================
-
-@router.post("/shifts/start")
-async def start_shift(
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
-):
-    """Начать новую смену"""
-    try:
-        # Проверяем, нет ли уже активной смены
-        existing = db.query(Shift).filter(
-            Shift.user_id == current_user.id,
-            Shift.status == 'active'
-        ).first()
-        if existing:
-            raise HTTPException(status_code=400, detail="Уже есть активная смена")
-
-        shift = Shift(
-            user_id=current_user.id,
-            start_time=datetime.utcnow().isoformat(),
-            status='active',
-            total_paid_distance=0.0,
-            total_idle_distance=0.0,
-            orders_count=0,
-            total_income=0.0,
-            total_expenses=0.0,
-            net_profit=0.0,
-            duration_seconds=0,
-            is_synced=True,
-            synced_at=datetime.utcnow(),
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
-        )
-        db.add(shift)
-        db.commit()
-        db.refresh(shift)
-        return {
-            "id": shift.id,
-            "startTime": shift.start_time,
-            "status": shift.status,
-            "totalPaidDistance": shift.total_paid_distance,
-            "totalIdleDistance": shift.total_idle_distance,
-            "ordersCount": shift.orders_count,
-            "totalIncome": shift.total_income,
-            "totalExpenses": shift.total_expenses,
-            "netProfit": shift.net_profit,
-            "durationSeconds": shift.duration_seconds
-        }
-    except Exception as e:
-        logger.error(f"❌ Ошибка начала смены: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/shifts/{shift_id}/complete")
-async def complete_shift(
-    shift_id: int,
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
-):
-    """Завершить смену"""
-    try:
-        shift = db.query(Shift).filter(
-            Shift.id == shift_id,
-            Shift.user_id == current_user.id
-        ).first()
-        if not shift:
-            raise HTTPException(status_code=404, detail="Смена не найдена")
-        if shift.status == 'completed':
-            raise HTTPException(status_code=400, detail="Смена уже завершена")
-
-        shift.status = 'completed'
-        shift.end_time = datetime.utcnow().isoformat()
-        # Пересчитываем длительность
-        if shift.start_time:
-            start = datetime.fromisoformat(shift.start_time)
-            end = datetime.fromisoformat(shift.end_time)
-            shift.duration_seconds = int((end - start).total_seconds())
-        shift.updated_at = datetime.utcnow()
-        db.commit()
-        db.refresh(shift)
-        return {"status": "ok", "shift": {"id": shift.id, "status": "completed"}}
-    except Exception as e:
-        logger.error(f"❌ Ошибка завершения смены: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/orders")
-async def create_order(
-    data: Dict[str, Any],
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
-):
-    """Создать новый заказ"""
-    try:
-        # Проверяем активную смену
-        shift = db.query(Shift).filter(
-            Shift.user_id == current_user.id,
-            Shift.status == 'active'
-        ).first()
-        if not shift:
-            raise HTTPException(status_code=400, detail="Нет активной смены")
-
-        order = Order(
-            user_id=current_user.id,
-            shift_id=shift.id,
-            service_name=data.get("serviceName", "Заказ"),
-            coefficient=data.get("coefficient", 1.0),
-            delivery_number=data.get("deliveryNumber", 1),
-            total_paid_distance=data.get("totalPaidDistance", 0.0),
-            total_income=data.get("totalIncome", 0.0),
-            total_expenses=data.get("totalExpenses", 0.0),
-            net_profit=data.get("netProfit", 0.0),
-            total_time_seconds=data.get("totalTimeSeconds", 0),
-            status='active',
-            is_synced=True,
-            synced_at=datetime.utcnow(),
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
-        )
-        db.add(order)
-        db.commit()
-        db.refresh(order)
-
-        # Обновляем счётчики в смене
-        shift.orders_count += 1
-        shift.total_income += order.total_income
-        shift.total_expenses += order.total_expenses
-        shift.net_profit += order.net_profit
-        shift.total_paid_distance += order.total_paid_distance
-        shift.updated_at = datetime.utcnow()
-        db.commit()
-
-        return {
-            "id": order.id,
-            "shiftId": order.shift_id,
-            "serviceName": order.service_name,
-            "coefficient": order.coefficient,
-            "deliveryNumber": order.delivery_number,
-            "totalPaidDistance": order.total_paid_distance,
-            "totalIncome": order.total_income,
-            "totalExpenses": order.total_expenses,
-            "netProfit": order.net_profit,
-            "totalTimeSeconds": order.total_time_seconds,
-            "status": order.status,
-        }
-    except Exception as e:
-        logger.error(f"❌ Ошибка создания заказа: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/orders/{order_id}/complete")
-async def complete_order(
-    order_id: int,
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
-):
-    """Завершить заказ"""
-    try:
-        order = db.query(Order).filter(
-            Order.id == order_id,
-            Order.user_id == current_user.id
-        ).first()
-        if not order:
-            raise HTTPException(status_code=404, detail="Заказ не найден")
-        if order.status == 'completed':
-            raise HTTPException(status_code=400, detail="Заказ уже завершён")
-
-        order.status = 'completed'
-        order.updated_at = datetime.utcnow()
-        db.commit()
-        db.refresh(order)
-
-        # Пересчитываем смену (можно оставить как есть)
-        shift = db.query(Shift).filter(Shift.id == order.shift_id).first()
-        if shift:
-            shift.updated_at = datetime.utcnow()
-            db.commit()
-
-        return {"status": "ok", "order": {"id": order.id, "status": "completed"}}
-    except Exception as e:
-        logger.error(f"❌ Ошибка завершения заказа: {e}")
         raise HTTPException(status_code=500, detail=str(e))

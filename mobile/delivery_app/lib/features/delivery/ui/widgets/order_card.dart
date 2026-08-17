@@ -58,7 +58,7 @@ class OrderCard extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  'К: $coefficient',
+                  'К: ${coefficient.toString()}',
                   style: const TextStyle(fontSize: 12, color: Color(0xFF6C63FF), fontWeight: FontWeight.w600),
                 ),
               ),

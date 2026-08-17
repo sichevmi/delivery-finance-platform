@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:delivery_app/logger.dart';
 
 class GeocoderService {
   // Зарегистрируйтесь на https://dadata.ru и получите токен
