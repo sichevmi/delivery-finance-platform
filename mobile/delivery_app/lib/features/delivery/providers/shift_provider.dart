@@ -4,6 +4,7 @@ import 'package:delivery_app/core/services/api_service.dart';
 import 'package:delivery_app/features/delivery/providers/gps_provider.dart';
 import 'package:delivery_app/features/delivery/providers/settings_provider.dart';
 import 'package:delivery_app/features/delivery/services/gps_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ShiftState {
   final bool isActive;
@@ -151,16 +152,50 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   final ApiService _apiService = ApiService();
   GpsService? _gpsService;
   bool _isLoading = false;
+  
+  // Ключи для SharedPreferences
+  static const String _keyIdleTime = 'shift_idle_time_seconds';
+  static const String _keyWorkTime = 'shift_work_time_seconds';
 
   ShiftNotifier(this._ref) : super(const ShiftState()) {
+    logMessage('🔵 [SHIFT] ShiftNotifier конструктор', category: 'SHIFT');
     _initGpsService();
     _loadFromCache();
   }
 
-  void _loadFromCache() {
+  Future<int> _loadSavedIdleTime() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final seconds = prefs.getInt(_keyIdleTime) ?? 0;
+      logMessage('🔵 [SHIFT] Загружено сохранённое время простоя: $seconds сек', category: 'SHIFT');
+      return seconds;
+    } catch (e) {
+      logMessage('⚠️ [SHIFT] Ошибка загрузки времени простоя: $e', category: 'SHIFT');
+      return 0;
+    }
+  }
+
+  Future<void> _saveIdleTime(Duration duration) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_keyIdleTime, duration.inSeconds);
+      logMessage('🔵 [SHIFT] Сохранено время простоя: ${duration.inSeconds} сек', category: 'SHIFT');
+    } catch (e) {
+      logMessage('⚠️ [SHIFT] Ошибка сохранения времени простоя: $e', category: 'SHIFT');
+    }
+  }
+
+  Future<void> _loadFromCache() async {
+    logMessage('🔵 [SHIFT] _loadFromCache() начат', category: 'SHIFT');
+    
     final cache = _apiService.cache;
     
-    // ===== 1. СУММИРУЕМ ЗАКАЗЫ ИЗ КЭША =====
+    // ===== 1. ЗАГРУЖАЕМ СОХРАНЁННОЕ ВРЕМЯ ПРОСТОЯ =====
+    final savedIdleSeconds = await _loadSavedIdleTime();
+    final restoredIdleTime = Duration(seconds: savedIdleSeconds);
+    logMessage('🔵 [SHIFT] restoredIdleTime=$restoredIdleTime.inSeconds сек', category: 'SHIFT');
+    
+    // ===== 2. СУММИРУЕМ ЗАКАЗЫ ИЗ КЭША =====
     int cachedOrdersCount = cache.todayOrders.length;
     double cachedTotalIncome = 0.0;
     double cachedTotalExpenses = 0.0;
@@ -176,29 +211,25 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
       cachedTotalOrderTime += order.totalTime;
     }
 
-    // ===== 2. СУММИРУЕМ ВРЕМЯ РАБОТЫ И ПРОСТОЯ ИЗ ВСЕХ СМЕН =====
+    // ===== 3. СУММИРУЕМ ВРЕМЯ РАБОТЫ ИЗ ВСЕХ СМЕН =====
     Duration totalWorkTimeFromShifts = Duration.zero;
-    Duration totalIdleTimeFromShifts = Duration.zero;
     double totalIdleDistanceFromShifts = 0.0;
     
+    logMessage('🔵 [SHIFT] cache.todayShifts.length=${cache.todayShifts.length}', category: 'SHIFT');
+    
     for (final shift in cache.todayShifts) {
-      // Время работы
       if (shift.status == 'completed' && shift.duration != null) {
         totalWorkTimeFromShifts += shift.duration!;
+        logMessage('🔵 [SHIFT]   смена id=${shift.id}, duration=${shift.duration!.inSeconds} сек', category: 'SHIFT');
       }
-      // Холостой пробег
       totalIdleDistanceFromShifts += shift.totalIdleDistance;
-      
-      // ===== ВРЕМЯ ПРОСТОЯ =====
-      // В модели Shift нет отдельного поля для времени простоя,
-      // поэтому мы не можем восстановить его из кэша.
-      // Оставляем как есть (будет накапливаться заново)
-      // Но если смена активна, idleStartTime устанавливается сейчас
     }
+    logMessage('🔵 [SHIFT] totalWorkTimeFromShifts=${totalWorkTimeFromShifts.inSeconds} сек', category: 'SHIFT');
 
-    // ===== 3. ВОССТАНАВЛИВАЕМ АКТИВНУЮ СМЕНУ =====
+    // ===== 4. ВОССТАНАВЛИВАЕМ АКТИВНУЮ СМЕНУ =====
     if (cache.activeShift != null) {
       final shift = cache.activeShift!;
+      logMessage('🔵 [SHIFT] cache.activeShift найден: id=${shift.id}', category: 'SHIFT');
       
       state = state.copyWith(
         isActive: true,
@@ -212,21 +243,20 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
         netProfit: cachedNetProfit > 0 ? cachedNetProfit : state.netProfit,
         totalOrderTime: cachedTotalOrderTime > Duration.zero ? cachedTotalOrderTime : state.totalOrderTime,
         idleStartTime: DateTime.now(),
-        // ===== ВОССТАНАВЛИВАЕМ ВРЕМЯ РАБОТЫ =====
         totalWorkTime: totalWorkTimeFromShifts,
-        // ===== ВРЕМЯ ПРОСТОЯ: НЕ СБРАСЫВАЕМ, А ПРОДОЛЖАЕМ =====
-        totalIdleTime: state.totalIdleTime, // сохраняем накопленное
+        totalIdleTime: restoredIdleTime,
         processedIdleDistance: state.processedIdleDistance,
       );
       
-      logMessage('📁 Смена восстановлена из кэша: id=${shift.id}', category: 'SHIFT');
-      logMessage('📁 Восстановлено время работы: ${totalWorkTimeFromShifts.inSeconds} сек', category: 'SHIFT');
-      logMessage('📁 Восстановлено время простоя: ${state.totalIdleTime.inSeconds} сек', category: 'SHIFT');
-      logMessage('📁 Заказов: ${state.ordersCount}, доход: ${state.totalIncome}', category: 'SHIFT');
+      logMessage('📁 [SHIFT] Смена восстановлена из кэша: id=${shift.id}', category: 'SHIFT');
+      logMessage('📁 [SHIFT] Восстановлено время работы: ${state.totalWorkTime.inSeconds} сек', category: 'SHIFT');
+      logMessage('📁 [SHIFT] Восстановлено время простоя: ${state.totalIdleTime.inSeconds} сек', category: 'SHIFT');
       
       _startGpsTracking();
     } else {
-      // ===== 4. НЕТ АКТИВНОЙ СМЕНЫ, НО ЕСТЬ ДАННЫЕ =====
+      logMessage('🔵 [SHIFT] cache.activeShift == null', category: 'SHIFT');
+      
+      // ===== 5. НЕТ АКТИВНОЙ СМЕНЫ =====
       if (cachedOrdersCount > 0 || totalWorkTimeFromShifts > Duration.zero) {
         state = state.copyWith(
           isActive: false,
@@ -238,11 +268,20 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
           totalOrderTime: cachedTotalOrderTime,
           totalWorkTime: totalWorkTimeFromShifts,
           totalIdleDistance: totalIdleDistanceFromShifts,
-          // totalIdleTime сохраняем
+          totalIdleTime: restoredIdleTime,
         );
-        logMessage('📁 Восстановлена статистика из кэша: заказов=${state.ordersCount}, доход=${state.totalIncome}, время работы=${totalWorkTimeFromShifts.inSeconds} сек', category: 'SHIFT');
+        logMessage('📁 [SHIFT] Восстановлена статистика из кэша: заказов=${state.ordersCount}, время работы=${totalWorkTimeFromShifts.inSeconds} сек, время простоя=${state.totalIdleTime.inSeconds} сек', category: 'SHIFT');
+      } else {
+        // Если нет данных, но есть сохранённое время простоя
+        if (restoredIdleTime > Duration.zero) {
+          state = state.copyWith(
+            totalIdleTime: restoredIdleTime,
+          );
+          logMessage('📁 [SHIFT] Восстановлено время простоя из SharedPreferences: ${state.totalIdleTime.inSeconds} сек', category: 'SHIFT');
+        }
       }
     }
+    logMessage('🔵 [SHIFT] _loadFromCache() завершён, state.totalIdleTime=${state.totalIdleTime.inSeconds} сек', category: 'SHIFT');
   }
 
   void _initGpsService() {
@@ -293,7 +332,7 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     _isLoading = true;
 
     if (_apiService.cache.activeShift != null) {
-      _loadFromCache();
+      await _loadFromCache();
       _isLoading = false;
       return;
     }
@@ -301,14 +340,16 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     try {
       final shift = await _apiService.startShift();
       
+      final idleTimeToPreserve = state.totalIdleTime;
+      logMessage('🔵 [SHIFT] startShift: idleTimeToPreserve=${idleTimeToPreserve.inSeconds} сек', category: 'SHIFT');
+      
       state = ShiftState(
         isActive: true,
         shiftStartTime: shift.startTime,
         shiftId: shift.id,
         idleStartTime: DateTime.now(),
-        // Сохраняем накопления
         totalWorkTime: state.totalWorkTime,
-        totalIdleTime: state.totalIdleTime,
+        totalIdleTime: idleTimeToPreserve,
         totalPaidDistance: state.totalPaidDistance,
         totalIdleDistance: state.totalIdleDistance,
         processedIdleDistance: state.processedIdleDistance,
@@ -322,14 +363,14 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
       );
       
       _startGpsTracking();
-      logMessage('✅ Смена начата на сервере (id=${shift.id})', category: 'SHIFT');
-      logMessage('📊 Накопления: заказов=${state.ordersCount}, доход=${state.totalIncome}, время=${state.totalWorkTime.inSeconds} сек, простой=${state.totalIdleTime.inSeconds} сек', category: 'SHIFT');
+      logMessage('✅ [SHIFT] Смена начата на сервере (id=${shift.id})', category: 'SHIFT');
+      logMessage('📊 [SHIFT] Накопления: заказов=${state.ordersCount}, доход=${state.totalIncome}, время=${state.totalWorkTime.inSeconds} сек, простой=${state.totalIdleTime.inSeconds} сек', category: 'SHIFT');
     } catch (e) {
       logMessage('❌ Ошибка начала смены: $e', category: 'SHIFT', level: LogLevel.error);
       if (e.toString().contains('Уже есть активная смена')) {
         logMessage('🔄 Активная смена уже есть на сервере, перезагружаем данные', category: 'SHIFT');
         await _apiService.loadAllData();
-        _loadFromCache();
+        await _loadFromCache();
       }
     }
     _isLoading = false;
@@ -347,12 +388,14 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     final addedWork = now.difference(state.shiftStartTime!);
     final idleDuration = state.currentIdlePeriod;
     
+    logMessage('🔵 [SHIFT] stopShift: idleDuration=${idleDuration.inSeconds} сек', category: 'SHIFT');
+    logMessage('🔵 [SHIFT] stopShift: state.totalIdleTime до=${state.totalIdleTime.inSeconds} сек', category: 'SHIFT');
+    
     Duration addedOrderTime = Duration.zero;
     if (state.isOnOrder && state.orderStartTime != null) {
       addedOrderTime = now.difference(state.orderStartTime!);
     }
 
-    // ==== ПРИ ЗАВЕРШЕНИИ СМЕНЫ СПИСЫВАЕМ ВЕСЬ ОСТАВШИЙСЯ ХОЛОСТОЙ ПРОБЕГ ====
     final unprocessedIdle = state.unprocessedIdleDistance;
     final settings = _ref.read(settingsProvider);
     final idleCost = _calculateIdleCost(unprocessedIdle, settings);
@@ -361,12 +404,17 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
       logMessage('📊 [СМЕНА] Списание холостого пробега: ${unprocessedIdle.toStringAsFixed(2)} км на сумму ${idleCost.toStringAsFixed(2)} руб', category: 'SHIFT');
     }
 
+    // ===== СОХРАНЯЕМ ВРЕМЯ ПРОСТОЯ В SharedPreferences =====
+    final newTotalIdleTime = state.totalIdleTime + idleDuration;
+    await _saveIdleTime(newTotalIdleTime);
+    logMessage('🔵 [SHIFT] stopShift: newTotalIdleTime=${newTotalIdleTime.inSeconds} сек', category: 'SHIFT');
+
     state = state.copyWith(
       isActive: false,
       shiftStartTime: null,
       shiftEndTime: now,
       totalWorkTime: state.totalWorkTime + addedWork,
-      totalIdleTime: state.totalIdleTime + idleDuration,
+      totalIdleTime: newTotalIdleTime,
       idleStartTime: null,
       isOnOrder: false,
       orderStartTime: null,
@@ -380,8 +428,8 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
 
     try {
       await _apiService.completeShift(state.shiftId!);
-      logMessage('✅ Смена завершена на сервере (id=${state.shiftId})', category: 'SHIFT');
-      logMessage('📊 Итоговые накопления за день: заказов=${state.ordersCount}, доход=${state.totalIncome}, расходы=${state.totalExpenses}, прибыль=${state.netProfit}, время=${state.totalWorkTime.inSeconds} сек, простой=${state.totalIdleTime.inSeconds} сек', category: 'SHIFT');
+      logMessage('✅ [SHIFT] Смена завершена на сервере (id=${state.shiftId})', category: 'SHIFT');
+      logMessage('📊 [SHIFT] Итоговые накопления за день: заказов=${state.ordersCount}, доход=${state.totalIncome}, расходы=${state.totalExpenses}, прибыль=${state.netProfit}, время=${state.totalWorkTime.inSeconds} сек, простой=${state.totalIdleTime.inSeconds} сек', category: 'SHIFT');
     } catch (e) {
       logMessage('❌ Ошибка завершения смены: $e', category: 'SHIFT', level: LogLevel.error);
     }
@@ -426,7 +474,6 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     final now = DateTime.now();
     final orderTime = now.difference(state.orderStartTime!);
 
-    // ==== ПРИ ЗАВЕРШЕНИИ ЗАКАЗА СПИСЫВАЕМ ХОЛОСТОЙ ПРОБЕГ ====
     final unprocessedIdle = state.unprocessedIdleDistance;
     final settings = _ref.read(settingsProvider);
     final idleCost = _calculateIdleCost(unprocessedIdle, settings);
@@ -457,8 +504,8 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     );
   }
 
-  void loadFromCache() {
-    _loadFromCache();
+  Future<void> loadFromCache() async {
+    await _loadFromCache();
   }
   
   bool get isLoading => _isLoading;
