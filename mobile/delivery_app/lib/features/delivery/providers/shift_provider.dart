@@ -296,18 +296,27 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   }
 
   void _startGpsTracking() {
-    if (_gpsService == null) {
-      try {
-        _gpsService = _ref.read(gpsServiceProvider);
-      } catch (e) {
-        logMessage('⚠️ Не удалось получить GPS сервис: $e', category: 'SHIFT');
-        return;
-      }
-    }
-    if (_gpsService != null) {
-      _gpsService!.startTracking();
+  logMessage('🟢 [SHIFT] _startGpsTracking() вызван', category: 'SHIFT');
+  
+  if (_gpsService == null) {
+    logMessage('🟢 [SHIFT] _gpsService == null, пытаемся получить из провайдера', category: 'SHIFT');
+    try {
+      _gpsService = _ref.read(gpsServiceProvider);
+      logMessage('✅ [SHIFT] _gpsService получен: ${_gpsService.hashCode}', category: 'SHIFT');
+    } catch (e) {
+      logMessage('❌ [SHIFT] Не удалось получить GPS сервис: $e', category: 'SHIFT', level: LogLevel.error);
+      return;
     }
   }
+  
+  if (_gpsService != null) {
+    logMessage('🟢 [SHIFT] Запускаем GPS трекинг', category: 'SHIFT');
+    _gpsService!.startTracking();
+    logMessage('✅ [SHIFT] GPS трекинг запущен', category: 'SHIFT');
+  } else {
+    logMessage('⚠️ [SHIFT] _gpsService == null, GPS НЕ запущен', category: 'SHIFT');
+  }
+}
 
   void _stopGpsTracking() {
     if (_gpsService != null) {

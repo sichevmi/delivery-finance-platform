@@ -99,17 +99,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     return Scaffold(
       appBar: AppBar(
         title: const Text('FinFlow Доставка'),
+        toolbarHeight: 48,
         actions: [
-          IconButton(icon: const Icon(Icons.notifications_outlined), onPressed: () {}),
+          IconButton(icon: const Icon(Icons.notifications_outlined), onPressed: () {}, padding: EdgeInsets.zero),
           CircleAvatar(
-            radius: 16,
+            radius: 14,
             backgroundColor: const Color(0xFF6C63FF),
             child: Text(
               authState.user?.name.isNotEmpty == true ? authState.user!.name[0].toUpperCase() : 'К',
-              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
         ],
       ),
       body: IndexedStack(
@@ -143,41 +144,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   Widget _buildHomeTab(ShiftState shiftState, SettingsState settings, AsyncValue<DailyStats> dailyStatsAsync) {
     return dailyStatsAsync.when(
       data: (stats) => Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(8.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Дата и статус смены
             Row(
               children: [
-                const Icon(Icons.calendar_today, size: 14, color: Color(0xFF888888)),
-                const SizedBox(width: 6),
+                const Icon(Icons.calendar_today, size: 12, color: Color(0xFF888888)),
+                const SizedBox(width: 4),
                 Text(
                   _getTodayDate(),
-                  style: const TextStyle(fontSize: 13, color: Color(0xFF888888)),
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF888888)),
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: shiftState.isActive ? Colors.green.withOpacity(0.15) : Colors.grey.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(6),
                   ),
                   child: Row(
                     children: [
                       Container(
-                        width: 6,
-                        height: 6,
+                        width: 5,
+                        height: 5,
                         decoration: BoxDecoration(
                           color: shiftState.isActive ? Colors.green : Colors.grey,
                           shape: BoxShape.circle,
                         ),
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 4),
                       Text(
-                        shiftState.isActive ? 'Смена активна' : 'Смена не начата',
+                        shiftState.isActive ? 'Активна' : 'Не начата',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 10,
                           color: shiftState.isActive ? Colors.green : Colors.grey,
                           fontWeight: FontWeight.w500,
                         ),
@@ -187,83 +188,81 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
 
             // Строка: Время работы + Стоимость пробега
             Row(
               children: [
-                // Время работы (крупно)
                 _TimeDisplay(
                   shiftState: shiftState,
                   label: 'Время работы',
                   color: Colors.white,
                 ),
                 const Spacer(),
-                // Стоимость пробега за км (крупно)
                 _buildCostPerKm(settings),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
 
-            // Блоки 2x2
+            // Блоки 2x2 — компактные
             Row(
               children: [
-                _buildBigMetricCard(
+                _buildCompactMetricCard(
                   value: '${stats.netProfit.toStringAsFixed(0)} ₽',
                   label: 'Доход',
                   color: Colors.green,
                 ),
-                const SizedBox(width: 12),
-                _buildBigMetricCard(
+                const SizedBox(width: 8),
+                _buildCompactMetricCard(
                   value: '${stats.totalExpenses.toStringAsFixed(0)} ₽',
                   label: 'Расход',
                   color: Colors.red,
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 6),
 
             Row(
               children: [
-                _buildBigMetricCard(
+                _buildCompactMetricCard(
                   value: '${stats.totalDistance.toStringAsFixed(1)} км',
                   label: 'Пробег всего',
                   color: Colors.white,
                 ),
-                const SizedBox(width: 12),
-                _buildBigMetricCard(
+                const SizedBox(width: 8),
+                _buildCompactMetricCard(
                   value: '${stats.totalIdleDistance.toStringAsFixed(1)} км',
                   label: 'Холостой пробег',
                   color: Colors.white,
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 6),
 
             Row(
               children: [
-                _buildBigMetricCard(
+                _buildCompactMetricCard(
                   value: _calculateProfitPerKm(stats, settings),
                   label: 'Прибыль на км',
                   color: Colors.white,
                 ),
-                const SizedBox(width: 12),
-                _buildBigMetricCard(
+                const SizedBox(width: 8),
+                _buildCompactMetricCard(
                   value: _calculateProfitPerHour(stats),
                   label: 'Прибыль за час',
                   color: Colors.white,
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 6),
 
-            // Время простоя — большая плашка
-            _buildIdleTimeCard(shiftState),
+            // Время простоя — компактная плашка
+            _buildCompactIdleTimeCard(shiftState),
             const Spacer(),
 
-            // Кнопка начала/остановки смены
+            // Кнопка — меньше по высоте
             SizedBox(
-              height: 54,
+              height: 40,
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
@@ -279,42 +278,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                   backgroundColor: shiftState.isActive ? Colors.red : const Color(0xFF6C63FF),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(8),
                   ),
+                  padding: EdgeInsets.zero,
                 ),
                 child: Text(
                   shiftState.isActive ? 'Остановить работу' : 'Начать работу',
-                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
               ),
             ),
-            const SizedBox(height: 4),
           ],
         ),
       ),
       loading: () => Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(8),
         child: const Center(
           child: CircularProgressIndicator(color: Color(0xFF6C63FF)),
         ),
       ),
       error: (error, stack) => Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(8),
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, color: Colors.red, size: 48),
-              const SizedBox(height: 16),
+              const Icon(Icons.error_outline, color: Colors.red, size: 32),
+              const SizedBox(height: 8),
               Text(
-                'Ошибка загрузки статистики: $error',
-                style: const TextStyle(color: Colors.red),
+                'Ошибка загрузки',
+                style: const TextStyle(color: Colors.red, fontSize: 12),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
               ElevatedButton(
                 onPressed: () => ref.invalidate(dailyStatsProvider),
-                child: const Text('Обновить'),
+                child: const Text('Обновить', style: TextStyle(fontSize: 12)),
               ),
             ],
           ),
@@ -329,7 +328,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final now = DateTime.now();
     const weekdays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
     const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
-    return '${weekdays[now.weekday - 1]}, ${now.day} ${months[now.month - 1]} ${now.year}';
+    return '${weekdays[now.weekday - 1]}, ${now.day} ${months[now.month - 1]}';
   }
 
   String _calculateProfitPerKm(DailyStats stats, SettingsState settings) {
@@ -339,15 +338,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   }
 
   String _calculateProfitPerHour(DailyStats stats) {
-    // Если работали меньше 1 часа (3600 секунд) — не показываем
-    if (stats.totalWorkTime.inSeconds < 3600) {
-      return '—';
-    }
+    if (stats.totalWorkTime.inSeconds < 3600) return '—';
     if (stats.totalWorkTime.inSeconds <= 0) return '0.00 ₽/ч';
-    
     final hours = stats.totalWorkTime.inSeconds / 3600.0;
     if (hours <= 0) return '0.00 ₽/ч';
-    
     final profitPerHour = stats.netProfit / hours;
     return '${profitPerHour.toStringAsFixed(2)} ₽/ч';
   }
@@ -358,48 +352,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final fuelCostPerKm = (settings.fuelConsumption / 100) * settings.fuelPrice;
     final totalCostPerKm = fuelCostPerKm + settings.repairCost;
     
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+    return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.local_gas_station, size: 16, color: Color(0xFF6C63FF)),
-            const SizedBox(width: 6),
-            Text(
-              '${totalCostPerKm.toStringAsFixed(2)} ₽/км',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ],
-        ),
-        const Text(
-          'Стоимость 1 км',
-          style: TextStyle(
-            fontSize: 10,
-            color: Color(0xFF888888),
+        const Icon(Icons.local_gas_station, size: 14, color: Color(0xFF6C63FF)),
+        const SizedBox(width: 4),
+        Text(
+          '${totalCostPerKm.toStringAsFixed(2)} ₽/км',
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildBigMetricCard({
+  Widget _buildCompactMetricCard({
     required String value,
     required String label,
     required Color color,
   }) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
         decoration: BoxDecoration(
           color: const Color(0xFF1E1E1E),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF2C2C2C)),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFF2C2C2C), width: 0.5),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -408,18 +389,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             Text(
               value,
               style: TextStyle(
-                fontSize: 22,
+                fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: color,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
               label,
               style: const TextStyle(
-                fontSize: 12,
+                fontSize: 10,
                 color: Color(0xFF888888),
               ),
               maxLines: 1,
@@ -431,22 +412,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     );
   }
 
-  Widget _buildIdleTimeCard(ShiftState shiftState) {
+  Widget _buildCompactIdleTimeCard(ShiftState shiftState) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF2C2C2C)),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF2C2C2C), width: 0.5),
       ),
       child: Row(
         children: [
-          const Icon(Icons.pause_circle_outline, size: 22, color: Color(0xFF6C63FF)),
-          const SizedBox(width: 12),
+          const Icon(Icons.pause_circle_outline, size: 16, color: Color(0xFF6C63FF)),
+          const SizedBox(width: 6),
           const Text(
             'Время простоя',
             style: TextStyle(
-              fontSize: 15,
+              fontSize: 12,
               fontWeight: FontWeight.w500,
               color: Color(0xFF888888),
             ),
@@ -460,7 +441,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 }
 
 // ============================================================
-// ВИДЖЕТ ДЛЯ ВРЕМЕНИ РАБОТЫ
+// ВИДЖЕТ ДЛЯ ВРЕМЕНИ РАБОТЫ (компактный)
 // ============================================================
 class _TimeDisplay extends StatefulWidget {
   final ShiftState shiftState;
@@ -529,7 +510,7 @@ class _TimeDisplayState extends State<_TimeDisplay> {
         Text(
           formattedTime,
           style: TextStyle(
-            fontSize: 28,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
             color: widget.color,
           ),
@@ -537,7 +518,7 @@ class _TimeDisplayState extends State<_TimeDisplay> {
         Text(
           widget.label,
           style: const TextStyle(
-            fontSize: 12,
+            fontSize: 10,
             color: Color(0xFF888888),
           ),
         ),
@@ -554,7 +535,7 @@ class _TimeDisplayState extends State<_TimeDisplay> {
 }
 
 // ============================================================
-// ВИДЖЕТ ДЛЯ ВРЕМЕНИ ПРОСТОЯ
+// ВИДЖЕТ ДЛЯ ВРЕМЕНИ ПРОСТОЯ (компактный)
 // ============================================================
 class _IdleTimeDisplay extends StatefulWidget {
   final ShiftState shiftState;
@@ -619,7 +600,7 @@ class _IdleTimeDisplayState extends State<_IdleTimeDisplay> {
     return Text(
       formattedTime,
       style: const TextStyle(
-        fontSize: 22,
+        fontSize: 16,
         fontWeight: FontWeight.bold,
         color: Colors.white,
       ),

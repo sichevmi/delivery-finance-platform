@@ -128,31 +128,40 @@ class GpsService {
   // ===== ОСНОВНЫЕ МЕТОДЫ GPS =====
 
   void startTracking() {
-    logMessage('🟢 GPS: startTracking() called on instance ${hashCode}', category: 'GPS');
-    if (_isTracking) {
-      logMessage('🟡 GPS: already tracking', category: 'GPS');
-      return;
-    }
-    _isTracking = true;
-    _isPaused = false;
-    _totalDistance = 0.0;
-    _lastPosition = null;
-
-    const settings = LocationSettings(
-      accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 0,
-    );
-
-    logMessage('🟢 GPS: подписываемся на поток позиции', category: 'GPS');
-    _positionSubscription = Geolocator.getPositionStream(
-      locationSettings: settings,
-    ).listen(
-      (Position position) => _onPositionUpdate(position),
-      onError: (error) => logMessage('🔴 GPS error: $error', category: 'GPS', level: LogLevel.error),
-      cancelOnError: false,
-    );
-    logMessage('🟢 GPS: поток запущен', category: 'GPS');
+  logMessage('🟢 [GPS] startTracking() called on instance ${hashCode}', category: 'GPS');
+  
+  if (_isTracking) {
+    logMessage('🟡 [GPS] already tracking', category: 'GPS');
+    return;
   }
+  
+  _isTracking = true;
+  _isPaused = false;
+  _totalDistance = 0.0;
+  _lastPosition = null;
+
+  const settings = LocationSettings(
+    accuracy: LocationAccuracy.bestForNavigation,
+    distanceFilter: 0,
+  );
+
+  logMessage('🟢 [GPS] подписываемся на поток позиции', category: 'GPS');
+  
+  _positionSubscription = Geolocator.getPositionStream(
+    locationSettings: settings,
+  ).listen(
+    (Position position) {
+      logMessage('📍 [GPS] Получена позиция: lat=${position.latitude}, lon=${position.longitude}, acc=${position.accuracy}m', category: 'GPS');
+      _onPositionUpdate(position);
+    },
+    onError: (error) {
+      logMessage('🔴 [GPS] Ошибка: $error', category: 'GPS', level: LogLevel.error);
+    },
+    cancelOnError: false,
+  );
+  
+  logMessage('🟢 [GPS] поток запущен', category: 'GPS');
+}
 
   void _onPositionUpdate(Position position) {
     if (!_isTracking || _isPaused) return;
