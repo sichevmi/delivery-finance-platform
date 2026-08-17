@@ -243,35 +243,53 @@ async def complete_shift(
         if shift.status == 'completed':
             raise HTTPException(status_code=400, detail="Смена уже завершена")
 
-        # Используем UTC время с часовым поясом
         now = datetime.now(timezone.utc)
         
-        # Расчёт длительности
-        if shift.start_time:
-            try:
-                start = datetime.fromisoformat(shift.start_time)
-                # Если нет часового пояса — добавляем UTC
-                if start.tzinfo is None:
-                    start = start.replace(tzinfo=timezone.utc)
-                shift.duration_seconds = int((now - start).total_seconds())
-            except Exception as e:
-                logger.warning(f"⚠️ Ошибка парсинга start_time: {e}, используем 0")
-                shift.duration_seconds = 0
-        
+        # ===== ОБНОВЛЯЕМ ВСЕ ПОЛЯ =====
         shift.status = 'completed'
         shift.end_time = now.isoformat()
+        
+        if shift.start_time:
+            try:
+                start = parse_datetime_safe(shift.start_time)
+                shift.duration_seconds = int((now - start).total_seconds())
+            except Exception as e:
+                logger.warning(f"⚠️ Ошибка расчёта длительности: {e}")
+                shift.duration_seconds = 0
+        
+        # ===== СОХРАНЯЕМ СТАТИСТИКУ =====
+        shift.total_paid_distance = data.get("totalPaidDistance", shift.total_paid_distance)
+        shift.total_idle_distance = data.get("totalIdleDistance", shift.total_idle_distance)
+        shift.total_order_time_seconds = data.get("totalOrderTimeSeconds", shift.total_order_time_seconds)
+        shift.orders_count = data.get("ordersCount", shift.orders_count)
+        shift.total_income = data.get("totalIncome", shift.total_income)
+        shift.total_expenses = data.get("totalExpenses", shift.total_expenses)
+        shift.net_profit = data.get("netProfit", shift.net_profit)
+        
         shift.updated_at = now
         db.commit()
         db.refresh(shift)
         
         logger.info(f"✅ Смена завершена: id={shift_id}, duration={shift.duration_seconds} сек")
+        logger.info(f"📊 Статистика: заказов={shift.orders_count}, доход={shift.total_income}, холостой пробег={shift.total_idle_distance}")
         
-        return {"status": "ok", "shift": {"id": shift.id, "status": "completed"}}
+        return {
+            "status": "ok",
+            "shift": {
+                "id": shift.id,
+                "status": "completed",
+                "durationSeconds": shift.duration_seconds,
+                "totalPaidDistance": shift.total_paid_distance,
+                "totalIdleDistance": shift.total_idle_distance,
+                "ordersCount": shift.orders_count,
+                "totalIncome": shift.total_income,
+                "totalExpenses": shift.total_expenses,
+                "netProfit": shift.net_profit,
+            }
+        }
     except Exception as e:
         logger.error(f"❌ Ошибка завершения смены: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
 # ============================================================
 # ЭНДПОИНТЫ ДЛЯ ЗАКАЗОВ С ДОСТАВКАМИ
 # ============================================================

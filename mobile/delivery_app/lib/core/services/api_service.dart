@@ -88,17 +88,35 @@ class ApiService {
     }
   }
 
-  Future<void> completeShift(int shiftId) async {
-    try {
-      await _apiClient.completeShift(shiftId);
-      _cache.activeShift = null;
-      await loadAllData();
-      logMessage('✅ Смена завершена на сервере', category: 'API');
-    } catch (e) {
-      logMessage('❌ Ошибка завершения смены: $e', category: 'API', level: LogLevel.error);
-      rethrow;
-    }
+  Future<void> completeShift(
+  int shiftId, {
+  double? totalPaidDistance,
+  double? totalIdleDistance,
+  int? totalOrderTimeSeconds,
+  int? ordersCount,
+  double? totalIncome,
+  double? totalExpenses,
+  double? netProfit,
+}) async {
+  try {
+    await _apiClient.completeShift(
+      shiftId,
+      totalPaidDistance: totalPaidDistance,
+      totalIdleDistance: totalIdleDistance,
+      totalOrderTimeSeconds: totalOrderTimeSeconds,
+      ordersCount: ordersCount,
+      totalIncome: totalIncome,
+      totalExpenses: totalExpenses,
+      netProfit: netProfit,
+    );
+    _cache.activeShift = null;
+    await loadAllData();
+    logMessage('✅ Смена завершена на сервере', category: 'API');
+  } catch (e) {
+    logMessage('❌ Ошибка завершения смены: $e', category: 'API', level: LogLevel.error);
+    rethrow;
   }
+}
 
   // Заказ
   // В ApiService классе, метод createOrder:

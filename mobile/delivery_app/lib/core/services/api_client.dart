@@ -96,15 +96,36 @@ class ApiClient {
     }
   }
 
-  Future<Map<String, dynamic>> completeShift(int shiftId) async {
-    try {
-      final response = await _dio.post('/shifts/$shiftId/complete');
-      return response.data;
-    } catch (e) {
-      logMessage('⚠️ Ошибка завершения смены: $e', category: 'API', level: LogLevel.error);
-      rethrow;
-    }
+  Future<Map<String, dynamic>> completeShift(
+  int shiftId, {
+  double? totalPaidDistance,
+  double? totalIdleDistance,
+  int? totalOrderTimeSeconds,
+  int? ordersCount,
+  double? totalIncome,
+  double? totalExpenses,
+  double? netProfit,
+}) async {
+  try {
+    final data = <String, dynamic>{};
+    if (totalPaidDistance != null) data['totalPaidDistance'] = totalPaidDistance;
+    if (totalIdleDistance != null) data['totalIdleDistance'] = totalIdleDistance;
+    if (totalOrderTimeSeconds != null) data['totalOrderTimeSeconds'] = totalOrderTimeSeconds;
+    if (ordersCount != null) data['ordersCount'] = ordersCount;
+    if (totalIncome != null) data['totalIncome'] = totalIncome;
+    if (totalExpenses != null) data['totalExpenses'] = totalExpenses;
+    if (netProfit != null) data['netProfit'] = netProfit;
+    
+    final response = await _dio.post(
+      '/shifts/$shiftId/complete',
+      data: data,
+    );
+    return response.data;
+  } catch (e) {
+    logMessage('⚠️ Ошибка завершения смены: $e', category: 'API', level: LogLevel.error);
+    rethrow;
   }
+}
 
   // ===== ЗАКАЗЫ =====
 
