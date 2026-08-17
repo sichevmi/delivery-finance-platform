@@ -673,6 +673,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
           totalCost: totalCost,
           totalTime: totalTime,
           totalDistance: totalDistance,
+                shopAddress: _state.shopAddress,  // <-- ЭТО КЛЮЧЕВОЕ
         ),
       ),
     ).then((result) async {

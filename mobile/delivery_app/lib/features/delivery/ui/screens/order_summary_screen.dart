@@ -15,6 +15,7 @@ class OrderSummaryScreen extends ConsumerWidget {
   final double totalCost;
   final int totalTime;
   final double totalDistance;
+  final String? shopAddress;
 
   const OrderSummaryScreen({
     super.key,
@@ -24,6 +25,7 @@ class OrderSummaryScreen extends ConsumerWidget {
     required this.totalCost,
     required this.totalTime,
     required this.totalDistance,
+    this.shopAddress,
   });
 
   String _formatTime(int seconds) {
@@ -68,10 +70,14 @@ class OrderSummaryScreen extends ConsumerWidget {
     final netProfit = totalCostFinal - totalExpenses;
 
     logMessage('🟢 OrderSummaryScreen: отображение сводки');
+    logMessage('   shopAddress: $shopAddress');
     logMessage('   totalAllDistance: $totalAllDistance');
     logMessage('   totalExpenses: $totalExpenses');
     logMessage('   totalCostFinal: $totalCostFinal');
     logMessage('   netProfit: $netProfit');
+
+    // ===== ПОКАЗЫВАЕМ АДРЕС МАГАЗИНА =====
+    final displayShopAddress = shopAddress ?? 'Адрес не определён';
 
     return Scaffold(
       appBar: AppBar(
@@ -121,7 +127,7 @@ class OrderSummaryScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 12),
 
-                  // Карточка "Магазин"
+                  // ===== КАРТОЧКА "МАГАЗИН" =====
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -144,6 +150,18 @@ class OrderSummaryScreen extends ConsumerWidget {
                                   fontWeight: FontWeight.w600,
                                   color: Colors.white,
                                 ),
+                              ),
+                              const SizedBox(height: 4),
+                              // ===== АДРЕС МАГАЗИНА (ВСЕГДА ПОКАЗЫВАЕМ) =====
+                              Text(
+                                displayShopAddress,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF6C63FF),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 4),
                               Wrap(
