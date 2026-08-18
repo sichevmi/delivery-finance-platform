@@ -9,7 +9,8 @@ class Shift {
   final double totalIncome;
   final double totalExpenses;
   final double netProfit;
-  final String status; // 'active' или 'completed'
+  final String status;
+  final Duration? totalIdleTime;  // <-- ДОБАВЛЕНО
 
   Shift({
     required this.id,
@@ -23,6 +24,7 @@ class Shift {
     this.totalExpenses = 0.0,
     this.netProfit = 0.0,
     required this.status,
+    this.totalIdleTime,
   });
 
   factory Shift.fromJson(Map<String, dynamic> json) {
@@ -38,6 +40,9 @@ class Shift {
       totalExpenses: (json['totalExpenses'] ?? 0).toDouble(),
       netProfit: (json['netProfit'] ?? 0).toDouble(),
       status: json['status'] ?? 'active',
+      totalIdleTime: json['totalIdleTimeSeconds'] != null 
+          ? Duration(seconds: json['totalIdleTimeSeconds']) 
+          : null,
     );
   }
 
@@ -53,5 +58,6 @@ class Shift {
     'totalExpenses': totalExpenses,
     'netProfit': netProfit,
     'status': status,
+    'totalIdleTimeSeconds': totalIdleTime?.inSeconds,
   };
 }

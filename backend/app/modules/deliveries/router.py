@@ -77,28 +77,33 @@ async def get_today_data(
                 ]
             })
         
+        # ===== ВЫЧИСЛЯЕМ ВРЕМЯ ПРОСТОЯ ДЛЯ КАЖДОЙ СМЕНЫ =====
+        shifts_data = []
+        for s in shifts:
+            # Время простоя = общая длительность - время на заказах
+            idle_time_seconds = max(0, (s.duration_seconds or 0) - (s.total_order_time_seconds or 0))
+            shifts_data.append({
+                "id": s.id,
+                "localId": s.local_id,
+                "startTime": s.start_time,
+                "endTime": s.end_time,
+                "durationSeconds": s.duration_seconds,
+                "totalPaidDistance": s.total_paid_distance,
+                "totalIdleDistance": s.total_idle_distance,
+                "ordersCount": s.orders_count,
+                "totalIncome": s.total_income,
+                "totalExpenses": s.total_expenses,
+                "netProfit": s.net_profit,
+                "status": s.status,
+                "isSynced": s.is_synced,
+                "createdAt": s.created_at.isoformat() if s.created_at else None,
+                "totalIdleTimeSeconds": idle_time_seconds,  # <-- ДОБАВЛЕНО
+            })
+        
         return {
             "status": "success",
             "date": today.isoformat(),
-            "shifts": [
-                {
-                    "id": s.id,
-                    "localId": s.local_id,
-                    "startTime": s.start_time,
-                    "endTime": s.end_time,
-                    "durationSeconds": s.duration_seconds,
-                    "totalPaidDistance": s.total_paid_distance,
-                    "totalIdleDistance": s.total_idle_distance,
-                    "ordersCount": s.orders_count,
-                    "totalIncome": s.total_income,
-                    "totalExpenses": s.total_expenses,
-                    "netProfit": s.net_profit,
-                    "status": s.status,
-                    "isSynced": s.is_synced,
-                    "createdAt": s.created_at.isoformat() if s.created_at else None,
-                }
-                for s in shifts
-            ],
+            "shifts": shifts_data,
             "orders": orders_data,
         }
     except Exception as e:

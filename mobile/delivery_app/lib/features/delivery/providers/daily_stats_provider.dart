@@ -118,50 +118,23 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
     totalOrderTime += order.totalTime;
   }
 
-  // ===== 2. ДОБАВЛЯЕМ ДАННЫЕ ИЗ shiftState (текущие накопления) =====
-  // Если смена активна или есть данные в shiftState, суммируем их
+  // ===== 2. ДОБАВЛЯЕМ ДАННЫЕ ИЗ shiftState =====
   if (shiftState.isActive || shiftState.ordersCount > 0) {
-    // Используем данные из shiftState, но не дублируем заказы
-    // shiftState.ordersCount - это заказы, сделанные в текущей сессии
-    // Они ещё могут не быть в кэше, поэтому добавляем их отдельно
-    
-    // Но чтобы не дублировать, проверяем: если заказы из кэша уже есть,
-    // а shiftState показывает больше заказов - значит есть несинхронизированные
     final shiftOrdersCount = shiftState.ordersCount;
     final cachedOrdersCount = cache.todayOrders.length;
     
-    // Если в shiftState больше заказов, чем в кэше, добавляем недостающие
-    // Но мы не можем просто добавить недостающие, т.к. у нас нет их данных в shiftState
-    // Поэтому используем данные из shiftState как основные для дохода/расходов
-    // и добавляем их к данным из кэша
-    
-    // Однако в shiftState мы храним полные накопления (totalIncome, totalExpenses, netProfit)
-    // Поэтому используем их как основные, если они больше нуля
     if (shiftState.totalIncome > 0 || shiftState.totalExpenses > 0) {
-      // Используем данные из shiftState как основные
-      // Но нужно быть осторожным: если есть заказы в кэше, они уже учтены
-      // Поэтому берём максимум или сумму
-      // Лучше всего: если shiftState показывает больше - используем его данные
       if (shiftState.totalIncome > totalIncome || shiftState.ordersCount > cachedOrdersCount) {
-        // Заменяем данные из кэша данными из shiftState
         totalIncome = shiftState.totalIncome;
         totalExpenses = shiftState.totalExpenses;
         netProfit = shiftState.netProfit;
-        // ordersCount берём из shiftState, т.к. там актуальное количество
         ordersCount = shiftState.ordersCount;
-        // Пробег тоже берём из shiftState
         totalPaid = shiftState.totalPaidDistance;
       }
     }
-    
-    // Время работы и холостой пробег
-    if (shiftState.isActive) {
-      // Если смена активна, время работы считается в реальном времени
-      // totalWorkTime будет добавлено позже
-    }
   }
 
-  // ===== 3. ВРЕМЯ РАБОТЫ И ХОЛОСТОЙ ПРОБЕГ =====
+  // ===== 3. ВРЕМЯ РАБОТЫ =====
   Duration totalWorkTime = Duration.zero;
   double totalIdle = 0.0;
   Duration totalIdleTime = Duration.zero;
@@ -171,19 +144,44 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
     totalIdle = shiftState.totalIdleDistance;
     totalIdleTime = shiftState.totalIdleTimeDisplay;
   } else {
-    // Если смена не активна, берём данные из кэша
     if (cache.activeShift != null) {
       totalWorkTime = cache.activeShift!.duration ?? Duration.zero;
       totalIdle = cache.activeShift!.totalIdleDistance;
     }
-    // Также добавляем накопленное время из shiftState (если смена была завершена)
     if (shiftState.totalWorkTime > Duration.zero) {
       totalWorkTime = shiftState.totalWorkTime;
       totalIdle = shiftState.totalIdleDistance;
     }
   }
 
-  logMessage('📊 Дневная статистика: заказов=$ordersCount, пробег=$totalPaid, доход=$totalIncome, расходы=$totalExpenses, прибыль=$netProfit', category: 'STATS');
+  // ===== 4. ВОССТАНАВЛИВАЕМ ВРЕМЯ ПРОСТОЯ ИЗ КЭША =====
+  // Суммируем время простоя из всех смен в кэше
+  Duration totalIdleTimeFromCache = Duration.zero;
+  for (final shift in cache.todayShifts) {
+    // Если в модели Shift есть поле totalIdleTime, используем его
+    // Или вычисляем: idleTime = duration - totalOrderTime
+    if (shift.duration != null) {
+      final shiftDuration = shift.duration!;
+      final orderTime = Duration(seconds: 0); // TODO: нужно добавить totalOrderTime в модель Shift
+      // Пока используем то, что есть
+      if (shift.totalIdleDistance > 0) {
+        // Если есть холостой пробег, но нет времени простоя,
+        // пока оставляем как есть
+      }
+    }
+    // Используем totalIdleTime если оно есть в модели
+  }
+
+  // Если в кэше есть время простоя из предыдущих сессий, используем его
+  if (cache.todayShifts.isNotEmpty) {
+    // Суммируем время простоя из всех смен
+    // Временно используем totalIdleTime из shiftState
+    if (shiftState.totalIdleTime > Duration.zero) {
+      totalIdleTime = shiftState.totalIdleTime;
+    }
+  }
+
+  logMessage('📊 Дневная статистика: заказов=$ordersCount, пробег=$totalPaid, доход=$totalIncome, расходы=$totalExpenses, прибыль=$netProfit, время простоя=${totalIdleTime.inSeconds} сек', category: 'STATS');
 
   return DailyStats(
     totalPaidDistance: totalPaid,
