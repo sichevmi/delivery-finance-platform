@@ -443,19 +443,25 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   try {
     // ===== ОТПРАВЛЯЕМ ВСЕ ДАННЫЕ НА СЕРВЕР =====
     final shiftId = state.shiftId!;
-    final data = {
-      'totalPaidDistance': state.totalPaidDistance,
-      'totalIdleDistance': state.totalIdleDistance,
-      'totalOrderTimeSeconds': state.totalOrderTime.inSeconds,
-      'ordersCount': state.ordersCount,
-      'totalIncome': state.totalIncome,
-      'totalExpenses': state.totalExpenses,
-      'netProfit': state.netProfit,
-    };
     
-    logMessage('📤 [СМЕНА] Отправка данных на сервер: $data', category: 'SHIFT');
+    logMessage('📤 [СМЕНА] Отправка данных на сервер:', category: 'SHIFT');
+    logMessage('   totalPaidDistance: ${state.totalPaidDistance}', category: 'SHIFT');
+    logMessage('   totalIdleDistance: ${state.totalIdleDistance}', category: 'SHIFT');
+    logMessage('   ordersCount: ${state.ordersCount}', category: 'SHIFT');
+    logMessage('   totalIncome: ${state.totalIncome}', category: 'SHIFT');
+    logMessage('   totalExpenses: ${state.totalExpenses}', category: 'SHIFT');
+    logMessage('   netProfit: ${state.netProfit}', category: 'SHIFT');
     
-    await _apiService.completeShiftWithStats(shiftId, data);
+    await _apiService.completeShift(
+      shiftId,
+      totalPaidDistance: state.totalPaidDistance,
+      totalIdleDistance: state.totalIdleDistance,
+      totalOrderTimeSeconds: state.totalOrderTime.inSeconds,
+      ordersCount: state.ordersCount,
+      totalIncome: state.totalIncome,
+      totalExpenses: state.totalExpenses,
+      netProfit: state.netProfit,
+    );
     
     logMessage('✅ Смена завершена на сервере (id=$shiftId)', category: 'SHIFT');
   } catch (e) {

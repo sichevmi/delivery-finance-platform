@@ -28,7 +28,6 @@ class AppCache {
   void updateTodayData(Map<String, dynamic> data) {
     final shiftsList = data['shifts'] as List? ?? [];
     todayShifts = shiftsList.map((s) => Shift.fromJson(s)).toList();
-    // Используем firstWhereOrNull для безопасного поиска активной смены
     activeShift = todayShifts.cast<Shift?>().firstWhere(
       (s) => s?.status == 'active',
       orElse: () => null,
@@ -55,10 +54,8 @@ class ApiService {
   final ApiClient _apiClient = ApiClient();
   final AppCache _cache = AppCache();
 
-  // Геттер для доступа к ApiClient (используется в settings_provider)
   ApiClient get apiClient => _apiClient;
 
-  // Загрузка всех данных при старте
   Future<void> loadAllData() async {
     try {
       final todayResponse = await _apiClient.getTodayData();
@@ -74,7 +71,8 @@ class ApiService {
     }
   }
 
-  // Смена
+  // ===== СМЕНА =====
+
   Future<Shift> startShift() async {
     try {
       final response = await _apiClient.startShift();
@@ -89,69 +87,53 @@ class ApiService {
   }
 
   Future<void> completeShift(
-  int shiftId, {
-  double? totalPaidDistance,
-  double? totalIdleDistance,
-  int? totalOrderTimeSeconds,
-  int? ordersCount,
-  double? totalIncome,
-  double? totalExpenses,
-  double? netProfit,
-}) async {
-  try {
-    await _apiClient.completeShift(
-      shiftId,
-      totalPaidDistance: totalPaidDistance,
-      totalIdleDistance: totalIdleDistance,
-      totalOrderTimeSeconds: totalOrderTimeSeconds,
-      ordersCount: ordersCount,
-      totalIncome: totalIncome,
-      totalExpenses: totalExpenses,
-      netProfit: netProfit,
-    );
-    _cache.activeShift = null;
-    await loadAllData();
-    logMessage('✅ Смена завершена на сервере', category: 'API');
-  } catch (e) {
-    logMessage('❌ Ошибка завершения смены: $e', category: 'API', level: LogLevel.error);
-    rethrow;
-  }
-}
-
-  // Заказ
-  // В ApiService классе, метод createOrder:
-
-Future<Order> createOrder(Map<String, dynamic> data) async {
-  try {
-    final response = await _apiClient.createOrder(data);
-    final order = Order.fromJson(response);
-    _cache.todayOrders.add(order);
-    
-    // Если есть доставки — добавляем их в кэш (опционально)
-    final deliveries = data['deliveries'] as List?;
-    if (deliveries != null) {
-      logMessage('📦 Создано ${deliveries.length} доставок для заказа ${order.id}', category: 'API');
+    int shiftId, {
+    double? totalPaidDistance,
+    double? totalIdleDistance,
+    int? totalOrderTimeSeconds,
+    int? ordersCount,
+    double? totalIncome,
+    double? totalExpenses,
+    double? netProfit,
+  }) async {
+    try {
+      await _apiClient.completeShift(
+        shiftId,
+        totalPaidDistance: totalPaidDistance,
+        totalIdleDistance: totalIdleDistance,
+        totalOrderTimeSeconds: totalOrderTimeSeconds,
+        ordersCount: ordersCount,
+        totalIncome: totalIncome,
+        totalExpenses: totalExpenses,
+        netProfit: netProfit,
+      );
+      _cache.activeShift = null;
+      await loadAllData();
+      logMessage('✅ Смена завершена на сервере', category: 'API');
+    } catch (e) {
+      logMessage('❌ Ошибка завершения смены: $e', category: 'API', level: LogLevel.error);
+      rethrow;
     }
-    
-    logMessage('✅ Заказ создан на сервере', category: 'API');
-    return order;
-  } catch (e) {
-    logMessage('❌ Ошибка создания заказа: $e', category: 'API', level: LogLevel.error);
-    rethrow;
   }
-}
 
-Future<void> completeShiftWithStats(int shiftId, Map<String, dynamic> data) async {
-  try {
-    await _apiClient.completeShift(shiftId, data);
-    _cache.activeShift = null;
-    await loadAllData();
-    logMessage('✅ Смена завершена на сервере', category: 'API');
-  } catch (e) {
-    logMessage('❌ Ошибка завершения смены: $e', category: 'API', level: LogLevel.error);
-    rethrow;
+  // ===== ЗАКАЗ =====
+
+  Future<Order> createOrder(Map<String, dynamic> data) async {
+    try {
+      final response = await _apiClient.createOrder(data);
+      final order = Order.fromJson(response);
+      _cache.todayOrders.add(order);
+      final deliveries = data['deliveries'] as List?;
+      if (deliveries != null) {
+        logMessage('📦 Создано ${deliveries.length} доставок для заказа ${order.id}', category: 'API');
+      }
+      logMessage('✅ Заказ создан на сервере', category: 'API');
+      return order;
+    } catch (e) {
+      logMessage('❌ Ошибка создания заказа: $e', category: 'API', level: LogLevel.error);
+      rethrow;
+    }
   }
-}
 
   Future<void> completeOrder(int orderId) async {
     try {
