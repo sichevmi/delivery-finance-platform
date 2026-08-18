@@ -62,13 +62,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
   Future<void> _loadData() async {
     try {
+      logMessage('🔄 [HOME] _loadData() начат', category: 'SYSTEM');
       final apiService = ApiService();
       await apiService.loadAllData();
-      setState(() => _isLoading = false);
-      logMessage('✅ Данные загружены с сервера', category: 'SYSTEM');
+      logMessage('🔄 [HOME] Данные загружены с сервера', category: 'SYSTEM');
+      
+      // Обновляем статистику через Notifier
+      await ref.refreshStats();
+      logMessage('🔄 [HOME] Статистика обновлена', category: 'SYSTEM');
+      
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+      logMessage('🔄 [HOME] _loadData() завершён', category: 'SYSTEM');
     } catch (e) {
-      logMessage('⚠️ Ошибка загрузки данных: $e', category: 'SYSTEM', level: LogLevel.error);
-      setState(() => _isLoading = false);
+      logMessage('⚠️ [HOME] Ошибка загрузки данных: $e', category: 'SYSTEM', level: LogLevel.error);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -94,7 +105,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final shiftState = ref.watch(shiftProvider);
     final selectedTab = ref.watch(selectedTabProvider);
     final settings = ref.watch(settingsProvider);
-    final dailyStatsAsync = ref.watch(dailyStatsProvider);
+    // Теперь синхронно получаем статистику без моргания
+    final stats = ref.watch(dailyStatsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -116,7 +128,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       body: IndexedStack(
         index: selectedTab,
         children: [
-          _buildHomeTab(shiftState, settings, dailyStatsAsync),
+          _buildHomeTab(shiftState, settings, stats),
           Navigator(key: _navigatorKeys[1], onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => const OrdersTab())),
           Navigator(key: _navigatorKeys[2], onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => const DirectoriesTab())),
           Navigator(key: _navigatorKeys[3], onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => const AnalyticsTab())),
@@ -141,183 +153,161 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     );
   }
 
-  Widget _buildHomeTab(ShiftState shiftState, SettingsState settings, AsyncValue<DailyStats> dailyStatsAsync) {
-    return dailyStatsAsync.when(
-      data: (stats) => Container(
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Дата и статус смены
-            Row(
-              children: [
-                const Icon(Icons.calendar_today, size: 12, color: Color(0xFF888888)),
-                const SizedBox(width: 4),
-                Text(
-                  _getTodayDate(),
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF888888)),
-                ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: shiftState.isActive ? Colors.green.withOpacity(0.15) : Colors.grey.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 5,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          color: shiftState.isActive ? Colors.green : Colors.grey,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        shiftState.isActive ? 'Активна' : 'Не начата',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: shiftState.isActive ? Colors.green : Colors.grey,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-
-            // Строка: Время работы + Стоимость пробега
-            Row(
-              children: [
-                _TimeDisplay(
-                  shiftState: shiftState,
-                  label: 'Время работы',
-                  color: Colors.white,
-                ),
-                const Spacer(),
-                _buildCostPerKm(settings),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            // Блоки 2x2 — компактные
-            Row(
-              children: [
-                _buildCompactMetricCard(
-                  value: '${stats.netProfit.toStringAsFixed(0)} ₽',
-                  label: 'Доход',
-                  color: Colors.green,
-                ),
-                const SizedBox(width: 8),
-                _buildCompactMetricCard(
-                  value: '${stats.totalExpenses.toStringAsFixed(0)} ₽',
-                  label: 'Расход',
-                  color: Colors.red,
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-
-            Row(
-              children: [
-                _buildCompactMetricCard(
-                  value: '${stats.totalDistance.toStringAsFixed(1)} км',
-                  label: 'Пробег всего',
-                  color: Colors.white,
-                ),
-                const SizedBox(width: 8),
-                _buildCompactMetricCard(
-                  value: '${stats.totalIdleDistance.toStringAsFixed(1)} км',
-                  label: 'Холостой пробег',
-                  color: Colors.white,
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-
-            Row(
-              children: [
-                _buildCompactMetricCard(
-                  value: _calculateProfitPerKm(stats, settings),
-                  label: 'Прибыль на км',
-                  color: Colors.white,
-                ),
-                const SizedBox(width: 8),
-                _buildCompactMetricCard(
-                  value: _calculateProfitPerHour(stats),
-                  label: 'Прибыль за час',
-                  color: Colors.white,
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-
-            // Время простоя — компактная плашка
-            _buildCompactIdleTimeCard(shiftState),
-            const Spacer(),
-
-            // Кнопка — меньше по высоте
-            SizedBox(
-              height: 40,
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  final notifier = ref.read(shiftProvider.notifier);
-                  if (shiftState.isActive) {
-                    notifier.stopShift();
-                  } else {
-                    notifier.startShift();
-                  }
-                  ref.invalidate(dailyStatsProvider);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: shiftState.isActive ? Colors.red : const Color(0xFF6C63FF),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  padding: EdgeInsets.zero,
-                ),
-                child: Text(
-                  shiftState.isActive ? 'Остановить работу' : 'Начать работу',
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-      loading: () => Container(
-        padding: const EdgeInsets.all(8),
-        child: const Center(
-          child: CircularProgressIndicator(color: Color(0xFF6C63FF)),
-        ),
-      ),
-      error: (error, stack) => Container(
-        padding: const EdgeInsets.all(8),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+  Widget _buildHomeTab(ShiftState shiftState, SettingsState settings, DailyStats stats) {
+    return Container(
+      padding: const EdgeInsets.all(8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Дата и статус смены
+          Row(
             children: [
-              const Icon(Icons.error_outline, color: Colors.red, size: 32),
-              const SizedBox(height: 8),
+              const Icon(Icons.calendar_today, size: 12, color: Color(0xFF888888)),
+              const SizedBox(width: 4),
               Text(
-                'Ошибка загрузки',
-                style: const TextStyle(color: Colors.red, fontSize: 12),
-                textAlign: TextAlign.center,
+                _getTodayDate(),
+                style: const TextStyle(fontSize: 11, color: Color(0xFF888888)),
               ),
-              const SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: () => ref.invalidate(dailyStatsProvider),
-                child: const Text('Обновить', style: TextStyle(fontSize: 12)),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: shiftState.isActive ? Colors.green.withOpacity(0.15) : Colors.grey.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 5,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: shiftState.isActive ? Colors.green : Colors.grey,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      shiftState.isActive ? 'Активна' : 'Не начата',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: shiftState.isActive ? Colors.green : Colors.grey,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 4),
+
+          // Строка: Время работы + Стоимость пробега
+          Row(
+            children: [
+              _TimeDisplay(
+                shiftState: shiftState,
+                label: 'Время работы',
+                color: Colors.white,
+              ),
+              const Spacer(),
+              _buildCostPerKm(settings),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Блоки 2x2 — компактные
+          Row(
+            children: [
+              _buildCompactMetricCard(
+                value: '${stats.netProfit.toStringAsFixed(0)} ₽',
+                label: 'Доход',
+                color: Colors.green,
+              ),
+              const SizedBox(width: 8),
+              _buildCompactMetricCard(
+                value: '${stats.totalExpenses.toStringAsFixed(0)} ₽',
+                label: 'Расход',
+                color: Colors.red,
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+
+          Row(
+            children: [
+              _buildCompactMetricCard(
+                value: '${stats.totalDistance.toStringAsFixed(1)} км',
+                label: 'Пробег всего',
+                color: Colors.white,
+              ),
+              const SizedBox(width: 8),
+              _buildCompactMetricCard(
+                value: '${stats.totalIdleDistance.toStringAsFixed(1)} км',
+                label: 'Холостой пробег',
+                color: Colors.white,
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+
+          Row(
+            children: [
+              _buildCompactMetricCard(
+                value: _calculateProfitPerKm(stats, settings),
+                label: 'Прибыль на км',
+                color: Colors.white,
+              ),
+              const SizedBox(width: 8),
+              _buildCompactMetricCard(
+                value: _calculateProfitPerHour(stats),
+                label: 'Прибыль за час',
+                color: Colors.white,
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+
+          // Время простоя — компактная плашка
+          _buildCompactIdleTimeCard(shiftState),
+          const Spacer(),
+
+          // Кнопка начала/остановки смены
+          SizedBox(
+            height: 54,
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () async {
+                logMessage('🔄 [HOME] Нажата кнопка смены', category: 'SYSTEM');
+                final notifier = ref.read(shiftProvider.notifier);
+                if (shiftState.isActive) {
+                  logMessage('🔄 [HOME] Останавливаем смену', category: 'SYSTEM');
+                  await notifier.stopShift();
+                  logMessage('🔄 [HOME] Смена остановлена', category: 'SYSTEM');
+                } else {
+                  logMessage('🔄 [HOME] Запускаем смену', category: 'SYSTEM');
+                  await notifier.startShift();
+                  logMessage('🔄 [HOME] Смена запущена', category: 'SYSTEM');
+                }
+                
+                // ===== ОБНОВЛЯЕМ СТАТИСТИКУ БЕЗ МОРГАНИЯ =====
+                logMessage('🔄 [HOME] Обновляем статистику', category: 'SYSTEM');
+                await ref.refreshStats();
+                logMessage('🔄 [HOME] Статистика обновлена', category: 'SYSTEM');
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: shiftState.isActive ? Colors.red : const Color(0xFF6C63FF),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text(
+                shiftState.isActive ? 'Остановить работу' : 'Начать работу',
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

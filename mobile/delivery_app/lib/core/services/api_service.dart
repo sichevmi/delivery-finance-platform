@@ -57,19 +57,22 @@ class ApiService {
   ApiClient get apiClient => _apiClient;
 
   Future<void> loadAllData() async {
-    try {
-      final todayResponse = await _apiClient.getTodayData();
-      _cache.updateTodayData(todayResponse);
+  try {
+    logMessage('🔄 [API] loadAllData() начат', category: 'API');
+    final todayResponse = await _apiClient.getTodayData();
+    _cache.updateTodayData(todayResponse);
+    logMessage('🔄 [API] todayResponse получен: shifts=${_cache.todayShifts.length}, orders=${_cache.todayOrders.length}', category: 'API');
 
-      final dirsResponse = await _apiClient.getDirectories();
-      _cache.updateDirectories(dirsResponse);
+    final dirsResponse = await _apiClient.getDirectories();
+    _cache.updateDirectories(dirsResponse);
+    logMessage('🔄 [API] directories получены', category: 'API');
 
-      logMessage('✅ Все данные загружены с сервера', category: 'API');
-    } catch (e) {
-      logMessage('❌ Ошибка загрузки данных: $e', category: 'API', level: LogLevel.error);
-      rethrow;
-    }
+    logMessage('✅ [API] Все данные загружены с сервера', category: 'API');
+  } catch (e) {
+    logMessage('❌ [API] Ошибка загрузки данных: $e', category: 'API', level: LogLevel.error);
+    rethrow;
   }
+}
 
   // ===== СМЕНА =====
 

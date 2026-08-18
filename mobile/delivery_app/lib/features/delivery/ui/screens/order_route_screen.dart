@@ -554,74 +554,73 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   }
 
   void _addDelivery() {
-  logMessage('🔵 [_addDelivery] ВХОД, deliveryNumber=${_state.deliveryNumber}');
-  logMessage('🔵 [_addDelivery] completedDeliveries до: ${_state.completedDeliveries.length}');
-  
-  final alreadyExists = _state.completedDeliveries.any((d) => d.number == _state.deliveryNumber);
-  logMessage('🔵 [_addDelivery] alreadyExists: $alreadyExists');
-  
-  List<Delivery> newCompletedDeliveries = List.from(_state.completedDeliveries);
-  
-  if (!alreadyExists && _state.clientAddress != null && _state.clientAddress != 'Адрес клиента будет определён позже') {
-    logMessage('🔵 [_addDelivery] Сохраняем текущую доставку #${_state.deliveryNumber}');
-    final currentDelivery = Delivery(
-      id: 0,
-      number: _state.deliveryNumber,
-      clientAddress: _state.clientAddress ?? 'Неизвестный адрес',
-      apartment: _state.apartment ?? '',
-      weight: _state.weight ?? 0.0,
-      timeToShop: _state.timeToShop,
-      distanceToShop: _state.distanceToShop,
-      timeReceiving: _state.timeReceiving,
-      timeToClient: _state.timeToClient,
-      distanceToClient: _state.distanceToClient,
-      timeDelivery: _state.timeDelivery,
-    );
-    newCompletedDeliveries.add(currentDelivery);
-    logMessage('📦 Сохранена доставка #${_state.deliveryNumber} перед добавлением новой', category: 'ORDER');
-  } else if (alreadyExists) {
-    logMessage('🔵 [_addDelivery] Доставка #${_state.deliveryNumber} уже сохранена, пропускаем');
-  } else {
-    logMessage('🔵 [_addDelivery] clientAddress не готов, пропускаем сохранение');
+    logMessage('🔵 [_addDelivery] ВХОД, deliveryNumber=${_state.deliveryNumber}');
+    logMessage('🔵 [_addDelivery] completedDeliveries до: ${_state.completedDeliveries.length}');
+    
+    final alreadyExists = _state.completedDeliveries.any((d) => d.number == _state.deliveryNumber);
+    logMessage('🔵 [_addDelivery] alreadyExists: $alreadyExists');
+    
+    List<Delivery> newCompletedDeliveries = List.from(_state.completedDeliveries);
+    
+    if (!alreadyExists && _state.clientAddress != null && _state.clientAddress != 'Адрес клиента будет определён позже') {
+      logMessage('🔵 [_addDelivery] Сохраняем текущую доставку #${_state.deliveryNumber}');
+      final currentDelivery = Delivery(
+        id: 0,
+        number: _state.deliveryNumber,
+        clientAddress: _state.clientAddress ?? 'Неизвестный адрес',
+        apartment: _state.apartment ?? '',
+        weight: _state.weight ?? 0.0,
+        timeToShop: _state.timeToShop,
+        distanceToShop: _state.distanceToShop,
+        timeReceiving: _state.timeReceiving,
+        timeToClient: _state.timeToClient,
+        distanceToClient: _state.distanceToClient,
+        timeDelivery: _state.timeDelivery,
+      );
+      newCompletedDeliveries.add(currentDelivery);
+      logMessage('📦 Сохранена доставка #${_state.deliveryNumber} перед добавлением новой', category: 'ORDER');
+    } else if (alreadyExists) {
+      logMessage('🔵 [_addDelivery] Доставка #${_state.deliveryNumber} уже сохранена, пропускаем');
+    } else {
+      logMessage('🔵 [_addDelivery] clientAddress не готов, пропускаем сохранение');
+    }
+
+    logMessage('🔵 [_addDelivery] newCompletedDeliveries: ${newCompletedDeliveries.length}');
+
+    _isSummaryShown = false;
+
+    setState(() {
+      _state = _state.copyWith(
+        completedDeliveries: newCompletedDeliveries,
+        deliveryNumber: _state.deliveryNumber + 1,
+        currentSegment: 2,
+        weight: null,
+        apartment: null,
+        isWeightValid: false,
+        isApartmentValid: false,
+        isPrivateHouse: false,
+        distance: 0.0,
+        gpsDistance: 0.0,
+        showSummary: false,
+        useGps: true,
+        timeToShop: 0,
+        distanceToShop: 0.0,
+        timeReceiving: 0,
+        timeToClient: 0,
+        distanceToClient: 0.0,
+        timeDelivery: 0,
+        clientAddress: 'Адрес клиента будет определён позже',
+        shopAddress: _state.shopAddress,
+        coefficient: _state.coefficient,
+      );
+    });
+    
+    logMessage('🔵 [_addDelivery] После setState: deliveryNumber=${_state.deliveryNumber}, completedDeliveries=${_state.completedDeliveries.length}');
+    
+    _gpsService.resetDistance();
+    _startSegment();
+    logMessage('🔵 [_addDelivery] ВЫХОД');
   }
-
-  logMessage('🔵 [_addDelivery] newCompletedDeliveries: ${newCompletedDeliveries.length}');
-
-  // ===== СБРАСЫВАЕМ ФЛАГ ПОКАЗА СВОДКИ =====
-  _isSummaryShown = false;
-
-  setState(() {
-    _state = _state.copyWith(
-      completedDeliveries: newCompletedDeliveries,
-      deliveryNumber: _state.deliveryNumber + 1,
-      currentSegment: 2,
-      weight: null,
-      apartment: null,
-      isWeightValid: false,
-      isApartmentValid: false,
-      isPrivateHouse: false,
-      distance: 0.0,
-      gpsDistance: 0.0,
-      showSummary: false,
-      useGps: true,
-      timeToShop: 0,
-      distanceToShop: 0.0,
-      timeReceiving: 0,
-      timeToClient: 0,
-      distanceToClient: 0.0,
-      timeDelivery: 0,
-      clientAddress: 'Адрес клиента будет определён позже',
-      shopAddress: _state.shopAddress,
-      coefficient: _state.coefficient,
-    );
-  });
-  
-  logMessage('🔵 [_addDelivery] После setState: deliveryNumber=${_state.deliveryNumber}, completedDeliveries=${_state.completedDeliveries.length}');
-  
-  _gpsService.resetDistance();
-  _startSegment();
-  logMessage('🔵 [_addDelivery] ВЫХОД');
-}
 
   void _cancelOrder() {
     _gpsSubscription?.cancel();
@@ -673,7 +672,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
           totalCost: totalCost,
           totalTime: totalTime,
           totalDistance: totalDistance,
-                shopAddress: _state.shopAddress,  // <-- ЭТО КЛЮЧЕВОЕ
+          shopAddress: _state.shopAddress,
         ),
       ),
     ).then((result) async {
@@ -699,6 +698,10 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
           expenses: totalExpenses,
           orderDuration: orderDuration,
         );
+        
+        // ===== ПРИНУДИТЕЛЬНО ОБНОВЛЯЕМ СТАТИСТИКУ =====
+        ref.invalidate(dailyStatsProvider);
+        logMessage('📊 Статистика обновлена после завершения заказа', category: 'STATS');
         
         try {
           final apiService = ApiService();
