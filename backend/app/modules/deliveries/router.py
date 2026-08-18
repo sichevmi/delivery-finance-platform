@@ -229,10 +229,11 @@ async def start_shift(
 @router.post("/shifts/{shift_id}/complete")
 async def complete_shift(
     shift_id: int,
+    request_data: Dict[str, Any],  # <-- ПРИНИМАЕМ ДАННЫЕ ИЗ ТЕЛА ЗАПРОСА
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    """Завершить смену"""
+    """Завершить смену с сохранением статистики"""
     try:
         shift = db.query(Shift).filter(
             Shift.id == shift_id,
@@ -245,7 +246,7 @@ async def complete_shift(
 
         now = datetime.now(timezone.utc)
         
-        # ===== ОБНОВЛЯЕМ ВСЕ ПОЛЯ =====
+        # ===== ОБНОВЛЯЕМ ВРЕМЯ =====
         shift.status = 'completed'
         shift.end_time = now.isoformat()
         
@@ -257,14 +258,21 @@ async def complete_shift(
                 logger.warning(f"⚠️ Ошибка расчёта длительности: {e}")
                 shift.duration_seconds = 0
         
-        # ===== СОХРАНЯЕМ СТАТИСТИКУ =====
-        shift.total_paid_distance = data.get("totalPaidDistance", shift.total_paid_distance)
-        shift.total_idle_distance = data.get("totalIdleDistance", shift.total_idle_distance)
-        shift.total_order_time_seconds = data.get("totalOrderTimeSeconds", shift.total_order_time_seconds)
-        shift.orders_count = data.get("ordersCount", shift.orders_count)
-        shift.total_income = data.get("totalIncome", shift.total_income)
-        shift.total_expenses = data.get("totalExpenses", shift.total_expenses)
-        shift.net_profit = data.get("netProfit", shift.net_profit)
+        # ===== СОХРАНЯЕМ СТАТИСТИКУ ИЗ ТЕЛА ЗАПРОСА =====
+        if 'totalPaidDistance' in request_data:
+            shift.total_paid_distance = request_data.get('totalPaidDistance', 0.0)
+        if 'totalIdleDistance' in request_data:
+            shift.total_idle_distance = request_data.get('totalIdleDistance', 0.0)
+        if 'totalOrderTimeSeconds' in request_data:
+            shift.total_order_time_seconds = request_data.get('totalOrderTimeSeconds', 0)
+        if 'ordersCount' in request_data:
+            shift.orders_count = request_data.get('ordersCount', 0)
+        if 'totalIncome' in request_data:
+            shift.total_income = request_data.get('totalIncome', 0.0)
+        if 'totalExpenses' in request_data:
+            shift.total_expenses = request_data.get('totalExpenses', 0.0)
+        if 'netProfit' in request_data:
+            shift.net_profit = request_data.get('netProfit', 0.0)
         
         shift.updated_at = now
         db.commit()
