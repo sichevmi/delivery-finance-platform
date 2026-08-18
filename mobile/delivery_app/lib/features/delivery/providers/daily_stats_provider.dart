@@ -93,25 +93,54 @@ class DailyStats {
 class DailyStatsNotifier extends StateNotifier<DailyStats> {
   final Ref _ref;
   bool _isInitialized = false;
+  bool _isDisposed = false;
 
   DailyStatsNotifier(this._ref) : super(DailyStats()) {
     _loadStats();
   }
 
   Future<void> _loadStats() async {
-    final stats = await _calculateDailyStats(_ref);
-    state = stats;
-    _isInitialized = true;
-    logMessage('📊 [STATS] Статистика загружена', category: 'STATS');
+    if (_isDisposed) return;
+    try {
+      final stats = await _calculateDailyStats(_ref);
+      if (!_isDisposed) {
+        state = stats;
+        _isInitialized = true;
+        logMessage('📊 [STATS] Статистика загружена', category: 'STATS');
+      }
+    } catch (e) {
+      if (!_isDisposed) {
+        logMessage('❌ [STATS] Ошибка загрузки статистики: $e', category: 'STATS', level: LogLevel.error);
+      }
+    }
   }
 
   Future<void> refresh() async {
+    if (_isDisposed) {
+      logMessage('⚠️ [STATS] Пропускаем refresh: notifier уже уничтожен', category: 'STATS');
+      return;
+    }
     logMessage('🔄 [STATS] Принудительное обновление статистики', category: 'STATS');
-    final stats = await _calculateDailyStats(_ref);
-    state = stats;
+    try {
+      final stats = await _calculateDailyStats(_ref);
+      if (!_isDisposed) {
+        state = stats;
+        logMessage('✅ [STATS] Статистика обновлена', category: 'STATS');
+      }
+    } catch (e) {
+      if (!_isDisposed) {
+        logMessage('❌ [STATS] Ошибка обновления статистики: $e', category: 'STATS', level: LogLevel.error);
+      }
+    }
   }
 
   DailyStats get currentStats => state;
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
+  }
 }
 
 final dailyStatsProvider = StateNotifierProvider<DailyStatsNotifier, DailyStats>((ref) {
@@ -161,7 +190,6 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
   logMessage('📊 [STATS] После кэша: ordersCount=$ordersCount, totalIncome=$totalIncome, totalExpenses=$totalExpenses, netProfit=$netProfit', category: 'STATS');
 
   // ===== 2. ПРИОРИТЕТНО ИСПОЛЬЗУЕМ ДАННЫЕ ИЗ shiftState =====
-  // Если в shiftState есть данные — используем их вместо кэша
   if (shiftState.totalIncome > 0 || shiftState.totalExpenses > 0 || shiftState.totalIdleDistance > 0) {
     logMessage('📊 [STATS] Используем данные из shiftState (приоритет)', category: 'STATS');
     if (shiftState.totalIncome > 0) totalIncome = shiftState.totalIncome;
@@ -169,7 +197,6 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
     if (shiftState.netProfit != 0) netProfit = shiftState.netProfit;
     if (shiftState.ordersCount > 0) ordersCount = shiftState.ordersCount;
     if (shiftState.totalPaidDistance > 0) totalPaid = shiftState.totalPaidDistance;
-    // ===== КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: берём холостой пробег из shiftState =====
     if (shiftState.totalIdleDistance > 0) {
       totalIdleDistance = shiftState.totalIdleDistance;
       logMessage('📊 [STATS] Холостой пробег из shiftState: $totalIdleDistance', category: 'STATS');

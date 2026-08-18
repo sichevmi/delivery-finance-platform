@@ -197,6 +197,7 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   double cachedTotalExpenses = 0.0;
   double cachedNetProfit = 0.0;
   double cachedTotalPaid = 0.0;
+  double cachedTotalIdleDistance = 0.0;  // <-- ДОБАВЛЯЕМ
   Duration cachedTotalOrderTime = Duration.zero;
 
   for (final order in cache.todayOrders) {
@@ -207,10 +208,13 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     cachedTotalOrderTime += order.totalTime;
   }
 
+  // ===== СУММИРУЕМ ХОЛОСТОЙ ПРОБЕГ ИЗ ВСЕХ СМЕН =====
+  for (final shift in cache.todayShifts) {
+    cachedTotalIdleDistance += shift.totalIdleDistance;
+    logMessage('🔵 [SHIFT]   смена ${shift.id}: idleDistance=${shift.totalIdleDistance}', category: 'SHIFT');
+  }
+
   Duration totalWorkTimeFromShifts = Duration.zero;
-  // ===== НЕ СУММИРУЕМ ХОЛОСТОЙ ПРОБЕГ ИЗ ЗАВЕРШЁННЫХ СМЕН =====
-  // Они уже сохранены на сервере, и при загрузке дублируются
-  double totalIdleDistanceFromShifts = 0.0;
   Duration totalIdleTimeFromShifts = Duration.zero;
   
   logMessage('🔵 [SHIFT] cache.todayShifts.length=${cache.todayShifts.length}', category: 'SHIFT');
@@ -220,12 +224,6 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
       totalWorkTimeFromShifts += shift.duration!;
       logMessage('🔵 [SHIFT]   смена id=${shift.id}, duration=${shift.duration!.inSeconds} сек', category: 'SHIFT');
     }
-    // ===== НЕ СУММИРУЕМ totalIdleDistance ИЗ ЗАВЕРШЁННЫХ СМЕН =====
-    // if (shift.status == 'completed') {
-    //   totalIdleDistanceFromShifts += shift.totalIdleDistance; // <-- УБРАТЬ!
-    // }
-    
-    // ===== СУММИРУЕМ ВРЕМЯ ПРОСТОЯ ТОЛЬКО ИЗ ЗАВЕРШЁННЫХ СМЕН =====
     if (shift.status == 'completed' && shift.totalIdleTime != null) {
       totalIdleTimeFromShifts += shift.totalIdleTime!;
       logMessage('🔵 [SHIFT]   смена id=${shift.id}, idleTime=${shift.totalIdleTime!.inSeconds} сек', category: 'SHIFT');
@@ -234,7 +232,6 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   logMessage('🔵 [SHIFT] totalWorkTimeFromShifts=${totalWorkTimeFromShifts.inSeconds} сек', category: 'SHIFT');
   logMessage('🔵 [SHIFT] totalIdleTimeFromShifts=${totalIdleTimeFromShifts.inSeconds} сек', category: 'SHIFT');
 
-  // ===== ВОССТАНАВЛИВАЕМ ВРЕМЯ ПРОСТОЯ =====
   Duration finalIdleTime = restoredIdleTime;
   if (totalIdleTimeFromShifts > finalIdleTime) {
     finalIdleTime = totalIdleTimeFromShifts;
@@ -250,7 +247,6 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
       isActive: true,
       shiftStartTime: shift.startTime,
       shiftId: shift.id,
-      // ===== ИСПОЛЬЗУЕМ ХОЛОСТОЙ ПРОБЕГ ИЗ АКТИВНОЙ СМЕНЫ =====
       totalPaidDistance: shift.totalPaidDistance,
       totalIdleDistance: shift.totalIdleDistance,
       ordersCount: cachedOrdersCount > 0 ? cachedOrdersCount : state.ordersCount,
@@ -273,7 +269,7 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     logMessage('🔵 [SHIFT] cache.activeShift == null', category: 'SHIFT');
     
     // ===== ВОССТАНАВЛИВАЕМ СТАТИСТИКУ ИЗ ЗАВЕРШЁННЫХ СМЕН =====
-    if (cachedOrdersCount > 0 || totalWorkTimeFromShifts > Duration.zero) {
+    if (cachedOrdersCount > 0 || totalWorkTimeFromShifts > Duration.zero || cachedTotalIdleDistance > 0) {
       state = state.copyWith(
         isActive: false,
         ordersCount: cachedOrdersCount,
@@ -283,11 +279,11 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
         totalPaidDistance: cachedTotalPaid,
         totalOrderTime: cachedTotalOrderTime,
         totalWorkTime: totalWorkTimeFromShifts,
-        // ===== НЕ СУММИРУЕМ ХОЛОСТОЙ ПРОБЕГ =====
-        totalIdleDistance: 0.0,  // <-- ОБНУЛЯЕМ, ТАК КАК ОН УЖЕ В СМЕНАХ
+        // ===== ВОССТАНАВЛИВАЕМ ХОЛОСТОЙ ПРОБЕГ =====
+        totalIdleDistance: cachedTotalIdleDistance,
         totalIdleTime: finalIdleTime,
       );
-      logMessage('📁 [SHIFT] Восстановлена статистика из кэша: заказов=${state.ordersCount}, время работы=${totalWorkTimeFromShifts.inSeconds} сек, время простоя=${state.totalIdleTime.inSeconds} сек', category: 'SHIFT');
+      logMessage('📁 [SHIFT] Восстановлена статистика из кэша: заказов=${state.ordersCount}, время работы=${totalWorkTimeFromShifts.inSeconds} сек, время простоя=${state.totalIdleTime.inSeconds} сек, холостой пробег=${state.totalIdleDistance} км', category: 'SHIFT');
     } else {
       if (finalIdleTime > Duration.zero) {
         state = state.copyWith(

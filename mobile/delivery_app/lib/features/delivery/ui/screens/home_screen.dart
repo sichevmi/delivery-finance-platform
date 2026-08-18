@@ -67,9 +67,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       await apiService.loadAllData();
       logMessage('🔄 [HOME] Данные загружены с сервера', category: 'SYSTEM');
       
-      // Обновляем статистику через Notifier
-      await ref.refreshStats();
-      logMessage('🔄 [HOME] Статистика обновлена', category: 'SYSTEM');
+      // ===== ПРОВЕРЯЕМ mounted ПЕРЕД ОБНОВЛЕНИЕМ =====
+      if (mounted) {
+        await ref.refreshStats();
+        logMessage('🔄 [HOME] Статистика обновлена', category: 'SYSTEM');
+      } else {
+        logMessage('⚠️ [HOME] Виджет не смонтирован, пропускаем обновление статистики', category: 'SYSTEM');
+      }
       
       if (mounted) {
         setState(() => _isLoading = false);
@@ -105,7 +109,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final shiftState = ref.watch(shiftProvider);
     final selectedTab = ref.watch(selectedTabProvider);
     final settings = ref.watch(settingsProvider);
-    // Теперь синхронно получаем статистику без моргания
     final stats = ref.watch(dailyStatsProvider);
 
     return Scaffold(
@@ -289,10 +292,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                   logMessage('🔄 [HOME] Смена запущена', category: 'SYSTEM');
                 }
                 
-                // ===== ОБНОВЛЯЕМ СТАТИСТИКУ БЕЗ МОРГАНИЯ =====
-                logMessage('🔄 [HOME] Обновляем статистику', category: 'SYSTEM');
-                await ref.refreshStats();
-                logMessage('🔄 [HOME] Статистика обновлена', category: 'SYSTEM');
+                // ===== ОБНОВЛЯЕМ СТАТИСТИКУ С ПРОВЕРКОЙ mounted =====
+                if (mounted) {
+                  try {
+                    await ref.refreshStats();
+                    logMessage('🔄 [HOME] Статистика обновлена', category: 'SYSTEM');
+                  } catch (e) {
+                    logMessage('⚠️ [HOME] Ошибка обновления статистики: $e', category: 'SYSTEM');
+                  }
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: shiftState.isActive ? Colors.red : const Color(0xFF6C63FF),
