@@ -225,17 +225,10 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
       }
       totalIdleDistanceFromShifts += shift.totalIdleDistance;
       
-      // ===== ВЫЧИСЛЯЕМ ВРЕМЯ ПРОСТОЯ ДЛЯ СМЕНЫ =====
-      // Время простоя = длительность смены - время на заказах
-      if (shift.duration != null) {
-        // TODO: когда в модели Shift появится totalOrderTime, используем его
-        // Пока оставляем 0
-        final orderTime = Duration(seconds: 0);
-        final idleTime = shift.duration! - orderTime;
-        if (idleTime > Duration.zero) {
-          totalIdleTimeFromShifts += idleTime;
-          logMessage('🔵 [SHIFT]   смена id=${shift.id}, idleTime=${idleTime.inSeconds} сек', category: 'SHIFT');
-        }
+      // ===== ИСПОЛЬЗУЕМ ВРЕМЯ ПРОСТОЯ ИЗ МОДЕЛИ (вычислено на сервере) =====
+      if (shift.totalIdleTime != null) {
+        totalIdleTimeFromShifts += shift.totalIdleTime!;
+        logMessage('🔵 [SHIFT]   смена id=${shift.id}, idleTime=${shift.totalIdleTime!.inSeconds} сек', category: 'SHIFT');
       }
     }
     logMessage('🔵 [SHIFT] totalWorkTimeFromShifts=${totalWorkTimeFromShifts.inSeconds} сек', category: 'SHIFT');

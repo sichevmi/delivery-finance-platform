@@ -77,27 +77,33 @@ async def get_today_data(
                 ]
             })
         
-        # ===== ВЫЧИСЛЯЕМ ВРЕМЯ ПРОСТОЯ ДЛЯ КАЖДОЙ СМЕНЫ =====
+        # ===== ВЫЧИСЛЯЕМ ВРЕМЯ ПРОСТОЯ =====
         shifts_data = []
         for s in shifts:
-            # Время простоя = общая длительность - время на заказах
-            idle_time_seconds = max(0, (s.duration_seconds or 0) - (s.total_order_time_seconds or 0))
+            duration = s.duration_seconds or 0
+            order_time = s.total_order_time_seconds or 0
+            # ===== КЛЮЧЕВОЕ: время простоя = длительность - время на заказах =====
+            idle_time = max(0, duration - order_time)
+            
+            logger.info(f"📊 Смена {s.id}: duration={duration}, order_time={order_time}, idle_time={idle_time}")
+            
             shifts_data.append({
                 "id": s.id,
                 "localId": s.local_id,
                 "startTime": s.start_time,
                 "endTime": s.end_time,
-                "durationSeconds": s.duration_seconds,
-                "totalPaidDistance": s.total_paid_distance,
-                "totalIdleDistance": s.total_idle_distance,
-                "ordersCount": s.orders_count,
-                "totalIncome": s.total_income,
-                "totalExpenses": s.total_expenses,
-                "netProfit": s.net_profit,
+                "durationSeconds": duration,
+                "totalPaidDistance": s.total_paid_distance or 0.0,
+                "totalIdleDistance": s.total_idle_distance or 0.0,
+                "totalOrderTimeSeconds": order_time,  # <-- ДОБАВЛЯЕМ В ОТВЕТ
+                "ordersCount": s.orders_count or 0,
+                "totalIncome": s.total_income or 0.0,
+                "totalExpenses": s.total_expenses or 0.0,
+                "netProfit": s.net_profit or 0.0,
                 "status": s.status,
                 "isSynced": s.is_synced,
                 "createdAt": s.created_at.isoformat() if s.created_at else None,
-                "totalIdleTimeSeconds": idle_time_seconds,  # <-- ДОБАВЛЕНО
+                "totalIdleTimeSeconds": idle_time,  # <-- ВЫЧИСЛЕННОЕ ВРЕМЯ ПРОСТОЯ
             })
         
         return {

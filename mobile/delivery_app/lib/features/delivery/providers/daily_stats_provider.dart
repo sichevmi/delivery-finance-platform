@@ -155,30 +155,22 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
   }
 
   // ===== 4. ВОССТАНАВЛИВАЕМ ВРЕМЯ ПРОСТОЯ ИЗ КЭША =====
-  // Суммируем время простоя из всех смен в кэше
   Duration totalIdleTimeFromCache = Duration.zero;
   for (final shift in cache.todayShifts) {
-    // Если в модели Shift есть поле totalIdleTime, используем его
-    // Или вычисляем: idleTime = duration - totalOrderTime
-    if (shift.duration != null) {
-      final shiftDuration = shift.duration!;
-      final orderTime = Duration(seconds: 0); // TODO: нужно добавить totalOrderTime в модель Shift
-      // Пока используем то, что есть
-      if (shift.totalIdleDistance > 0) {
-        // Если есть холостой пробег, но нет времени простоя,
-        // пока оставляем как есть
-      }
+    // Используем totalIdleTime если оно есть в модели (вычислено на сервере)
+    if (shift.totalIdleTime != null) {
+      totalIdleTimeFromCache += shift.totalIdleTime!;
+      logMessage('📊 Смена ${shift.id}: idleTime=${shift.totalIdleTime!.inSeconds} сек', category: 'STATS');
     }
-    // Используем totalIdleTime если оно есть в модели
   }
 
-  // Если в кэше есть время простоя из предыдущих сессий, используем его
-  if (cache.todayShifts.isNotEmpty) {
-    // Суммируем время простоя из всех смен
-    // Временно используем totalIdleTime из shiftState
-    if (shiftState.totalIdleTime > Duration.zero) {
-      totalIdleTime = shiftState.totalIdleTime;
-    }
+  // Если есть время простоя из кэша — используем его
+  if (totalIdleTimeFromCache > Duration.zero) {
+    totalIdleTime = totalIdleTimeFromCache;
+    logMessage('📊 Восстановлено время простоя из кэша: ${totalIdleTime.inSeconds} сек', category: 'STATS');
+  } else if (shiftState.totalIdleTime > Duration.zero) {
+    // Иначе используем из shiftState
+    totalIdleTime = shiftState.totalIdleTime;
   }
 
   logMessage('📊 Дневная статистика: заказов=$ordersCount, пробег=$totalPaid, доход=$totalIncome, расходы=$totalExpenses, прибыль=$netProfit, время простоя=${totalIdleTime.inSeconds} сек', category: 'STATS');
