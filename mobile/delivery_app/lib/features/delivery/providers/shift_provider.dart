@@ -407,18 +407,22 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   final settings = _ref.read(settingsProvider);
   final idleCost = _calculateIdleCost(unprocessedIdle, settings);
   
-  if (unprocessedIdle > 0) {
-    logMessage('📊 [СМЕНА] Списание холостого пробега: ${unprocessedIdle.toStringAsFixed(2)} км на сумму ${idleCost.toStringAsFixed(2)} руб', category: 'SHIFT');
-  }
+  // ===== ЛОГИРУЕМ ТЕКУЩИЕ ДАННЫЕ =====
+  logMessage('📊 [СМЕНА] Данные перед завершением:', category: 'SHIFT');
+  logMessage('   totalPaidDistance: ${state.totalPaidDistance}', category: 'SHIFT');
+  logMessage('   totalIdleDistance: ${state.totalIdleDistance}', category: 'SHIFT');
+  logMessage('   ordersCount: ${state.ordersCount}', category: 'SHIFT');
+  logMessage('   totalIncome: ${state.totalIncome}', category: 'SHIFT');
+  logMessage('   totalExpenses: ${state.totalExpenses}', category: 'SHIFT');
+  logMessage('   netProfit: ${state.netProfit}', category: 'SHIFT');
 
-  // ===== СОХРАНЯЕМ ВСЕ ДАННЫЕ =====
+  // ===== ОБНОВЛЯЕМ ЛОКАЛЬНОЕ СОСТОЯНИЕ =====
   final newTotalIdleTime = state.totalIdleTime + idleDuration;
   final newTotalWorkTime = state.totalWorkTime + addedWork;
   final newTotalOrderTime = state.totalOrderTime + addedOrderTime;
   final newTotalExpenses = state.totalExpenses + idleCost;
   final newNetProfit = state.totalIncome - newTotalExpenses;
 
-  // ===== ОБНОВЛЯЕМ ЛОКАЛЬНОЕ СОСТОЯНИЕ =====
   state = state.copyWith(
     isActive: false,
     shiftStartTime: null,
@@ -438,23 +442,22 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
 
   try {
     // ===== ОТПРАВЛЯЕМ ВСЕ ДАННЫЕ НА СЕРВЕР =====
-    // Используем существующий метод completeShift с передачей данных
-    await _apiService.completeShift(
-      state.shiftId!,
-      totalPaidDistance: state.totalPaidDistance,
-      totalIdleDistance: state.totalIdleDistance,
-      totalOrderTimeSeconds: state.totalOrderTimeDisplay.inSeconds,
-      ordersCount: state.ordersCount,
-      totalIncome: state.totalIncome,
-      totalExpenses: state.totalExpenses,
-      netProfit: state.netProfit,
-    );
+    final shiftId = state.shiftId!;
+    final data = {
+      'totalPaidDistance': state.totalPaidDistance,
+      'totalIdleDistance': state.totalIdleDistance,
+      'totalOrderTimeSeconds': state.totalOrderTime.inSeconds,
+      'ordersCount': state.ordersCount,
+      'totalIncome': state.totalIncome,
+      'totalExpenses': state.totalExpenses,
+      'netProfit': state.netProfit,
+    };
     
-    // ===== ПЕРЕЗАГРУЖАЕМ ДАННЫЕ С СЕРВЕРА =====
-    await _apiService.loadAllData();
+    logMessage('📤 [СМЕНА] Отправка данных на сервер: $data', category: 'SHIFT');
     
-    logMessage('✅ Смена завершена на сервере (id=${state.shiftId})', category: 'SHIFT');
-    logMessage('📊 Итоговые накопления за день: заказов=${state.ordersCount}, доход=${state.totalIncome}, расходы=${state.totalExpenses}, прибыль=${state.netProfit}, холостой пробег=${state.totalIdleDistance} км', category: 'SHIFT');
+    await _apiService.completeShiftWithStats(shiftId, data);
+    
+    logMessage('✅ Смена завершена на сервере (id=$shiftId)', category: 'SHIFT');
   } catch (e) {
     logMessage('❌ Ошибка завершения смены: $e', category: 'SHIFT', level: LogLevel.error);
   }

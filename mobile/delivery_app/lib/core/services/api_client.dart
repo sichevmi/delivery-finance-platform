@@ -97,65 +97,64 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> completeShift(
-  int shiftId, {
-  double? totalPaidDistance,
-  double? totalIdleDistance,
-  int? totalOrderTimeSeconds,
-  int? ordersCount,
-  double? totalIncome,
-  double? totalExpenses,
-  double? netProfit,
-}) async {
-  try {
-    final data = <String, dynamic>{};
-    if (totalPaidDistance != null) data['totalPaidDistance'] = totalPaidDistance;
-    if (totalIdleDistance != null) data['totalIdleDistance'] = totalIdleDistance;
-    if (totalOrderTimeSeconds != null) data['totalOrderTimeSeconds'] = totalOrderTimeSeconds;
-    if (ordersCount != null) data['ordersCount'] = ordersCount;
-    if (totalIncome != null) data['totalIncome'] = totalIncome;
-    if (totalExpenses != null) data['totalExpenses'] = totalExpenses;
-    if (netProfit != null) data['netProfit'] = netProfit;
-    
-    final response = await _dio.post(
-      '/shifts/$shiftId/complete',
-      data: data,
-    );
-    return response.data;
-  } catch (e) {
-    logMessage('⚠️ Ошибка завершения смены: $e', category: 'API', level: LogLevel.error);
-    rethrow;
+    int shiftId, {
+    double? totalPaidDistance,
+    double? totalIdleDistance,
+    int? totalOrderTimeSeconds,
+    int? ordersCount,
+    double? totalIncome,
+    double? totalExpenses,
+    double? netProfit,
+  }) async {
+    try {
+      final data = <String, dynamic>{};
+      if (totalPaidDistance != null) data['totalPaidDistance'] = totalPaidDistance;
+      if (totalIdleDistance != null) data['totalIdleDistance'] = totalIdleDistance;
+      if (totalOrderTimeSeconds != null) data['totalOrderTimeSeconds'] = totalOrderTimeSeconds;
+      if (ordersCount != null) data['ordersCount'] = ordersCount;
+      if (totalIncome != null) data['totalIncome'] = totalIncome;
+      if (totalExpenses != null) data['totalExpenses'] = totalExpenses;
+      if (netProfit != null) data['netProfit'] = netProfit;
+      
+      logMessage('📤 [API] Отправка завершения смены $shiftId: $data', category: 'API');
+      
+      final response = await _dio.post(
+        '/shifts/$shiftId/complete',
+        data: data,
+      );
+      return response.data;
+    } catch (e) {
+      logMessage('⚠️ Ошибка завершения смены: $e', category: 'API', level: LogLevel.error);
+      rethrow;
+    }
   }
-}
 
   // ===== ЗАКАЗЫ =====
 
-  // В ApiClient классе, метод createOrder:
-
-Future<Map<String, dynamic>> createOrder(Map<String, dynamic> data) async {
-  try {
-    // Формируем тело запроса с доставками
-    final requestData = {
-      'serviceName': data['serviceName'],
-      'coefficient': data['coefficient'],
-      'deliveryNumber': data['deliveryNumber'],
-      'totalPaidDistance': data['totalPaidDistance'],
-      'totalIncome': data['totalIncome'],
-      'totalExpenses': data['totalExpenses'],
-      'netProfit': data['netProfit'],
-      'totalTimeSeconds': data['totalTimeSeconds'],
-      'deliveries': data['deliveries'] ?? [], // ← доставки
-    };
-    
-    final response = await _dio.post(
-      '/orders',
-      data: requestData,
-    );
-    return response.data;
-  } catch (e) {
-    logMessage('⚠️ Ошибка создания заказа: $e', category: 'API', level: LogLevel.error);
-    rethrow;
+  Future<Map<String, dynamic>> createOrder(Map<String, dynamic> data) async {
+    try {
+      final requestData = {
+        'serviceName': data['serviceName'],
+        'coefficient': data['coefficient'],
+        'deliveryNumber': data['deliveryNumber'],
+        'totalPaidDistance': data['totalPaidDistance'],
+        'totalIncome': data['totalIncome'],
+        'totalExpenses': data['totalExpenses'],
+        'netProfit': data['netProfit'],
+        'totalTimeSeconds': data['totalTimeSeconds'],
+        'deliveries': data['deliveries'] ?? [],
+      };
+      
+      final response = await _dio.post(
+        '/orders',
+        data: requestData,
+      );
+      return response.data;
+    } catch (e) {
+      logMessage('⚠️ Ошибка создания заказа: $e', category: 'API', level: LogLevel.error);
+      rethrow;
+    }
   }
-}
 
   Future<Map<String, dynamic>> completeOrder(int orderId) async {
     try {

@@ -141,6 +141,18 @@ Future<Order> createOrder(Map<String, dynamic> data) async {
   }
 }
 
+Future<void> completeShiftWithStats(int shiftId, Map<String, dynamic> data) async {
+  try {
+    await _apiClient.completeShift(shiftId, data);
+    _cache.activeShift = null;
+    await loadAllData();
+    logMessage('✅ Смена завершена на сервере', category: 'API');
+  } catch (e) {
+    logMessage('❌ Ошибка завершения смены: $e', category: 'API', level: LogLevel.error);
+    rethrow;
+  }
+}
+
   Future<void> completeOrder(int orderId) async {
     try {
       await _apiClient.completeOrder(orderId);

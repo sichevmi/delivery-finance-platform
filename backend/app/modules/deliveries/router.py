@@ -229,7 +229,7 @@ async def start_shift(
 @router.post("/shifts/{shift_id}/complete")
 async def complete_shift(
     shift_id: int,
-    request_data: Dict[str, Any],  # <-- ПРИНИМАЕМ ДАННЫЕ ИЗ ТЕЛА ЗАПРОСА
+    request_data: Dict[str, Any],
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
@@ -250,36 +250,39 @@ async def complete_shift(
         shift.status = 'completed'
         shift.end_time = now.isoformat()
         
+        # ===== РАСЧЁТ ДЛИТЕЛЬНОСТИ =====
         if shift.start_time:
             try:
-                start = parse_datetime_safe(shift.start_time)
+                # Пробуем распарсить разными способами
+                start_str = shift.start_time
+                # Убираем Z в конце если есть
+                if start_str.endswith('Z'):
+                    start_str = start_str[:-1] + '+00:00'
+                start = datetime.fromisoformat(start_str)
+                if start.tzinfo is None:
+                    start = start.replace(tzinfo=timezone.utc)
                 shift.duration_seconds = int((now - start).total_seconds())
+                logger.info(f"📊 Длительность смены: {shift.duration_seconds} сек")
             except Exception as e:
                 logger.warning(f"⚠️ Ошибка расчёта длительности: {e}")
                 shift.duration_seconds = 0
         
-        # ===== СОХРАНЯЕМ СТАТИСТИКУ ИЗ ТЕЛА ЗАПРОСА =====
-        if 'totalPaidDistance' in request_data:
-            shift.total_paid_distance = request_data.get('totalPaidDistance', 0.0)
-        if 'totalIdleDistance' in request_data:
-            shift.total_idle_distance = request_data.get('totalIdleDistance', 0.0)
-        if 'totalOrderTimeSeconds' in request_data:
-            shift.total_order_time_seconds = request_data.get('totalOrderTimeSeconds', 0)
-        if 'ordersCount' in request_data:
-            shift.orders_count = request_data.get('ordersCount', 0)
-        if 'totalIncome' in request_data:
-            shift.total_income = request_data.get('totalIncome', 0.0)
-        if 'totalExpenses' in request_data:
-            shift.total_expenses = request_data.get('totalExpenses', 0.0)
-        if 'netProfit' in request_data:
-            shift.net_profit = request_data.get('netProfit', 0.0)
+        # ===== СОХРАНЯЕМ СТАТИСТИКУ =====
+        # Используем данные из запроса или оставляем существующие
+        shift.total_paid_distance = request_data.get('totalPaidDistance', shift.total_paid_distance or 0.0)
+        shift.total_idle_distance = request_data.get('totalIdleDistance', shift.total_idle_distance or 0.0)
+        shift.total_order_time_seconds = request_data.get('totalOrderTimeSeconds', shift.total_order_time_seconds or 0)
+        shift.orders_count = request_data.get('ordersCount', shift.orders_count or 0)
+        shift.total_income = request_data.get('totalIncome', shift.total_income or 0.0)
+        shift.total_expenses = request_data.get('totalExpenses', shift.total_expenses or 0.0)
+        shift.net_profit = request_data.get('netProfit', shift.net_profit or 0.0)
         
         shift.updated_at = now
         db.commit()
         db.refresh(shift)
         
-        logger.info(f"✅ Смена завершена: id={shift_id}, duration={shift.duration_seconds} сек")
-        logger.info(f"📊 Статистика: заказов={shift.orders_count}, доход={shift.total_income}, холостой пробег={shift.total_idle_distance}")
+        logger.info(f"✅ Смена завершена: id={shift_id}")
+        logger.info(f"📊 duration={shift.duration_seconds} сек, заказов={shift.orders_count}, доход={shift.total_income}, холостой пробег={shift.total_idle_distance}")
         
         return {
             "status": "ok",
