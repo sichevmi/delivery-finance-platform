@@ -89,7 +89,7 @@ class DailyStats {
   }
 }
 
-// ===== NOTIFIER ДЛЯ УПРАВЛЕНИЯ СТАТИСТИКОЙ =====
+// ===== NOTIFIER =====
 class DailyStatsNotifier extends StateNotifier<DailyStats> {
   final Ref _ref;
   bool _isInitialized = false;
@@ -118,7 +118,6 @@ final dailyStatsProvider = StateNotifierProvider<DailyStatsNotifier, DailyStats>
   return DailyStatsNotifier(ref);
 });
 
-// ===== РАСШИРЕНИЕ ДЛЯ ОБНОВЛЕНИЯ =====
 extension DailyStatsExtensions on WidgetRef {
   Future<void> refreshStats() async {
     final notifier = read(dailyStatsProvider.notifier);
@@ -162,14 +161,19 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
   logMessage('📊 [STATS] После кэша: ordersCount=$ordersCount, totalIncome=$totalIncome, totalExpenses=$totalExpenses, netProfit=$netProfit', category: 'STATS');
 
   // ===== 2. ПРИОРИТЕТНО ИСПОЛЬЗУЕМ ДАННЫЕ ИЗ shiftState =====
-  if (shiftState.totalIncome > 0 || shiftState.totalExpenses > 0) {
+  // Если в shiftState есть данные — используем их вместо кэша
+  if (shiftState.totalIncome > 0 || shiftState.totalExpenses > 0 || shiftState.totalIdleDistance > 0) {
     logMessage('📊 [STATS] Используем данные из shiftState (приоритет)', category: 'STATS');
-    totalIncome = shiftState.totalIncome;
-    totalExpenses = shiftState.totalExpenses;
-    netProfit = shiftState.netProfit;
-    ordersCount = shiftState.ordersCount;
-    totalPaid = shiftState.totalPaidDistance;
-    totalIdleDistance = shiftState.totalIdleDistance;
+    if (shiftState.totalIncome > 0) totalIncome = shiftState.totalIncome;
+    if (shiftState.totalExpenses > 0) totalExpenses = shiftState.totalExpenses;
+    if (shiftState.netProfit != 0) netProfit = shiftState.netProfit;
+    if (shiftState.ordersCount > 0) ordersCount = shiftState.ordersCount;
+    if (shiftState.totalPaidDistance > 0) totalPaid = shiftState.totalPaidDistance;
+    // ===== КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: берём холостой пробег из shiftState =====
+    if (shiftState.totalIdleDistance > 0) {
+      totalIdleDistance = shiftState.totalIdleDistance;
+      logMessage('📊 [STATS] Холостой пробег из shiftState: $totalIdleDistance', category: 'STATS');
+    }
   }
 
   logMessage('📊 [STATS] После shiftState: ordersCount=$ordersCount, totalIncome=$totalIncome, totalExpenses=$totalExpenses, netProfit=$netProfit', category: 'STATS');
@@ -181,7 +185,6 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
   if (shiftState.isActive) {
     totalWorkTime = shiftState.workTime;
     totalIdleTime = shiftState.totalIdleTimeDisplay;
-    // Если смена активна, холостой пробег уже взят из shiftState выше
   } else {
     if (cache.activeShift != null) {
       totalWorkTime = cache.activeShift!.duration ?? Duration.zero;
