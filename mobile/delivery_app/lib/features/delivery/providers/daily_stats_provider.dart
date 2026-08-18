@@ -105,21 +105,26 @@ class DailyStatsNotifier extends StateNotifier<DailyStats> {
     logMessage('📊 [STATS] Статистика загружена', category: 'STATS');
   }
 
-  // Метод для принудительного обновления
   Future<void> refresh() async {
     logMessage('🔄 [STATS] Принудительное обновление статистики', category: 'STATS');
     final stats = await _calculateDailyStats(_ref);
     state = stats;
   }
 
-  // Метод для получения текущих данных без ожидания
   DailyStats get currentStats => state;
 }
 
-// ===== ПРОВАЙДЕР =====
 final dailyStatsProvider = StateNotifierProvider<DailyStatsNotifier, DailyStats>((ref) {
   return DailyStatsNotifier(ref);
 });
+
+// ===== РАСШИРЕНИЕ ДЛЯ ОБНОВЛЕНИЯ =====
+extension DailyStatsExtensions on WidgetRef {
+  Future<void> refreshStats() async {
+    final notifier = read(dailyStatsProvider.notifier);
+    await notifier.refresh();
+  }
+}
 
 // ===== ФУНКЦИЯ РАСЧЁТА =====
 Future<DailyStats> _calculateDailyStats(Ref ref) async {
@@ -128,6 +133,15 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
   final shiftState = ref.watch(shiftProvider);
   final settings = ref.watch(settingsProvider);
 
+  logMessage('📊 [STATS] _calculateDailyStats() начат', category: 'STATS');
+  logMessage('📊 [STATS] cache.todayOrders.length=${cache.todayOrders.length}', category: 'STATS');
+  logMessage('📊 [STATS] cache.todayShifts.length=${cache.todayShifts.length}', category: 'STATS');
+  logMessage('📊 [STATS] shiftState.ordersCount=${shiftState.ordersCount}', category: 'STATS');
+  logMessage('📊 [STATS] shiftState.totalIncome=${shiftState.totalIncome}', category: 'STATS');
+  logMessage('📊 [STATS] shiftState.totalExpenses=${shiftState.totalExpenses}', category: 'STATS');
+  logMessage('📊 [STATS] shiftState.netProfit=${shiftState.netProfit}', category: 'STATS');
+  logMessage('📊 [STATS] shiftState.totalIdleDistance=${shiftState.totalIdleDistance}', category: 'STATS');
+
   // ===== 1. СЧИТАЕМ ИЗ КЭША =====
   int ordersCount = cache.todayOrders.length;
   double totalPaid = 0.0;
@@ -135,6 +149,7 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
   double totalExpenses = 0.0;
   double netProfit = 0.0;
   Duration totalOrderTime = Duration.zero;
+  double totalIdleDistance = 0.0;
 
   for (final order in cache.todayOrders) {
     totalPaid += order.totalPaidDistance;
@@ -144,55 +159,57 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
     totalOrderTime += order.totalTime;
   }
 
+  logMessage('📊 [STATS] После кэша: ordersCount=$ordersCount, totalIncome=$totalIncome, totalExpenses=$totalExpenses, netProfit=$netProfit', category: 'STATS');
+
   // ===== 2. ПРИОРИТЕТНО ИСПОЛЬЗУЕМ ДАННЫЕ ИЗ shiftState =====
   if (shiftState.totalIncome > 0 || shiftState.totalExpenses > 0) {
-  logMessage('📊 [STATS] Используем данные из shiftState (приоритет)', category: 'STATS');
-  totalIncome = shiftState.totalIncome;
-  totalExpenses = shiftState.totalExpenses;
-  netProfit = shiftState.netProfit;
-  ordersCount = shiftState.ordersCount;
-  totalPaid = shiftState.totalPaidDistance;
-  // Холостой пробег берём из shiftState
-  totalIdle = shiftState.totalIdleDistance;
-}
+    logMessage('📊 [STATS] Используем данные из shiftState (приоритет)', category: 'STATS');
+    totalIncome = shiftState.totalIncome;
+    totalExpenses = shiftState.totalExpenses;
+    netProfit = shiftState.netProfit;
+    ordersCount = shiftState.ordersCount;
+    totalPaid = shiftState.totalPaidDistance;
+    totalIdleDistance = shiftState.totalIdleDistance;
+  }
+
+  logMessage('📊 [STATS] После shiftState: ordersCount=$ordersCount, totalIncome=$totalIncome, totalExpenses=$totalExpenses, netProfit=$netProfit', category: 'STATS');
 
   // ===== 3. ВРЕМЯ РАБОТЫ =====
   Duration totalWorkTime = Duration.zero;
-  double totalIdle = 0.0;
   Duration totalIdleTime = Duration.zero;
 
   if (shiftState.isActive) {
     totalWorkTime = shiftState.workTime;
-    totalIdle = shiftState.totalIdleDistance;
     totalIdleTime = shiftState.totalIdleTimeDisplay;
+    // Если смена активна, холостой пробег уже взят из shiftState выше
   } else {
     if (cache.activeShift != null) {
       totalWorkTime = cache.activeShift!.duration ?? Duration.zero;
-      totalIdle = cache.activeShift!.totalIdleDistance;
     }
     if (shiftState.totalWorkTime > Duration.zero) {
       totalWorkTime = shiftState.totalWorkTime;
-      totalIdle = shiftState.totalIdleDistance;
+    }
+    // Время простоя из кэша
+    Duration totalIdleTimeFromCache = Duration.zero;
+    for (final shift in cache.todayShifts) {
+      if (shift.totalIdleTime != null) {
+        totalIdleTimeFromCache += shift.totalIdleTime!;
+        logMessage('📊 [STATS] Смена ${shift.id}: idleTime=${shift.totalIdleTime!.inSeconds} сек', category: 'STATS');
+      }
+    }
+    if (totalIdleTimeFromCache > Duration.zero) {
+      totalIdleTime = totalIdleTimeFromCache;
+      logMessage('📊 [STATS] Восстановлено время простоя из кэша: ${totalIdleTime.inSeconds} сек', category: 'STATS');
+    } else if (shiftState.totalIdleTime > Duration.zero) {
+      totalIdleTime = shiftState.totalIdleTime;
     }
   }
 
-  // ===== 4. ВРЕМЯ ПРОСТОЯ =====
-  Duration totalIdleTimeFromCache = Duration.zero;
-  for (final shift in cache.todayShifts) {
-    if (shift.totalIdleTime != null) {
-      totalIdleTimeFromCache += shift.totalIdleTime!;
-    }
-  }
-
-  if (totalIdleTimeFromCache > Duration.zero) {
-    totalIdleTime = totalIdleTimeFromCache;
-  } else if (shiftState.totalIdleTime > Duration.zero) {
-    totalIdleTime = shiftState.totalIdleTime;
-  }
+  logMessage('📊 [STATS] ФИНАЛЬНЫЕ ДАННЫЕ: заказов=$ordersCount, пробег=$totalPaid, доход=$totalIncome, расходы=$totalExpenses, прибыль=$netProfit, холостой пробег=$totalIdleDistance, время простоя=${totalIdleTime.inSeconds} сек', category: 'STATS');
 
   return DailyStats(
     totalPaidDistance: totalPaid,
-    totalIdleDistance: totalIdle,
+    totalIdleDistance: totalIdleDistance,
     ordersCount: ordersCount,
     totalIncome: totalIncome,
     totalExpenses: totalExpenses,
@@ -201,16 +218,4 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
     totalIdleTime: totalIdleTime,
     totalOrderTime: totalOrderTime,
   );
-}
-
-// ===== ХЕЛПЕР ДЛЯ ОБНОВЛЕНИЯ =====
-final refreshStatsProvider = Provider<void>((ref) {
-  return null;
-});
-
-extension DailyStatsExtensions on WidgetRef {
-  Future<void> refreshStats() async {
-    final notifier = read(dailyStatsProvider.notifier);
-    await notifier.refresh();
-  }
 }
