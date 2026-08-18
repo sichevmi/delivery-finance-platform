@@ -77,15 +77,13 @@ async def get_today_data(
                 ]
             })
         
-        # ===== ВЫЧИСЛЯЕМ ВРЕМЯ ПРОСТОЯ =====
+        # ===== ВЫЧИСЛЯЕМ ВРЕМЯ ПРОСТОЯ ДЛЯ КАЖДОЙ СМЕНЫ =====
         shifts_data = []
         for s in shifts:
             duration = s.duration_seconds or 0
             order_time = s.total_order_time_seconds or 0
-            # ===== КЛЮЧЕВОЕ: время простоя = длительность - время на заказах =====
+            # Время простоя = длительность - время на заказах
             idle_time = max(0, duration - order_time)
-            
-            logger.info(f"📊 Смена {s.id}: duration={duration}, order_time={order_time}, idle_time={idle_time}")
             
             shifts_data.append({
                 "id": s.id,
@@ -95,7 +93,7 @@ async def get_today_data(
                 "durationSeconds": duration,
                 "totalPaidDistance": s.total_paid_distance or 0.0,
                 "totalIdleDistance": s.total_idle_distance or 0.0,
-                "totalOrderTimeSeconds": order_time,  # <-- ДОБАВЛЯЕМ В ОТВЕТ
+                "totalOrderTimeSeconds": order_time,  # <-- ДОБАВЛЯЕМ
                 "ordersCount": s.orders_count or 0,
                 "totalIncome": s.total_income or 0.0,
                 "totalExpenses": s.total_expenses or 0.0,
@@ -103,7 +101,7 @@ async def get_today_data(
                 "status": s.status,
                 "isSynced": s.is_synced,
                 "createdAt": s.created_at.isoformat() if s.created_at else None,
-                "totalIdleTimeSeconds": idle_time,  # <-- ВЫЧИСЛЕННОЕ ВРЕМЯ ПРОСТОЯ
+                "totalIdleTimeSeconds": idle_time,  # <-- ДОБАВЛЯЕМ
             })
         
         return {

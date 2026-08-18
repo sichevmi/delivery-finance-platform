@@ -10,8 +10,8 @@ class Shift {
   final double totalExpenses;
   final double netProfit;
   final String status;
-  final Duration? totalIdleTime;
-  final Duration? totalOrderTime;  // <-- ДОБАВЛЯЕМ
+  final Duration? totalIdleTime;      // <-- ДЛЯ ОТОБРАЖЕНИЯ
+  final Duration? totalOrderTime;     // <-- ДЛЯ ВЫЧИСЛЕНИЙ
 
   Shift({
     required this.id,

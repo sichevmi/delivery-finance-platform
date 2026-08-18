@@ -146,12 +146,15 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
 
   // ===== 2. ПРИОРИТЕТНО ИСПОЛЬЗУЕМ ДАННЫЕ ИЗ shiftState =====
   if (shiftState.totalIncome > 0 || shiftState.totalExpenses > 0) {
-    totalIncome = shiftState.totalIncome;
-    totalExpenses = shiftState.totalExpenses;
-    netProfit = shiftState.netProfit;
-    ordersCount = shiftState.ordersCount;
-    totalPaid = shiftState.totalPaidDistance;
-  }
+  logMessage('📊 [STATS] Используем данные из shiftState (приоритет)', category: 'STATS');
+  totalIncome = shiftState.totalIncome;
+  totalExpenses = shiftState.totalExpenses;
+  netProfit = shiftState.netProfit;
+  ordersCount = shiftState.ordersCount;
+  totalPaid = shiftState.totalPaidDistance;
+  // Холостой пробег берём из shiftState
+  totalIdle = shiftState.totalIdleDistance;
+}
 
   // ===== 3. ВРЕМЯ РАБОТЫ =====
   Duration totalWorkTime = Duration.zero;
