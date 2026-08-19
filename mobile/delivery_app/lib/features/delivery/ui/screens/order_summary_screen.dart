@@ -15,7 +15,7 @@ class OrderSummaryScreen extends ConsumerWidget {
   final double totalCost;
   final int totalTime;
   final double totalDistance;
-  final String? shopAddress;
+  final String? shopAddress; // <-- ДОБАВЛЯЕМ
 
   const OrderSummaryScreen({
     super.key,
@@ -25,7 +25,7 @@ class OrderSummaryScreen extends ConsumerWidget {
     required this.totalCost,
     required this.totalTime,
     required this.totalDistance,
-    this.shopAddress,
+    this.shopAddress, // <-- ДОБАВЛЯЕМ
   });
 
   String _formatTime(int seconds) {
@@ -69,15 +69,15 @@ class OrderSummaryScreen extends ConsumerWidget {
     final totalCostFinal = shopCost + totalDeliveriesCost;
     final netProfit = totalCostFinal - totalExpenses;
 
+    // ===== ПОКАЗЫВАЕМ АДРЕС МАГАЗИНА =====
+    final displayShopAddress = shopAddress ?? 'Адрес не определён';
+
     logMessage('🟢 OrderSummaryScreen: отображение сводки');
-    logMessage('   shopAddress: $shopAddress');
+    logMessage('   shopAddress: $displayShopAddress');
     logMessage('   totalAllDistance: $totalAllDistance');
     logMessage('   totalExpenses: $totalExpenses');
     logMessage('   totalCostFinal: $totalCostFinal');
     logMessage('   netProfit: $netProfit');
-
-    // ===== ПОКАЗЫВАЕМ АДРЕС МАГАЗИНА =====
-    final displayShopAddress = shopAddress ?? 'Адрес не определён';
 
     return Scaffold(
       appBar: AppBar(
