@@ -28,8 +28,9 @@ class AppCache {
   void updateTodayData(Map<String, dynamic> data) {
     final shiftsList = data['shifts'] as List? ?? [];
     todayShifts = shiftsList.map((s) => Shift.fromJson(s)).toList();
+    // Ищем смену со статусом active или paused
     activeShift = todayShifts.cast<Shift?>().firstWhere(
-      (s) => s?.status == 'active',
+      (s) => s?.status == 'active' || s?.status == 'paused',
       orElse: () => null,
     );
     final ordersList = data['orders'] as List? ?? [];
@@ -62,15 +63,15 @@ class ApiService {
       logMessage('🔄 [API] loadAllData() начат', category: 'API');
       final todayResponse = await _apiClient.getTodayData();
       _cache.updateTodayData(todayResponse);
-      logMessage('🔄 [API] todayResponse получен: shifts=${_cache.todayShifts.length}, orders=${_cache.todayOrders.length}, activeShift=${_cache.activeShift?.id ?? 'null'}', category: 'API');
+      logMessage('🔄 [API] todayResponse: shifts=${_cache.todayShifts.length}, activeShift=${_cache.activeShift?.id ?? 'null'}, status=${_cache.activeShift?.status ?? 'null'}', category: 'API');
 
       final dirsResponse = await _apiClient.getDirectories();
       _cache.updateDirectories(dirsResponse);
       logMessage('🔄 [API] directories получены', category: 'API');
 
-      logMessage('✅ [API] Все данные загружены с сервера', category: 'API');
+      logMessage('✅ [API] Все данные загружены', category: 'API');
     } catch (e) {
-      logMessage('❌ [API] Ошибка загрузки данных: $e', category: 'API', level: LogLevel.error);
+      logMessage('❌ [API] Ошибка загрузки: $e', category: 'API', level: LogLevel.error);
       rethrow;
     }
   }
@@ -79,40 +80,64 @@ class ApiService {
 
   Future<Shift> startShift() async {
     try {
-      logMessage('🔄 [API] startShift() вызван', category: 'API');
+      logMessage('🔄 [API] startShift()', category: 'API');
       
-      // Перед созданием смены проверяем, нет ли активной в кеше
       if (_cache.activeShift != null) {
-        logMessage('⚠️ [API] В кеше уже есть активная смена id=${_cache.activeShift!.id}', category: 'API');
-        // Возвращаем существующую смену из кеша
+        logMessage('⚠️ [API] Уже есть смена id=${_cache.activeShift!.id}, status=${_cache.activeShift!.status}', category: 'API');
         return _cache.activeShift!;
       }
       
       final response = await _apiClient.startShift();
       final shift = Shift.fromJson(response);
       _cache.activeShift = shift;
-      logMessage('✅ [API] Смена начата на сервере id=${shift.id}', category: 'API');
+      logMessage('✅ [API] Создана смена id=${shift.id}, status=${shift.status}', category: 'API');
       return shift;
     } catch (e) {
-      logMessage('❌ [API] Ошибка начала смены: $e', category: 'API', level: LogLevel.error);
-      
-      // Если ошибка "Уже есть активная смена" - перезагружаем данные
-      final errorMessage = e.toString();
-      if (errorMessage.contains('Уже есть активная смена') || 
-          errorMessage.contains('400') ||
-          errorMessage.contains('active shift')) {
-        logMessage('🔄 [API] Обнаружена активная смена, перезагружаем данные...', category: 'API');
-        try {
-          await loadAllData();
-          if (_cache.activeShift != null) {
-            logMessage('✅ [API] Активная смена восстановлена id=${_cache.activeShift!.id}', category: 'API');
-            // Возвращаем восстановленную смену
-            return _cache.activeShift!;
-          }
-        } catch (loadError) {
-          logMessage('❌ [API] Ошибка перезагрузки данных: $loadError', category: 'API', level: LogLevel.error);
-        }
-      }
+      logMessage('❌ [API] Ошибка создания смены: $e', category: 'API', level: LogLevel.error);
+      rethrow;
+    }
+  }
+
+  Future<void> pauseShift(
+    int shiftId, {
+    required int addedWorkSeconds,
+    required int addedIdleSeconds,
+    required double totalPaidDistance,
+    required double totalIdleDistance,
+    required int totalOrderTimeSeconds,
+    required int ordersCount,
+    required double totalIncome,
+    required double totalExpenses,
+    required double netProfit,
+  }) async {
+    try {
+      await _apiClient.pauseShift(
+        shiftId,
+        addedWorkSeconds: addedWorkSeconds,
+        addedIdleSeconds: addedIdleSeconds,
+        totalPaidDistance: totalPaidDistance,
+        totalIdleDistance: totalIdleDistance,
+        totalOrderTimeSeconds: totalOrderTimeSeconds,
+        ordersCount: ordersCount,
+        totalIncome: totalIncome,
+        totalExpenses: totalExpenses,
+        netProfit: netProfit,
+      );
+      await loadAllData();
+      logMessage('✅ [API] Смена приостановлена', category: 'API');
+    } catch (e) {
+      logMessage('❌ [API] Ошибка приостановки: $e', category: 'API', level: LogLevel.error);
+      rethrow;
+    }
+  }
+
+  Future<void> resumeShift(int shiftId) async {
+    try {
+      await _apiClient.resumeShift(shiftId);
+      await loadAllData();
+      logMessage('✅ [API] Смена возобновлена', category: 'API');
+    } catch (e) {
+      logMessage('❌ [API] Ошибка возобновления: $e', category: 'API', level: LogLevel.error);
       rethrow;
     }
   }
@@ -128,8 +153,6 @@ class ApiService {
     double? netProfit,
   }) async {
     try {
-      logMessage('📤 [API] Отправка завершения смены $shiftId: {totalPaidDistance: $totalPaidDistance, totalIdleDistance: $totalIdleDistance, totalOrderTimeSeconds: $totalOrderTimeSeconds, ordersCount: $ordersCount, totalIncome: $totalIncome, totalExpenses: $totalExpenses, netProfit: $netProfit}', category: 'API');
-      
       await _apiClient.completeShift(
         shiftId,
         totalPaidDistance: totalPaidDistance,
@@ -142,9 +165,9 @@ class ApiService {
       );
       _cache.activeShift = null;
       await loadAllData();
-      logMessage('✅ [API] Смена завершена на сервере', category: 'API');
+      logMessage('✅ [API] Смена завершена', category: 'API');
     } catch (e) {
-      logMessage('❌ [API] Ошибка завершения смены: $e', category: 'API', level: LogLevel.error);
+      logMessage('❌ [API] Ошибка завершения: $e', category: 'API', level: LogLevel.error);
       rethrow;
     }
   }
@@ -160,7 +183,7 @@ class ApiService {
       if (deliveries != null) {
         logMessage('📦 Создано ${deliveries.length} доставок для заказа ${order.id}', category: 'API');
       }
-      logMessage('✅ [API] Заказ создан на сервере', category: 'API');
+      logMessage('✅ [API] Заказ создан', category: 'API');
       return order;
     } catch (e) {
       logMessage('❌ [API] Ошибка создания заказа: $e', category: 'API', level: LogLevel.error);
@@ -172,7 +195,7 @@ class ApiService {
     try {
       await _apiClient.completeOrder(orderId);
       await loadAllData();
-      logMessage('✅ [API] Заказ завершён на сервере', category: 'API');
+      logMessage('✅ [API] Заказ завершён', category: 'API');
     } catch (e) {
       logMessage('❌ [API] Ошибка завершения заказа: $e', category: 'API', level: LogLevel.error);
       rethrow;

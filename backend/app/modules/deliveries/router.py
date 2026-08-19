@@ -643,3 +643,129 @@ async def update_x5_settings(
     except Exception as e:
         logger.error(f"❌ Ошибка обновления X5 настроек: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# ===== ПРИОСТАНОВИТЬ СМЕНУ =====
+@router.post("/shifts/{shift_id}/pause")
+async def pause_shift(
+    shift_id: int,
+    request_data: Dict[str, Any],
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Приостановить работу"""
+    shift = db.query(Shift).filter(
+        Shift.id == shift_id,
+        Shift.user_id == current_user.id
+    ).first()
+    
+    if not shift:
+        raise HTTPException(status_code=404, detail="Смена не найдена")
+    
+    if shift.status != 'active':
+        raise HTTPException(status_code=400, detail="Смена не активна")
+    
+    now = datetime.now(timezone.utc)
+    
+    # Сохраняем накопленные данные
+    shift.total_paid_distance = request_data.get('totalPaidDistance', 0.0)
+    shift.total_idle_distance = request_data.get('totalIdleDistance', 0.0)
+    shift.total_order_time_seconds = request_data.get('totalOrderTimeSeconds', 0)
+    shift.orders_count = request_data.get('ordersCount', 0)
+    shift.total_income = request_data.get('totalIncome', 0.0)
+    shift.total_expenses = request_data.get('totalExpenses', 0.0)
+    shift.net_profit = request_data.get('netProfit', 0.0)
+    
+    shift.status = 'paused'
+    shift.paused_at = now.isoformat()
+    shift.updated_at = now
+    db.commit()
+    
+    logger.info(f"⏸️ Смена {shift_id} приостановлена")
+    
+    return {"status": "ok", "shift": {"id": shift.id, "status": "paused"}}
+
+
+# ===== ВОЗОБНОВИТЬ СМЕНУ =====
+@router.post("/shifts/{shift_id}/resume")
+async def resume_shift(
+    shift_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Возобновить работу"""
+    shift = db.query(Shift).filter(
+        Shift.id == shift_id,
+        Shift.user_id == current_user.id
+    ).first()
+    
+    if not shift:
+        raise HTTPException(status_code=404, detail="Смена не найдена")
+    
+    if shift.status != 'paused':
+        raise HTTPException(status_code=400, detail="Смена не приостановлена")
+    
+    now = datetime.now(timezone.utc)
+    shift.status = 'active'
+    shift.resumed_at = now.isoformat()
+    shift.updated_at = now
+    db.commit()
+    
+    logger.info(f"▶️ Смена {shift_id} возобновлена")
+    
+    return {"status": "ok", "shift": {"id": shift.id, "status": "active"}}
+
+
+# ===== НАЧАТЬ НОВУЮ СМЕНУ (ВСЕГДА PAUSED) =====
+@router.post("/shifts/start")
+async def start_shift(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Создать новую приостановленную смену"""
+    # Проверяем существующую смену
+    existing = db.query(Shift).filter(
+        Shift.user_id == current_user.id,
+        Shift.status.in_(['active', 'paused'])
+    ).first()
+    
+    if existing:
+        return {
+            "id": existing.id,
+            "startTime": existing.start_time,
+            "status": existing.status,
+            "totalPaidDistance": existing.total_paid_distance,
+            "totalIdleDistance": existing.total_idle_distance,
+            "ordersCount": existing.orders_count,
+        }
+    
+    now = datetime.now(timezone.utc)
+    
+    shift = Shift(
+        user_id=current_user.id,
+        start_time=now.isoformat(),
+        status='paused',
+        total_paid_distance=0.0,
+        total_idle_distance=0.0,
+        orders_count=0,
+        total_income=0.0,
+        total_expenses=0.0,
+        net_profit=0.0,
+        is_synced=True,
+        synced_at=now,
+        created_at=now,
+        updated_at=now
+    )
+    db.add(shift)
+    db.commit()
+    db.refresh(shift)
+    
+    logger.info(f"📅 Создана новая смена id={shift.id}")
+    
+    return {
+        "id": shift.id,
+        "startTime": shift.start_time,
+        "status": shift.status,
+        "totalPaidDistance": shift.total_paid_distance,
+        "totalIdleDistance": shift.total_idle_distance,
+        "ordersCount": shift.orders_count,
+    }

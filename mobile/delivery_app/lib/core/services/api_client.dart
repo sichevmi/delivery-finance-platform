@@ -84,14 +84,66 @@ class ApiClient {
     }
   }
 
-  // ===== СМЕНЫ =====
+  // ===== СМЕНЫ (НОВАЯ ЛОГИКА) =====
 
   Future<Map<String, dynamic>> startShift() async {
     try {
       final response = await _dio.post('/shifts/start');
       return response.data;
     } catch (e) {
-      logMessage('⚠️ Ошибка начала смены: $e', category: 'API', level: LogLevel.error);
+      logMessage('⚠️ Ошибка создания смены: $e', category: 'API', level: LogLevel.error);
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> pauseShift(
+    int shiftId, {
+    required int addedWorkSeconds,
+    required int addedIdleSeconds,
+    required double totalPaidDistance,
+    required double totalIdleDistance,
+    required int totalOrderTimeSeconds,
+    required int ordersCount,
+    required double totalIncome,
+    required double totalExpenses,
+    required double netProfit,
+  }) async {
+    try {
+      final data = {
+        'addedWorkSeconds': addedWorkSeconds,
+        'addedIdleSeconds': addedIdleSeconds,
+        'totalPaidDistance': totalPaidDistance,
+        'totalIdleDistance': totalIdleDistance,
+        'totalOrderTimeSeconds': totalOrderTimeSeconds,
+        'ordersCount': ordersCount,
+        'totalIncome': totalIncome,
+        'totalExpenses': totalExpenses,
+        'netProfit': netProfit,
+      };
+      
+      logMessage('⏸️ [API] Приостановка смены $shiftId', category: 'API');
+      
+      final response = await _dio.post(
+        '/shifts/$shiftId/pause',
+        data: data,
+      );
+      return response.data;
+    } catch (e) {
+      logMessage('⚠️ Ошибка приостановки смены: $e', category: 'API', level: LogLevel.error);
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> resumeShift(int shiftId) async {
+    try {
+      logMessage('▶️ [API] Возобновление смены $shiftId', category: 'API');
+      
+      final response = await _dio.post(
+        '/shifts/$shiftId/resume',
+      );
+      return response.data;
+    } catch (e) {
+      logMessage('⚠️ Ошибка возобновления смены: $e', category: 'API', level: LogLevel.error);
       rethrow;
     }
   }
@@ -116,7 +168,7 @@ class ApiClient {
       if (totalExpenses != null) data['totalExpenses'] = totalExpenses;
       if (netProfit != null) data['netProfit'] = netProfit;
       
-      logMessage('📤 [API] Отправка завершения смены $shiftId: $data', category: 'API');
+      logMessage('📤 [API] Завершение смены $shiftId', category: 'API');
       
       final response = await _dio.post(
         '/shifts/$shiftId/complete',
@@ -142,11 +194,11 @@ class ApiClient {
         'totalExpenses': data['totalExpenses'],
         'netProfit': data['netProfit'],
         'totalTimeSeconds': data['totalTimeSeconds'],
-        'shopAddress': data['shopAddress'] ?? '', // <-- ДОБАВЛЯЕМ
+        'shopAddress': data['shopAddress'] ?? '',
         'deliveries': data['deliveries'] ?? [],
       };
       
-      logMessage('📤 [API] Создание заказа: shopAddress=${requestData['shopAddress']}', category: 'API');
+      logMessage('📤 [API] Создание заказа', category: 'API');
       
       final response = await _dio.post(
         '/orders',
@@ -236,8 +288,6 @@ class _AuthInterceptor extends Interceptor {
     final token = await _storage.read(key: 'access_token');
     if (token != null && token.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $token';
-    } else {
-      logMessage('⚠️ Токен отсутствует!', category: 'API', level: LogLevel.debug);
     }
     handler.next(options);
   }

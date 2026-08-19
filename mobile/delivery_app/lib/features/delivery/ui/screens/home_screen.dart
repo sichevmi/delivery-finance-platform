@@ -276,50 +276,99 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           _buildCompactIdleTimeCard(shiftState),
           const Spacer(),
 
-          // Кнопка начала/остановки смены
-          SizedBox(
-            height: 54,
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () async {
-                logMessage('🔄 [HOME] Нажата кнопка смены', category: 'SYSTEM');
-                final notifier = ref.read(shiftProvider.notifier);
-                if (shiftState.isActive) {
-                  logMessage('🔄 [HOME] Останавливаем смену', category: 'SYSTEM');
-                  await notifier.stopShift();
-                  logMessage('🔄 [HOME] Смена остановлена', category: 'SYSTEM');
-                } else {
-                  logMessage('🔄 [HOME] Запускаем смену', category: 'SYSTEM');
-                  await notifier.startShift();
-                  logMessage('🔄 [HOME] Смена запущена', category: 'SYSTEM');
-                }
-                
-                if (mounted) {
-                  try {
-                    await ref.refreshStats();
-                    logMessage('🔄 [HOME] Статистика обновлена', category: 'SYSTEM');
-                  } catch (e) {
-                    logMessage('⚠️ [HOME] Ошибка обновления статистики: $e', category: 'SYSTEM');
-                  }
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: shiftState.isActive ? Colors.red : const Color(0xFF6C63FF),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text(
-                shiftState.isActive ? 'Остановить работу' : 'Начать работу',
-                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ),
+          // В _buildHomeTab, замените кнопку на:
+
+// ===== КНОПКА УПРАВЛЕНИЯ СМЕНОЙ =====
+SizedBox(
+  height: 54,
+  width: double.infinity,
+  child: _buildShiftButton(shiftState),
+),
+
+// ===== МЕТОД КНОПКИ =====
+Widget _buildShiftButton(ShiftState shiftState) {
+  if (shiftState.isCompleted || !shiftState.isActive) {
+    // Смена завершена — показываем, что всё ок
+    return ElevatedButton(
+      onPressed: null,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.grey,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+      child: const Text(
+        'Смена завершена',
+        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+  
+  if (shiftState.isPaused) {
+    // Приостановлена → "Возобновить"
+    return ElevatedButton(
+      onPressed: () async {
+        logMessage('🔄 [HOME] Возобновление работы', category: 'SYSTEM');
+        final notifier = ref.read(shiftProvider.notifier);
+        await notifier.resumeShift();
+        if (mounted) {
+          try {
+            await ref.refreshStats();
+          } catch (e) {
+            logMessage('⚠️ [HOME] Ошибка обновления: $e', category: 'SYSTEM');
+          }
+        }
+      },
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.green,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+      child: const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.play_arrow, size: 24),
+          SizedBox(width: 8),
+          Text('Возобновить работу', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  } else {
+    // Активна → "Приостановить"
+    return ElevatedButton(
+      onPressed: () async {
+        logMessage('🔄 [HOME] Приостановка работы', category: 'SYSTEM');
+        final notifier = ref.read(shiftProvider.notifier);
+        await notifier.pauseShift();
+        if (mounted) {
+          try {
+            await ref.refreshStats();
+          } catch (e) {
+            logMessage('⚠️ [HOME] Ошибка обновления: $e', category: 'SYSTEM');
+          }
+        }
+      },
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.orange,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+      child: const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.pause, size: 24),
+          SizedBox(width: 8),
+          Text('Приостановить работу', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
         ],
       ),
     );
   }
+}
 
   // ===== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ =====
 
