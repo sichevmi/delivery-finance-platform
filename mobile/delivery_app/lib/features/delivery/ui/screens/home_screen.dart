@@ -184,16 +184,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       width: 5,
                       height: 5,
                       decoration: BoxDecoration(
-                        color: shiftState.isActive ? Colors.green : Colors.grey,
+                        color: shiftState.isActive && !shiftState.isPaused ? Colors.green : Colors.orange,
                         shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      shiftState.isActive ? 'Активна' : 'Не начата',
+                      shiftState.isCompleted ? 'Завершена' :
+                      shiftState.isPaused ? 'Приостановлена' : 'Активна',
                       style: TextStyle(
                         fontSize: 10,
-                        color: shiftState.isActive ? Colors.green : Colors.grey,
+                        color: shiftState.isCompleted ? Colors.grey :
+                               shiftState.isPaused ? Colors.orange : Colors.green,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -207,15 +209,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           // Строка: Время работы + Стоимость пробега
           Row(
             children: [
-              _AnimatedTimeDisplay(
-                shiftState: shiftState,
-                label: 'Время работы',
-                color: Colors.white,
-              ),
+              _buildTimeDisplay(shiftState),
               const Spacer(),
-              _AnimatedCostPerKm(
-                value: '${totalCostPerKm.toStringAsFixed(2)} ₽/км',
-              ),
+              _buildCostPerKm(totalCostPerKm),
             ],
           ),
           const SizedBox(height: 8),
@@ -223,13 +219,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           // Блоки 2x2 — компактные
           Row(
             children: [
-              _AnimatedCompactMetricCard(
+              _buildCompactMetricCard(
                 value: '${stats.netProfit.toStringAsFixed(0)} ₽',
                 label: 'Доход',
                 color: Colors.green,
               ),
               const SizedBox(width: 8),
-              _AnimatedCompactMetricCard(
+              _buildCompactMetricCard(
                 value: '${stats.totalExpenses.toStringAsFixed(0)} ₽',
                 label: 'Расход',
                 color: Colors.red,
@@ -240,13 +236,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
           Row(
             children: [
-              _AnimatedCompactMetricCard(
+              _buildCompactMetricCard(
                 value: '${stats.totalDistance.toStringAsFixed(1)} км',
                 label: 'Пробег всего',
                 color: Colors.white,
               ),
               const SizedBox(width: 8),
-              _AnimatedCompactMetricCard(
+              _buildCompactMetricCard(
                 value: '${stats.totalIdleDistance.toStringAsFixed(1)} км',
                 label: 'Холостой пробег',
                 color: Colors.white,
@@ -257,13 +253,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
           Row(
             children: [
-              _AnimatedCompactMetricCard(
+              _buildCompactMetricCard(
                 value: _calculateProfitPerKm(stats, settings),
                 label: 'Прибыль на км',
                 color: Colors.white,
               ),
               const SizedBox(width: 8),
-              _AnimatedCompactMetricCard(
+              _buildCompactMetricCard(
                 value: _calculateProfitPerHour(stats),
                 label: 'Прибыль за час',
                 color: Colors.white,
@@ -276,99 +272,98 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           _buildCompactIdleTimeCard(shiftState),
           const Spacer(),
 
-          // В _buildHomeTab, замените кнопку на:
-
-// ===== КНОПКА УПРАВЛЕНИЯ СМЕНОЙ =====
-SizedBox(
-  height: 54,
-  width: double.infinity,
-  child: _buildShiftButton(shiftState),
-),
-
-// ===== МЕТОД КНОПКИ =====
-Widget _buildShiftButton(ShiftState shiftState) {
-  if (shiftState.isCompleted || !shiftState.isActive) {
-    // Смена завершена — показываем, что всё ок
-    return ElevatedButton(
-      onPressed: null,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.grey,
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-      child: const Text(
-        'Смена завершена',
-        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
-      ),
-    );
-  }
-  
-  if (shiftState.isPaused) {
-    // Приостановлена → "Возобновить"
-    return ElevatedButton(
-      onPressed: () async {
-        logMessage('🔄 [HOME] Возобновление работы', category: 'SYSTEM');
-        final notifier = ref.read(shiftProvider.notifier);
-        await notifier.resumeShift();
-        if (mounted) {
-          try {
-            await ref.refreshStats();
-          } catch (e) {
-            logMessage('⚠️ [HOME] Ошибка обновления: $e', category: 'SYSTEM');
-          }
-        }
-      },
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.green,
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-      child: const Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.play_arrow, size: 24),
-          SizedBox(width: 8),
-          Text('Возобновить работу', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
-  } else {
-    // Активна → "Приостановить"
-    return ElevatedButton(
-      onPressed: () async {
-        logMessage('🔄 [HOME] Приостановка работы', category: 'SYSTEM');
-        final notifier = ref.read(shiftProvider.notifier);
-        await notifier.pauseShift();
-        if (mounted) {
-          try {
-            await ref.refreshStats();
-          } catch (e) {
-            logMessage('⚠️ [HOME] Ошибка обновления: $e', category: 'SYSTEM');
-          }
-        }
-      },
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.orange,
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-      child: const Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.pause, size: 24),
-          SizedBox(width: 8),
-          Text('Приостановить работу', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+          // Кнопка управления сменой
+          SizedBox(
+            height: 54,
+            width: double.infinity,
+            child: _buildShiftButton(shiftState),
+          ),
         ],
       ),
     );
   }
-}
+
+  // ===== КНОПКА УПРАВЛЕНИЯ СМЕНОЙ =====
+  Widget _buildShiftButton(ShiftState shiftState) {
+    if (shiftState.isCompleted || !shiftState.isActive) {
+      return ElevatedButton(
+        onPressed: null,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.grey,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: const Text(
+          'Смена завершена',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+        ),
+      );
+    }
+    
+    if (shiftState.isPaused) {
+      return ElevatedButton(
+        onPressed: () async {
+          logMessage('🔄 [HOME] Возобновление работы', category: 'SYSTEM');
+          final notifier = ref.read(shiftProvider.notifier);
+          await notifier.resumeShift();
+          if (mounted) {
+            try {
+              await ref.refreshStats();
+            } catch (e) {
+              logMessage('⚠️ [HOME] Ошибка обновления: $e', category: 'SYSTEM');
+            }
+          }
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.green,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.play_arrow, size: 24),
+            SizedBox(width: 8),
+            Text('Возобновить работу', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      );
+    } else {
+      return ElevatedButton(
+        onPressed: () async {
+          logMessage('🔄 [HOME] Приостановка работы', category: 'SYSTEM');
+          final notifier = ref.read(shiftProvider.notifier);
+          await notifier.pauseShift();
+          if (mounted) {
+            try {
+              await ref.refreshStats();
+            } catch (e) {
+              logMessage('⚠️ [HOME] Ошибка обновления: $e', category: 'SYSTEM');
+            }
+          }
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.orange,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.pause, size: 24),
+            SizedBox(width: 8),
+            Text('Приостановить работу', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      );
+    }
+  }
 
   // ===== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ =====
 
@@ -396,6 +391,92 @@ Widget _buildShiftButton(ShiftState shiftState) {
 
   // ===== ВИДЖЕТЫ =====
 
+  Widget _buildCostPerKm(double totalCostPerKm) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.local_gas_station, size: 14, color: Color(0xFF6C63FF)),
+        const SizedBox(width: 4),
+        Text(
+          '${totalCostPerKm.toStringAsFixed(2)} ₽/км',
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTimeDisplay(ShiftState shiftState) {
+    final String formattedTime = shiftState.formattedWorkTime;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          formattedTime,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        const Text(
+          'Время работы',
+          style: TextStyle(
+            fontSize: 10,
+            color: Color(0xFF888888),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCompactMetricCard({
+    required String value,
+    required String label,
+    required Color color,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E1E),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFF2C2C2C), width: 0.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 10,
+                color: Color(0xFF888888),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildCompactIdleTimeCard(ShiftState shiftState) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
@@ -417,147 +498,10 @@ Widget _buildShiftButton(ShiftState shiftState) {
             ),
           ),
           const Spacer(),
-          _AnimatedIdleTimeDisplay(shiftState: shiftState),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================
-// АНИМИРОВАННОЕ ВРЕМЯ РАБОТЫ
-// ============================================================
-class _AnimatedTimeDisplay extends StatefulWidget {
-  final ShiftState shiftState;
-  final String label;
-  final Color color;
-
-  const _AnimatedTimeDisplay({
-    required this.shiftState,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  State<_AnimatedTimeDisplay> createState() => _AnimatedTimeDisplayState();
-}
-
-class _AnimatedTimeDisplayState extends State<_AnimatedTimeDisplay> {
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _startTimer();
-  }
-
-  @override
-  void didUpdateWidget(covariant _AnimatedTimeDisplay oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.shiftState.isActive != oldWidget.shiftState.isActive) {
-      _startTimer();
-    }
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  void _startTimer() {
-    _timer?.cancel();
-    if (widget.shiftState.isActive) {
-      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        if (mounted) setState(() {});
-      });
-    } else {
-      setState(() {});
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final String formattedTime;
-    if (widget.shiftState.isActive && widget.shiftState.shiftStartTime != null) {
-      final now = DateTime.now();
-      final duration = widget.shiftState.totalWorkTime + now.difference(widget.shiftState.shiftStartTime!);
-      formattedTime = _formatDuration(duration);
-    } else {
-      formattedTime = _formatDuration(widget.shiftState.totalWorkTime);
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 200),
-          transitionBuilder: (Widget child, Animation<double> animation) {
-            return FadeTransition(
-              opacity: animation,
-              child: child,
-            );
-          },
-          child: Text(
-            formattedTime,
-            key: ValueKey(formattedTime),
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: widget.color,
-            ),
-          ),
-        ),
-        Text(
-          widget.label,
-          style: const TextStyle(
-            fontSize: 10,
-            color: Color(0xFF888888),
-          ),
-        ),
-      ],
-    );
-  }
-
-  String _formatDuration(Duration duration) {
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60);
-    final seconds = duration.inSeconds.remainder(60);
-    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-  }
-}
-
-// ============================================================
-// АНИМИРОВАННАЯ СТОИМОСТЬ ПРОБЕГА
-// ============================================================
-class _AnimatedCostPerKm extends StatelessWidget {
-  final String value;
-
-  const _AnimatedCostPerKm({
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 200),
-      transitionBuilder: (Widget child, Animation<double> animation) {
-        return FadeTransition(
-          opacity: animation,
-          child: child,
-        );
-      },
-      child: Row(
-        key: ValueKey(value),
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.local_gas_station, size: 14, color: Color(0xFF6C63FF)),
-          const SizedBox(width: 4),
           Text(
-            value,
+            shiftState.formattedIdleTime,
             style: const TextStyle(
-              fontSize: 14,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
@@ -565,161 +509,5 @@ class _AnimatedCostPerKm extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-// ============================================================
-// АНИМИРОВАННАЯ КОМПАКТНАЯ КАРТОЧКА МЕТРИКИ
-// ============================================================
-class _AnimatedCompactMetricCard extends StatelessWidget {
-  final String value;
-  final String label;
-  final Color color;
-
-  const _AnimatedCompactMetricCard({
-    required this.value,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E1E1E),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF2C2C2C), width: 0.5),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              transitionBuilder: (Widget child, Animation<double> animation) {
-                return FadeTransition(
-                  opacity: animation,
-                  child: child,
-                );
-              },
-              child: Text(
-                value,
-                key: ValueKey(value),
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 10,
-                color: Color(0xFF888888),
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================
-// АНИМИРОВАННОЕ ВРЕМЯ ПРОСТОЯ
-// ============================================================
-class _AnimatedIdleTimeDisplay extends StatefulWidget {
-  final ShiftState shiftState;
-
-  const _AnimatedIdleTimeDisplay({
-    required this.shiftState,
-  });
-
-  @override
-  State<_AnimatedIdleTimeDisplay> createState() => _AnimatedIdleTimeDisplayState();
-}
-
-class _AnimatedIdleTimeDisplayState extends State<_AnimatedIdleTimeDisplay> {
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _startTimer();
-  }
-
-  @override
-  void didUpdateWidget(covariant _AnimatedIdleTimeDisplay oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.shiftState.isActive != oldWidget.shiftState.isActive ||
-        widget.shiftState.isOnOrder != oldWidget.shiftState.isOnOrder) {
-      _startTimer();
-    }
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  void _startTimer() {
-    _timer?.cancel();
-    if (widget.shiftState.isActive && !widget.shiftState.isOnOrder) {
-      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        if (mounted) setState(() {});
-      });
-    } else {
-      setState(() {});
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final String formattedTime;
-    if (widget.shiftState.isActive && 
-        !widget.shiftState.isOnOrder && 
-        widget.shiftState.idleStartTime != null) {
-      final now = DateTime.now();
-      final duration = widget.shiftState.totalIdleTime + 
-          now.difference(widget.shiftState.idleStartTime!);
-      formattedTime = _formatDuration(duration);
-    } else {
-      formattedTime = _formatDuration(widget.shiftState.totalIdleTime);
-    }
-
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 200),
-      transitionBuilder: (Widget child, Animation<double> animation) {
-        return FadeTransition(
-          opacity: animation,
-          child: child,
-        );
-      },
-      child: Text(
-        formattedTime,
-        key: ValueKey(formattedTime),
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
-      ),
-    );
-  }
-
-  String _formatDuration(Duration duration) {
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60);
-    final seconds = duration.inSeconds.remainder(60);
-    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 }

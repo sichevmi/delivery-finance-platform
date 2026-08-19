@@ -210,8 +210,8 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
   Duration totalIdleTime = Duration.zero;
 
   if (shiftState.isActive) {
-    totalWorkTime = shiftState.workTime;
-    totalIdleTime = shiftState.totalIdleTimeDisplay;
+    totalWorkTime = shiftState.currentWorkTime;
+    totalIdleTime = shiftState.currentIdleTime;
   } else {
     if (cache.activeShift != null) {
       totalWorkTime = cache.activeShift!.duration ?? Duration.zero;
