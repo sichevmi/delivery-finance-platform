@@ -343,14 +343,13 @@ async def create_order(
             total_expenses=data.get("totalExpenses", 0.0),
             net_profit=data.get("netProfit", 0.0),
             total_time_seconds=data.get("totalTimeSeconds", 0),
-            shop_address=data.get("shopAddress", ""),  # <-- ДОБАВЛЯЕМ
+            shop_address=data.get("shopAddress", ""),
             status='active',
             is_synced=True,
             synced_at=now,
             created_at=now,
             updated_at=now
         )
-        logger.info(f"📦 Создан заказ: shop_address={order.shop_address}")
         db.add(order)
         db.commit()
         db.refresh(order)
@@ -370,6 +369,7 @@ async def create_order(
                 time_to_client=d_data.get("timeToClient", 0),
                 distance_to_client=d_data.get("distanceToClient", 0.0),
                 time_delivery=d_data.get("timeDelivery", 0),
+                tip=d_data.get("tip", 0.0),  # <-- ДОБАВЛЯЕМ
                 status='completed',
                 is_synced=True,
                 synced_at=now,
@@ -400,7 +400,7 @@ async def create_order(
             "totalExpenses": order.total_expenses,
             "netProfit": order.net_profit,
             "totalTimeSeconds": order.total_time_seconds,
-            "shopAddress": order.shop_address,  # <-- ДОБАВЛЯЕМ В ОТВЕТ
+            "shopAddress": order.shop_address,
             "status": order.status,
         }
     except Exception as e:

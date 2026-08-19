@@ -10,6 +10,7 @@ class Delivery {
   final int timeToClient;
   final double distanceToClient;
   final int timeDelivery;
+  final double tip; // <-- ДОБАВЛЯЕМ
   final String status;
 
   const Delivery({
@@ -24,6 +25,7 @@ class Delivery {
     required this.timeToClient,
     required this.distanceToClient,
     required this.timeDelivery,
+    this.tip = 0.0,
     this.status = 'active',
   });
 
@@ -40,6 +42,7 @@ class Delivery {
       timeToClient: json['timeToClient'] ?? 0,
       distanceToClient: (json['distanceToClient'] ?? 0).toDouble(),
       timeDelivery: json['timeDelivery'] ?? 0,
+      tip: (json['tip'] ?? 0).toDouble(),
       status: json['status'] ?? 'active',
     );
   }
@@ -56,6 +59,7 @@ class Delivery {
       'timeToClient': timeToClient,
       'distanceToClient': distanceToClient,
       'timeDelivery': timeDelivery,
+      'tip': tip,
       'status': status,
     };
   }

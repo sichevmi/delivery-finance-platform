@@ -54,7 +54,14 @@ class _OrderRouteState {
   final DateTime? segmentEndTime;
   final Duration totalPauseDuration;
   final DateTime? pauseStartTime;
-  final String? shopAddressForOrder; // <-- НОВОЕ: адрес магазина для сохранения в заказе
+  final String? shopAddressForOrder;
+  final bool isShopAddressManual;
+  final String? manualShopAddress;
+  final bool isClientAddressManual;
+  final String? manualClientAddress;
+  final bool showManualShopInput;
+  final bool showManualClientInput;
+  final double tip; // <-- ДОБАВЛЯЕМ ЧАЕВЫЕ
 
   _OrderRouteState({
     this.currentSegment = 0,
@@ -89,6 +96,13 @@ class _OrderRouteState {
     this.totalPauseDuration = Duration.zero,
     this.pauseStartTime,
     this.shopAddressForOrder,
+    this.isShopAddressManual = false,
+    this.manualShopAddress,
+    this.isClientAddressManual = false,
+    this.manualClientAddress,
+    this.showManualShopInput = false,
+    this.showManualClientInput = false,
+    this.tip = 0.0, // <-- ДОБАВЛЯЕМ
   });
 
   _OrderRouteState copyWith({
@@ -124,6 +138,13 @@ class _OrderRouteState {
     Duration? totalPauseDuration,
     DateTime? pauseStartTime,
     String? shopAddressForOrder,
+    bool? isShopAddressManual,
+    String? manualShopAddress,
+    bool? isClientAddressManual,
+    String? manualClientAddress,
+    bool? showManualShopInput,
+    bool? showManualClientInput,
+    double? tip, // <-- ДОБАВЛЯЕМ
   }) {
     return _OrderRouteState(
       currentSegment: currentSegment ?? this.currentSegment,
@@ -158,6 +179,13 @@ class _OrderRouteState {
       totalPauseDuration: totalPauseDuration ?? this.totalPauseDuration,
       pauseStartTime: pauseStartTime ?? this.pauseStartTime,
       shopAddressForOrder: shopAddressForOrder ?? this.shopAddressForOrder,
+      isShopAddressManual: isShopAddressManual ?? this.isShopAddressManual,
+      manualShopAddress: manualShopAddress ?? this.manualShopAddress,
+      isClientAddressManual: isClientAddressManual ?? this.isClientAddressManual,
+      manualClientAddress: manualClientAddress ?? this.manualClientAddress,
+      showManualShopInput: showManualShopInput ?? this.showManualShopInput,
+      showManualClientInput: showManualClientInput ?? this.showManualClientInput,
+      tip: tip ?? this.tip, // <-- ДОБАВЛЯЕМ
     );
   }
 }
@@ -286,6 +314,172 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
     });
   }
 
+  // ===== МЕТОД ДЛЯ ОБНОВЛЕНИЯ ЧАЕВЫХ =====
+  void _updateTip(double value) {
+    setState(() {
+      _state = _state.copyWith(tip: value);
+    });
+    logMessage('📌 Чаевые обновлены: $value ₽', category: 'ORDER');
+  }
+
+  // ===== МЕТОДЫ ДЛЯ РУЧНОГО ВВОДА АДРЕСА МАГАЗИНА =====
+  void _retryGeocode() async {
+    logMessage('🔄 Повторная попытка геокодирования адреса магазина', category: 'ORDER');
+    if (_isProcessing) return;
+    _isProcessing = true;
+    final pos = await _getCurrentPosition();
+    if (!mounted) { _isProcessing = false; return; }
+    String? addr;
+    if (pos != null) {
+      addr = await GeocoderService.reverseGeocode(
+        pos.latitude,
+        pos.longitude,
+        onLog: (msg) => logMessage(msg, category: 'GEO'),
+      );
+    }
+    final shopAddr = addr ?? 'Адрес не определён';
+    setState(() {
+      _state = _state.copyWith(
+        shopAddress: shopAddr,
+        shopAddressForOrder: shopAddr,
+        isShopAddressManual: false,
+        manualShopAddress: null,
+        showManualShopInput: false,
+      );
+      if (shopAddr != 'Адрес не определён') {
+        _state = _state.copyWith(currentSegment: 1);
+        _startSegment();
+      } else {
+        _state = _state.copyWith(showManualShopInput: true);
+      }
+    });
+    _isProcessing = false;
+    if (shopAddr == 'Адрес не определён') {
+      logMessage('⚠️ Адрес магазина не определён после повторной попытки', category: 'ORDER');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Не удалось определить адрес магазина. Введите вручную.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
+  }
+
+  void _onManualShopAddressChanged(String value) {
+    setState(() {
+      _state = _state.copyWith(
+        manualShopAddress: value,
+      );
+    });
+  }
+
+  void _onManualShopAddressConfirm() {
+    final address = _state.manualShopAddress?.trim();
+    if (address == null || address.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Пожалуйста, введите адрес магазина'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+    setState(() {
+      _state = _state.copyWith(
+        shopAddress: address,
+        shopAddressForOrder: address,
+        isShopAddressManual: true,
+        manualShopAddress: null,
+        showManualShopInput: false,
+        currentSegment: 1,
+      );
+    });
+    _startSegment();
+    logMessage('📌 Введён адрес магазина вручную: $address', category: 'ORDER');
+  }
+
+  // ===== МЕТОДЫ ДЛЯ РУЧНОГО ВВОДА АДРЕСА КЛИЕНТА =====
+  void _retryClientGeocode() async {
+    logMessage('🔄 Повторная попытка геокодирования адреса клиента', category: 'ORDER');
+    if (_isProcessing) return;
+    _isProcessing = true;
+    final pos = await _getCurrentPosition();
+    if (!mounted) { _isProcessing = false; return; }
+    String? addr;
+    if (pos != null) {
+      addr = await GeocoderService.reverseGeocode(
+        pos.latitude,
+        pos.longitude,
+        onLog: (msg) => logMessage(msg, category: 'GEO'),
+      );
+    }
+    final clientAddr = addr ?? 'Адрес не определён';
+    setState(() {
+      _state = _state.copyWith(
+        clientAddress: clientAddr,
+        isClientAddressManual: false,
+        manualClientAddress: null,
+        showManualClientInput: false,
+      );
+      if (clientAddr != 'Адрес не определён') {
+        _state = _state.copyWith(currentSegment: 3);
+        _startSegment();
+      } else {
+        _state = _state.copyWith(showManualClientInput: true);
+      }
+    });
+    _isProcessing = false;
+    if (clientAddr == 'Адрес не определён') {
+      logMessage('⚠️ Адрес клиента не определён после повторной попытки', category: 'ORDER');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Не удалось определить адрес клиента. Введите вручную.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
+  }
+
+  void _onManualClientAddressChanged(String value) {
+    setState(() {
+      _state = _state.copyWith(
+        manualClientAddress: value,
+      );
+    });
+  }
+
+  void _onManualClientAddressConfirm() {
+    final address = _state.manualClientAddress?.trim();
+    if (address == null || address.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Пожалуйста, введите адрес клиента'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+    setState(() {
+      _state = _state.copyWith(
+        clientAddress: address,
+        isClientAddressManual: true,
+        manualClientAddress: null,
+        showManualClientInput: false,
+        currentSegment: 3,
+      );
+    });
+    _startSegment();
+    logMessage('📌 Введён адрес клиента вручную: $address', category: 'ORDER');
+  }
+
   Future<void> _handleMainAction() async {
     logMessage('🔵 [_handleMainAction] ВХОД, _isProcessing=$_isProcessing, сегмент=${_state.currentSegment}');
     
@@ -315,7 +509,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
 
     switch (_state.currentSegment) {
       case 0:
-        logMessage('🔵 [_handleMainAction] КЕЙС 0: получение позиции');
+        logMessage('🔵 [_handleMainAction] КЕЙС 0: получение позиции для адреса магазина');
+        
         final pos = await _getCurrentPosition();
         if (!mounted) { 
           logMessage('⚠️ [_handleMainAction] КЕЙС 0: виджет не смонтирован');
@@ -331,17 +526,43 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
           );
         }
         final shopAddr = addr ?? 'Адрес не определён';
-        setState(() {
-          _state = _state.copyWith(
-            shopAddress: shopAddr,
-            shopAddressForOrder: shopAddr, // <-- СОХРАНЯЕМ АДРЕС ДЛЯ ЗАКАЗА
-            currentSegment: 1,
-          );
-        });
-          logMessage('📌 Сохранён адрес магазина: $shopAddr', category: 'ORDER');
-        _startSegment();
-        _isProcessing = false;
-        logMessage('🔵 [_handleMainAction] КЕЙС 0: завершён, переход на сегмент 1');
+        
+        if (shopAddr == 'Адрес не определён') {
+          setState(() {
+            _state = _state.copyWith(
+              shopAddress: shopAddr,
+              shopAddressForOrder: null,
+              isShopAddressManual: false,
+              manualShopAddress: null,
+              showManualShopInput: true,
+            );
+          });
+          _isProcessing = false;
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Адрес магазина не определён. Введите вручную.'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+          logMessage('⚠️ Адрес магазина не определён, показываем форму для ручного ввода', category: 'ORDER');
+        } else {
+          setState(() {
+            _state = _state.copyWith(
+              shopAddress: shopAddr,
+              shopAddressForOrder: shopAddr,
+              isShopAddressManual: false,
+              manualShopAddress: null,
+              showManualShopInput: false,
+              currentSegment: 1,
+            );
+          });
+          _startSegment();
+          _isProcessing = false;
+          logMessage('🔵 [_handleMainAction] КЕЙС 0: адрес магазина определён, переход на сегмент 1');
+        }
         break;
 
       case 1:
@@ -364,29 +585,56 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
 
       case 2:
         logMessage('🔵 [_handleMainAction] КЕЙС 2: получение позиции для адреса клиента');
-        final pos = await _getCurrentPosition();
+        final posClient = await _getCurrentPosition();
         if (!mounted) { 
           logMessage('⚠️ [_handleMainAction] КЕЙС 2: виджет не смонтирован');
           _isProcessing = false; 
           return; 
         }
-        String? addr;
-        if (pos != null) {
-          addr = await GeocoderService.reverseGeocode(
-            pos.latitude, 
-            pos.longitude,
+        String? clientAddr;
+        if (posClient != null) {
+          clientAddr = await GeocoderService.reverseGeocode(
+            posClient.latitude, 
+            posClient.longitude,
             onLog: (msg) => logMessage(msg, category: 'GEO'),
           );
         }
-        setState(() {
-          _state = _state.copyWith(
-            clientAddress: addr ?? 'Адрес не определён',
-            currentSegment: 3,
-          );
-        });
-        _startSegment();
-        _isProcessing = false;
-        logMessage('🔵 [_handleMainAction] КЕЙС 2: завершён, переход на сегмент 3');
+        final clientAddress = clientAddr ?? 'Адрес не определён';
+        
+        if (clientAddress == 'Адрес не определён') {
+          setState(() {
+            _state = _state.copyWith(
+              clientAddress: clientAddress,
+              isClientAddressManual: false,
+              manualClientAddress: null,
+              showManualClientInput: true,
+            );
+          });
+          _isProcessing = false;
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Адрес клиента не определён. Введите вручную.'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+          logMessage('⚠️ Адрес клиента не определён, показываем форму для ручного ввода', category: 'ORDER');
+        } else {
+          setState(() {
+            _state = _state.copyWith(
+              clientAddress: clientAddress,
+              isClientAddressManual: false,
+              manualClientAddress: null,
+              showManualClientInput: false,
+              currentSegment: 3,
+            );
+          });
+          _startSegment();
+          _isProcessing = false;
+          logMessage('🔵 [_handleMainAction] КЕЙС 2: адрес клиента определён, переход на сегмент 3');
+        }
         break;
 
       case 3:
@@ -478,6 +726,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
       timeToClient: _state.timeToClient,
       distanceToClient: _state.distanceToClient,
       timeDelivery: _state.timeDelivery,
+      tip: _state.tip, // <-- ДОБАВЛЯЕМ ЧАЕВЫЕ В ДОСТАВКУ
     );
 
     final updatedList = List<Delivery>.from(_state.completedDeliveries)..add(delivery);
@@ -583,6 +832,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
         timeToClient: _state.timeToClient,
         distanceToClient: _state.distanceToClient,
         timeDelivery: _state.timeDelivery,
+        tip: _state.tip, // <-- ДОБАВЛЯЕМ ЧАЕВЫЕ
       );
       newCompletedDeliveries.add(currentDelivery);
       logMessage('📦 Сохранена доставка #${_state.deliveryNumber} перед добавлением новой', category: 'ORDER');
@@ -618,7 +868,14 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
         timeDelivery: 0,
         clientAddress: 'Адрес клиента будет определён позже',
         shopAddress: _state.shopAddress,
-        shopAddressForOrder: _state.shopAddressForOrder, // <-- СОХРАНЯЕМ АДРЕС
+        shopAddressForOrder: _state.shopAddressForOrder,
+        isShopAddressManual: _state.isShopAddressManual,
+        manualShopAddress: _state.manualShopAddress,
+        isClientAddressManual: _state.isClientAddressManual,
+        manualClientAddress: _state.manualClientAddress,
+        showManualShopInput: false,
+        showManualClientInput: false,
+        tip: 0.0, // <-- СБРАСЫВАЕМ ЧАЕВЫЕ ДЛЯ НОВОЙ ДОСТАВКИ
         coefficient: _state.coefficient,
       );
     });
@@ -680,7 +937,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
           totalCost: totalCost,
           totalTime: totalTime,
           totalDistance: totalDistance,
-          shopAddress: _state.shopAddressForOrder, // <-- ПЕРЕДАЁМ АДРЕС МАГАЗИНА
+          shopAddress: _state.shopAddressForOrder,
         ),
       ),
     ).then((result) async {
@@ -727,7 +984,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
             'totalExpenses': totalExpenses,
             'netProfit': totalCost - totalExpenses,
             'totalTimeSeconds': totalTime,
-            'shopAddress': _state.shopAddressForOrder ?? '', // <-- ДОБАВЛЯЕМ АДРЕС МАГАЗИНА
+            'shopAddress': _state.shopAddressForOrder ?? '',
             'deliveries': _state.completedDeliveries.map((d) => {
               'number': d.number,
               'clientAddress': d.clientAddress,
@@ -739,6 +996,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
               'timeToClient': d.timeToClient,
               'distanceToClient': d.distanceToClient,
               'timeDelivery': d.timeDelivery,
+              'tip': d.tip, // <-- ДОБАВЛЯЕМ ЧАЕВЫЕ В ОТПРАВКУ
               'status': d.status,
             }).toList(),
           };
@@ -884,9 +1142,25 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
               apartment: _state.apartment,
               isApartmentValid: _state.isApartmentValid,
               isPrivateHouse: _state.isPrivateHouse,
+              shopAddress: _state.shopAddress,
+              showManualShopInput: _state.showManualShopInput,
+              isShopAddressManual: _state.isShopAddressManual,
+              manualShopAddress: _state.manualShopAddress,
+              clientAddress: _state.clientAddress,
+              showManualClientInput: _state.showManualClientInput,
+              isClientAddressManual: _state.isClientAddressManual,
+              manualClientAddress: _state.manualClientAddress,
+              tip: _state.tip, // <-- ДОБАВЛЯЕМ
               onWeightChanged: _updateWeight,
               onApartmentChanged: _updateApartment,
               onPrivateHouseChanged: _togglePrivateHouse,
+              onRetryGeocode: _retryGeocode,
+              onManualShopAddressChanged: _onManualShopAddressChanged,
+              onManualShopAddressConfirm: _onManualShopAddressConfirm,
+              onRetryClientGeocode: _retryClientGeocode,
+              onManualClientAddressChanged: _onManualClientAddressChanged,
+              onManualClientAddressConfirm: _onManualClientAddressConfirm,
+              onTipChanged: _updateTip, // <-- ДОБАВЛЯЕМ
             ),
             const SizedBox(height: 20),
             ActionButtons(
