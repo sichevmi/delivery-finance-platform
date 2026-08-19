@@ -350,6 +350,7 @@ async def create_order(
             created_at=now,
             updated_at=now
         )
+        logger.info(f"📦 Создан заказ: shop_address={order.shop_address}")
         db.add(order)
         db.commit()
         db.refresh(order)

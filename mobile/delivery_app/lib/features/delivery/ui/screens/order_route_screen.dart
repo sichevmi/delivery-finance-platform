@@ -338,6 +338,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
             currentSegment: 1,
           );
         });
+          logMessage('📌 Сохранён адрес магазина: $shopAddr', category: 'ORDER');
         _startSegment();
         _isProcessing = false;
         logMessage('🔵 [_handleMainAction] КЕЙС 0: завершён, переход на сегмент 1');

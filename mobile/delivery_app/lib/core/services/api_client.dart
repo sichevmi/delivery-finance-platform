@@ -142,8 +142,11 @@ class ApiClient {
         'totalExpenses': data['totalExpenses'],
         'netProfit': data['netProfit'],
         'totalTimeSeconds': data['totalTimeSeconds'],
+        'shopAddress': data['shopAddress'] ?? '', // <-- ДОБАВЛЯЕМ
         'deliveries': data['deliveries'] ?? [],
       };
+      
+      logMessage('📤 [API] Создание заказа: shopAddress=${requestData['shopAddress']}', category: 'API');
       
       final response = await _dio.post(
         '/orders',
