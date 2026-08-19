@@ -255,36 +255,45 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   }
   
   Future<void> _createPausedShift() async {
-    try {
-      final shift = await _apiService.startShift();
-      logMessage('📅 [SHIFT] Создана новая смена с статусом paused: id=${shift.id}', category: 'SHIFT');
-      
-      state = state.copyWith(
-        isActive: true,
-        isPaused: true,
-        isCompleted: false,
-        shiftStartTime: shift.startTime,
-        shiftId: shift.id,
-        totalWorkTime: Duration.zero,
-        totalIdleTime: Duration.zero,
-        totalOrderTime: Duration.zero,
-        totalPaidDistance: 0.0,
-        totalIdleDistance: 0.0,
-        processedIdleDistance: 0.0,
-        ordersCount: 0,
-        totalIncome: 0.0,
-        totalExpenses: 0.0,
-        netProfit: 0.0,
-        isOnOrder: false,
-        orderStartTime: null,
-        idleStartTime: null,
-      );
-      
-      await _saveShiftState();
-    } catch (e) {
-      logMessage('❌ [SHIFT] Ошибка создания смены: $e', category: 'SHIFT', level: LogLevel.error);
+  try {
+    final shift = await _apiService.startShift();
+    logMessage('📅 [SHIFT] Создана новая смена: id=${shift.id}, status=${shift.status}', category: 'SHIFT');
+    
+    // ===== ПРОВЕРЯЕМ СТАТУС =====
+    bool isPaused = shift.status == 'paused';
+    
+    state = state.copyWith(
+      isActive: true,
+      isPaused: isPaused,
+      isCompleted: false,
+      shiftStartTime: shift.startTime,
+      shiftId: shift.id,
+      totalWorkTime: Duration.zero,
+      totalIdleTime: Duration.zero,
+      totalOrderTime: Duration.zero,
+      totalPaidDistance: 0.0,
+      totalIdleDistance: 0.0,
+      processedIdleDistance: 0.0,
+      ordersCount: 0,
+      totalIncome: 0.0,
+      totalExpenses: 0.0,
+      netProfit: 0.0,
+      isOnOrder: false,
+      orderStartTime: null,
+      idleStartTime: null,
+    );
+    
+    // Если статус active — приостанавливаем сразу
+    if (!isPaused) {
+      logMessage('⚠️ [SHIFT] Смена создана со статусом active, приостанавливаем', category: 'SHIFT');
+      await pauseShift();
     }
+    
+    await _saveShiftState();
+  } catch (e) {
+    logMessage('❌ [SHIFT] Ошибка создания смены: $e', category: 'SHIFT', level: LogLevel.error);
   }
+}
   
   // ============================================================
   // СОХРАНЕНИЕ СОСТОЯНИЯ

@@ -181,32 +181,36 @@ async def start_shift(
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    """Начать новую смену"""
+    """Создать новую приостановленную смену"""
     try:
+        # Проверяем существующую смену
         existing = db.query(Shift).filter(
             Shift.user_id == current_user.id,
-            Shift.status == 'active'
+            Shift.status.in_(['active', 'paused'])
         ).first()
-        if existing:
-            raise HTTPException(status_code=400, detail="Уже есть активная смена")
-
-        # Используем UTC время с часовым поясом
-        now = datetime.now(timezone.utc)
-        start_time_iso = now.isoformat()
         
-        logger.info(f"🕐 [СЕРВЕР] Сохраняем время с часовым поясом: {start_time_iso}")
+        if existing:
+            return {
+                "id": existing.id,
+                "startTime": existing.start_time,
+                "status": existing.status,
+                "totalPaidDistance": existing.total_paid_distance,
+                "totalIdleDistance": existing.total_idle_distance,
+                "ordersCount": existing.orders_count,
+            }
 
+        now = datetime.now(timezone.utc)
+        
         shift = Shift(
             user_id=current_user.id,
-            start_time=start_time_iso,
-            status='active',
+            start_time=now.isoformat(),
+            status='paused',  # <-- ВАЖНО: ВСЕГДА PAUSED
             total_paid_distance=0.0,
             total_idle_distance=0.0,
             orders_count=0,
             total_income=0.0,
             total_expenses=0.0,
             net_profit=0.0,
-            duration_seconds=0,
             is_synced=True,
             synced_at=now,
             created_at=now,
@@ -216,7 +220,7 @@ async def start_shift(
         db.commit()
         db.refresh(shift)
         
-        logger.info(f"✅ Смена начата: id={shift.id}, time={shift.start_time}")
+        logger.info(f"📅 Создана новая смена id={shift.id}, status={shift.status}")
         
         return {
             "id": shift.id,
@@ -225,13 +229,9 @@ async def start_shift(
             "totalPaidDistance": shift.total_paid_distance,
             "totalIdleDistance": shift.total_idle_distance,
             "ordersCount": shift.orders_count,
-            "totalIncome": shift.total_income,
-            "totalExpenses": shift.total_expenses,
-            "netProfit": shift.net_profit,
-            "durationSeconds": shift.duration_seconds
         }
     except Exception as e:
-        logger.error(f"❌ Ошибка начала смены: {e}")
+        logger.error(f"❌ Ошибка создания смены: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
