@@ -47,6 +47,7 @@ class Order(Base):
     total_expenses = Column(Float, default=0)
     net_profit = Column(Float, default=0)
     total_time_seconds = Column(Integer, default=0)
+    shop_address = Column(String(500), nullable=True)  # <-- ДОБАВЛЯЕМ
     status = Column(String, default="active")
     
     is_synced = Column(Boolean, default=False)

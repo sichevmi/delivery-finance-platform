@@ -170,6 +170,48 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     _loadFromCache();
   }
 
+  // ===== НОВЫЙ МЕТОД: ПРИНУДИТЕЛЬНОЕ ЗАВЕРШЕНИЕ ВСЕХ АКТИВНЫХ СМЕН =====
+  Future<void> forceCompleteAllActiveShifts() async {
+    logMessage('🔄 [SHIFT] forceCompleteAllActiveShifts() начат', category: 'SHIFT');
+    
+    try {
+      // Загружаем свежие данные с сервера
+      await _apiService.loadAllData();
+      
+      // Проверяем, есть ли активная смена
+      final activeShift = _apiService.cache.activeShift;
+      if (activeShift == null) {
+        logMessage('✅ [SHIFT] Нет активных смен для завершения', category: 'SHIFT');
+        return;
+      }
+      
+      logMessage('🔄 [SHIFT] Найдена активная смена id=${activeShift.id}, завершаем...', category: 'SHIFT');
+      
+      // Завершаем смену с нулевыми данными
+      await _apiService.completeShift(
+        activeShift.id,
+        totalPaidDistance: 0,
+        totalIdleDistance: 0,
+        totalOrderTimeSeconds: 0,
+        ordersCount: 0,
+        totalIncome: 0,
+        totalExpenses: 0,
+        netProfit: 0,
+      );
+      
+      logMessage('✅ [SHIFT] Активная смена принудительно завершена', category: 'SHIFT');
+      
+      // Перезагружаем данные
+      await _apiService.loadAllData();
+      await _loadFromCache();
+      
+      logMessage('✅ [SHIFT] forceCompleteAllActiveShifts() завершён', category: 'SHIFT');
+    } catch (e) {
+      logMessage('❌ [SHIFT] Ошибка принудительного завершения смены: $e', category: 'SHIFT', level: LogLevel.error);
+      rethrow;
+    }
+  }
+
   Future<void> _saveShiftState() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -416,14 +458,25 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
 
     _isLoading = true;
 
-    if (_apiService.cache.activeShift != null) {
-      await _loadFromCache();
-      _isLoading = false;
-      return;
+    try {
+      logMessage('🔄 [SHIFT] Проверка активной смены на сервере...', category: 'SHIFT');
+      await _apiService.loadAllData();
+      logMessage('🔄 [SHIFT] Данные с сервера загружены, activeShift=${_apiService.cache.activeShift?.id}', category: 'SHIFT');
+      
+      if (_apiService.cache.activeShift != null) {
+        logMessage('🔄 На сервере есть активная смена ${_apiService.cache.activeShift!.id}, восстанавливаем...', category: 'SHIFT');
+        await _loadFromCache();
+        _isLoading = false;
+        return;
+      }
+    } catch (e) {
+      logMessage('⚠️ Ошибка проверки активной смены: $e', category: 'SHIFT', level: LogLevel.error);
     }
 
     try {
+      logMessage('🔄 [SHIFT] Отправка запроса на создание смены...', category: 'SHIFT');
       final shift = await _apiService.startShift();
+      logMessage('✅ [SHIFT] Смена создана на сервере id=${shift.id}', category: 'SHIFT');
       
       final idleTimeToPreserve = state.totalIdleTime;
       logMessage('🔵 [SHIFT] startShift: idleTimeToPreserve=${idleTimeToPreserve.inSeconds} сек', category: 'SHIFT');
@@ -448,134 +501,160 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
       );
       
       await _saveShiftState();
-      
       _startGpsTracking();
       logMessage('✅ [SHIFT] Смена начата на сервере (id=${shift.id})', category: 'SHIFT');
     } catch (e) {
       logMessage('❌ Ошибка начала смены: $e', category: 'SHIFT', level: LogLevel.error);
-      if (e.toString().contains('Уже есть активная смена')) {
+      
+      final errorMessage = e.toString();
+      if (errorMessage.contains('Уже есть активная смена') || 
+          errorMessage.contains('400') ||
+          errorMessage.contains('active shift')) {
+        logMessage('🔄 Активная смена уже есть на сервере, перезагружаем данные', category: 'SHIFT');
+        try {
+          await _apiService.loadAllData();
+          logMessage('🔄 [SHIFT] Данные загружены, activeShift=${_apiService.cache.activeShift?.id}', category: 'SHIFT');
+          
+          if (_apiService.cache.activeShift != null) {
+            logMessage('🔄 Восстанавливаем активную смену ${_apiService.cache.activeShift!.id}', category: 'SHIFT');
+            await _loadFromCache();
+          } else {
+            logMessage('⚠️ Сервер говорит что есть активная смена, но в кеше её нет. Принудительно завершаем.', category: 'SHIFT');
+            // Принудительно завершаем активную смену на сервере
+            await forceCompleteAllActiveShifts();
+            // Теперь можно создавать новую смену
+            _isLoading = false;
+            return startShift();
+          }
+        } catch (loadError) {
+          logMessage('❌ Ошибка загрузки данных после ошибки: $loadError', category: 'SHIFT', level: LogLevel.error);
+        }
+      }
+      _isLoading = false;
+      return;
+    }
+    _isLoading = false;
+  }
+
+  Future<void> stopShift() async {
+    if (_isLoading) return;
+    if (!state.isActive || state.shiftId == null) {
+      logMessage('⚠️ Нет активной смены для остановки', category: 'SHIFT');
+      return;
+    }
+
+    _isLoading = true;
+    final now = DateTime.now();
+    final addedWork = now.difference(state.shiftStartTime!);
+    final idleDuration = state.currentIdlePeriod;
+    
+    Duration addedOrderTime = Duration.zero;
+    if (state.isOnOrder && state.orderStartTime != null) {
+      addedOrderTime = now.difference(state.orderStartTime!);
+    }
+
+    final unprocessedIdle = state.unprocessedIdleDistance;
+    final settings = _ref.read(settingsProvider);
+    final idleCost = _calculateIdleCost(unprocessedIdle, settings);
+    
+    logMessage('📊 [СМЕНА] Данные перед завершением:', category: 'SHIFT');
+    logMessage('   totalPaidDistance: ${state.totalPaidDistance}', category: 'SHIFT');
+    logMessage('   totalIdleDistance: ${state.totalIdleDistance}', category: 'SHIFT');
+    logMessage('   processedIdleDistance: ${state.processedIdleDistance}', category: 'SHIFT');
+    logMessage('   ordersCount: ${state.ordersCount}', category: 'SHIFT');
+    logMessage('   totalIncome: ${state.totalIncome}', category: 'SHIFT');
+    logMessage('   totalExpenses: ${state.totalExpenses}', category: 'SHIFT');
+    logMessage('   netProfit: ${state.netProfit}', category: 'SHIFT');
+
+    final newTotalIdleTime = state.totalIdleTime + idleDuration;
+    final newTotalWorkTime = state.totalWorkTime + addedWork;
+    final newTotalOrderTime = state.totalOrderTime + addedOrderTime;
+    final newTotalExpenses = state.totalExpenses + idleCost;
+    final newNetProfit = state.totalIncome - newTotalExpenses;
+
+    final savedShiftData = {
+      'totalPaidDistance': state.totalPaidDistance,
+      'totalIdleDistance': state.totalIdleDistance,
+      'processedIdleDistance': state.processedIdleDistance,
+      'ordersCount': state.ordersCount,
+      'totalIncome': state.totalIncome,
+      'totalExpenses': newTotalExpenses,
+      'netProfit': newNetProfit,
+      'totalWorkTime': newTotalWorkTime,
+      'totalIdleTime': newTotalIdleTime,
+      'totalOrderTime': newTotalOrderTime,
+    };
+
+    await _saveIdleTime(newTotalIdleTime);
+
+    state = state.copyWith(
+      isActive: false,
+      shiftStartTime: null,
+      shiftEndTime: now,
+      totalWorkTime: newTotalWorkTime,
+      totalIdleTime: newTotalIdleTime,
+      idleStartTime: null,
+      isOnOrder: false,
+      orderStartTime: null,
+      totalOrderTime: newTotalOrderTime,
+      processedIdleDistance: state.totalIdleDistance,
+      totalExpenses: newTotalExpenses,
+      netProfit: newNetProfit,
+    );
+    
+    await _saveShiftState();
+    _stopGpsTracking();
+
+    try {
+      final shiftId = state.shiftId!;
+      
+      logMessage('📤 [СМЕНА] Отправка данных на сервер:', category: 'SHIFT');
+      logMessage('   totalPaidDistance: ${state.totalPaidDistance}', category: 'SHIFT');
+      logMessage('   totalIdleDistance: ${state.totalIdleDistance}', category: 'SHIFT');
+      logMessage('   ordersCount: ${state.ordersCount}', category: 'SHIFT');
+      logMessage('   totalIncome: ${state.totalIncome}', category: 'SHIFT');
+      logMessage('   totalExpenses: ${state.totalExpenses}', category: 'SHIFT');
+      logMessage('   netProfit: ${state.netProfit}', category: 'SHIFT');
+      
+      await _apiService.completeShift(
+        shiftId,
+        totalPaidDistance: state.totalPaidDistance,
+        totalIdleDistance: state.totalIdleDistance,
+        totalOrderTimeSeconds: state.totalOrderTime.inSeconds,
+        ordersCount: state.ordersCount,
+        totalIncome: state.totalIncome,
+        totalExpenses: state.totalExpenses,
+        netProfit: state.netProfit,
+      );
+      
+      await _apiService.loadAllData();
+      
+      state = state.copyWith(
+        totalPaidDistance: savedShiftData['totalPaidDistance'] as double,
+        totalIdleDistance: savedShiftData['totalIdleDistance'] as double,
+        processedIdleDistance: savedShiftData['processedIdleDistance'] as double,
+        ordersCount: savedShiftData['ordersCount'] as int,
+        totalIncome: savedShiftData['totalIncome'] as double,
+        totalExpenses: savedShiftData['totalExpenses'] as double,
+        netProfit: savedShiftData['netProfit'] as double,
+        totalWorkTime: savedShiftData['totalWorkTime'] as Duration,
+        totalIdleTime: savedShiftData['totalIdleTime'] as Duration,
+        totalOrderTime: savedShiftData['totalOrderTime'] as Duration,
+      );
+      
+      await _saveShiftState();
+      logMessage('✅ [SHIFT] Смена завершена на сервере (id=$shiftId)', category: 'SHIFT');
+    } catch (e) {
+      logMessage('❌ [SHIFT] Ошибка завершения смены: $e', category: 'SHIFT', level: LogLevel.error);
+      
+      if (e.toString().contains('уже завершена') || e.toString().contains('not found')) {
+        logMessage('🔄 Смена уже завершена на сервере, обновляем состояние', category: 'SHIFT');
         await _apiService.loadAllData();
         await _loadFromCache();
       }
     }
     _isLoading = false;
   }
-
-  Future<void> stopShift() async {
-  if (_isLoading) return;
-  if (!state.isActive || state.shiftId == null) {
-    logMessage('⚠️ Нет активной смены для остановки', category: 'SHIFT');
-    return;
-  }
-
-  _isLoading = true;
-  final now = DateTime.now();
-  final addedWork = now.difference(state.shiftStartTime!);
-  final idleDuration = state.currentIdlePeriod;
-  
-  Duration addedOrderTime = Duration.zero;
-  if (state.isOnOrder && state.orderStartTime != null) {
-    addedOrderTime = now.difference(state.orderStartTime!);
-  }
-
-  // ===== СПИСАНИЕ ХОЛОСТОГО ПРОБЕГА ПРИ ЗАВЕРШЕНИИ СМЕНЫ =====
-  // Если есть несписанный холостой пробег и нет активного заказа
-  final unprocessedIdle = state.unprocessedIdleDistance;
-  final settings = _ref.read(settingsProvider);
-  final idleCost = _calculateIdleCost(unprocessedIdle, settings);
-  
-  if (unprocessedIdle > 0 && !state.isOnOrder) {
-    logMessage('📊 [СМЕНА] Списание холостого пробега при завершении смены: ${unprocessedIdle.toStringAsFixed(2)} км на сумму ${idleCost.toStringAsFixed(2)} руб', category: 'SHIFT');
-    // Добавляем к расходам
-    state = state.copyWith(
-      totalExpenses: state.totalExpenses + idleCost,
-      netProfit: state.totalIncome - (state.totalExpenses + idleCost),
-      processedIdleDistance: state.totalIdleDistance,
-    );
-    await _saveShiftState();
-  }
-
-  logMessage('📊 [СМЕНА] Данные перед завершением:', category: 'SHIFT');
-  logMessage('   totalIdleDistance: ${state.totalIdleDistance}', category: 'SHIFT');
-  logMessage('   processedIdleDistance: ${state.processedIdleDistance}', category: 'SHIFT');
-  logMessage('   totalExpenses: ${state.totalExpenses}', category: 'SHIFT');
-
-  final newTotalIdleTime = state.totalIdleTime + idleDuration;
-  final newTotalWorkTime = state.totalWorkTime + addedWork;
-  final newTotalOrderTime = state.totalOrderTime + addedOrderTime;
-  
-  final newTotalExpenses = state.totalExpenses;
-  final newNetProfit = state.totalIncome - newTotalExpenses;
-
-  final savedShiftData = {
-    'totalPaidDistance': state.totalPaidDistance,
-    'totalIdleDistance': state.totalIdleDistance,
-    'processedIdleDistance': state.processedIdleDistance,
-    'ordersCount': state.ordersCount,
-    'totalIncome': state.totalIncome,
-    'totalExpenses': newTotalExpenses,
-    'netProfit': newNetProfit,
-    'totalWorkTime': newTotalWorkTime,
-    'totalIdleTime': newTotalIdleTime,
-    'totalOrderTime': newTotalOrderTime,
-  };
-
-  await _saveIdleTime(newTotalIdleTime);
-
-  state = state.copyWith(
-    isActive: false,
-    shiftStartTime: null,
-    shiftEndTime: now,
-    totalWorkTime: newTotalWorkTime,
-    totalIdleTime: newTotalIdleTime,
-    idleStartTime: null,
-    isOnOrder: false,
-    orderStartTime: null,
-    totalOrderTime: newTotalOrderTime,
-    totalExpenses: newTotalExpenses,
-    netProfit: newNetProfit,
-  );
-  
-  await _saveShiftState();
-  _stopGpsTracking();
-
-  try {
-    final shiftId = state.shiftId!;
-    
-    await _apiService.completeShift(
-      shiftId,
-      totalPaidDistance: state.totalPaidDistance,
-      totalIdleDistance: state.totalIdleDistance,
-      totalOrderTimeSeconds: state.totalOrderTime.inSeconds,
-      ordersCount: state.ordersCount,
-      totalIncome: state.totalIncome,
-      totalExpenses: state.totalExpenses,
-      netProfit: state.netProfit,
-    );
-    
-    await _apiService.loadAllData();
-    
-    state = state.copyWith(
-      totalPaidDistance: savedShiftData['totalPaidDistance'] as double,
-      totalIdleDistance: savedShiftData['totalIdleDistance'] as double,
-      processedIdleDistance: savedShiftData['processedIdleDistance'] as double,
-      ordersCount: savedShiftData['ordersCount'] as int,
-      totalIncome: savedShiftData['totalIncome'] as double,
-      totalExpenses: savedShiftData['totalExpenses'] as double,
-      netProfit: savedShiftData['netProfit'] as double,
-      totalWorkTime: savedShiftData['totalWorkTime'] as Duration,
-      totalIdleTime: savedShiftData['totalIdleTime'] as Duration,
-      totalOrderTime: savedShiftData['totalOrderTime'] as Duration,
-    );
-    
-    await _saveShiftState();
-    
-    logMessage('✅ [SHIFT] Смена завершена на сервере (id=$shiftId)', category: 'SHIFT');
-  } catch (e) {
-    logMessage('❌ [SHIFT] Ошибка завершения смены: $e', category: 'SHIFT', level: LogLevel.error);
-  }
-  _isLoading = false;
-}
 
   void startOrder() {
     if (!state.isActive) {
@@ -626,7 +705,6 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     final now = DateTime.now();
     final orderTime = now.difference(state.orderStartTime!);
 
-    // ===== РАСЧЁТ ХОЛОСТОГО ПРОБЕГА =====
     final unprocessedIdle = state.unprocessedIdleDistance;
     final settings = _ref.read(settingsProvider);
     final idleCost = _calculateIdleCost(unprocessedIdle, settings);
@@ -640,7 +718,6 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
       logMessage('📊 [ЗАКАЗ] Списание холостого пробега: ${unprocessedIdle.toStringAsFixed(2)} км на сумму ${idleCost.toStringAsFixed(2)} руб', category: 'SHIFT');
     }
 
-    // ===== ОБНОВЛЯЕМ СОСТОЯНИЕ =====
     state = state.copyWith(
       isOnOrder: false,
       orderStartTime: null,

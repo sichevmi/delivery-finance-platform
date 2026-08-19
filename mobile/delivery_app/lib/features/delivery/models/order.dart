@@ -1,4 +1,4 @@
-import 'package:delivery_app/features/delivery/models/delivery.dart'; // если есть модель Delivery
+import 'package:delivery_app/features/delivery/models/delivery.dart';
 
 class Order {
   final int id;
@@ -11,8 +11,9 @@ class Order {
   final double totalExpenses;
   final double netProfit;
   final Duration totalTime;
+  final String? shopAddress;  // <-- ДОБАВЛЯЕМ
   final String status;
-  final List<Delivery> deliveries; // если есть
+  final List<Delivery> deliveries;
 
   Order({
     required this.id,
@@ -25,6 +26,7 @@ class Order {
     this.totalExpenses = 0.0,
     this.netProfit = 0.0,
     this.totalTime = Duration.zero,
+    this.shopAddress,
     this.status = 'active',
     this.deliveries = const [],
   });
@@ -41,8 +43,27 @@ class Order {
       totalExpenses: (json['totalExpenses'] ?? 0).toDouble(),
       netProfit: (json['netProfit'] ?? 0).toDouble(),
       totalTime: json['totalTimeSeconds'] != null ? Duration(seconds: json['totalTimeSeconds']) : Duration.zero,
+      shopAddress: json['shopAddress'],  // <-- ДОБАВЛЯЕМ
       status: json['status'] ?? 'active',
-      // deliveries: (json['deliveries'] as List?)?.map((d) => Delivery.fromJson(d)).toList() ?? [],
+      deliveries: (json['deliveries'] as List?)?.map((d) => Delivery.fromJson(d)).toList() ?? [],
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'shiftId': shiftId,
+      'serviceName': serviceName,
+      'coefficient': coefficient,
+      'deliveryNumber': deliveryNumber,
+      'totalPaidDistance': totalPaidDistance,
+      'totalIncome': totalIncome,
+      'totalExpenses': totalExpenses,
+      'netProfit': netProfit,
+      'totalTimeSeconds': totalTime.inSeconds,
+      'shopAddress': shopAddress,  // <-- ДОБАВЛЯЕМ
+      'status': status,
+      'deliveries': deliveries.map((d) => d.toJson()).toList(),
+    };
   }
 }

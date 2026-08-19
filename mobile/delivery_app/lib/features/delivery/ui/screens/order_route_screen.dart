@@ -54,6 +54,7 @@ class _OrderRouteState {
   final DateTime? segmentEndTime;
   final Duration totalPauseDuration;
   final DateTime? pauseStartTime;
+  final String? shopAddressForOrder; // <-- НОВОЕ: адрес магазина для сохранения в заказе
 
   _OrderRouteState({
     this.currentSegment = 0,
@@ -87,6 +88,7 @@ class _OrderRouteState {
     this.segmentEndTime,
     this.totalPauseDuration = Duration.zero,
     this.pauseStartTime,
+    this.shopAddressForOrder,
   });
 
   _OrderRouteState copyWith({
@@ -121,6 +123,7 @@ class _OrderRouteState {
     DateTime? segmentEndTime,
     Duration? totalPauseDuration,
     DateTime? pauseStartTime,
+    String? shopAddressForOrder,
   }) {
     return _OrderRouteState(
       currentSegment: currentSegment ?? this.currentSegment,
@@ -154,6 +157,7 @@ class _OrderRouteState {
       segmentEndTime: segmentEndTime ?? this.segmentEndTime,
       totalPauseDuration: totalPauseDuration ?? this.totalPauseDuration,
       pauseStartTime: pauseStartTime ?? this.pauseStartTime,
+      shopAddressForOrder: shopAddressForOrder ?? this.shopAddressForOrder,
     );
   }
 }
@@ -326,9 +330,11 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
             onLog: (msg) => logMessage(msg, category: 'GEO'),
           );
         }
+        final shopAddr = addr ?? 'Адрес не определён';
         setState(() {
           _state = _state.copyWith(
-            shopAddress: addr ?? 'Адрес не определён',
+            shopAddress: shopAddr,
+            shopAddressForOrder: shopAddr, // <-- СОХРАНЯЕМ АДРЕС ДЛЯ ЗАКАЗА
             currentSegment: 1,
           );
         });
@@ -611,6 +617,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
         timeDelivery: 0,
         clientAddress: 'Адрес клиента будет определён позже',
         shopAddress: _state.shopAddress,
+        shopAddressForOrder: _state.shopAddressForOrder, // <-- СОХРАНЯЕМ АДРЕС
         coefficient: _state.coefficient,
       );
     });
@@ -629,131 +636,130 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   }
 
   void _showSummary(BuildContext context) {
-  logMessage('🔵 [_showSummary] ВХОД, completedDeliveries=${_state.completedDeliveries.length}');
-  
-  if (_isProcessing) {
-    logMessage('⚠️ [_showSummary] ПРОПУСК: уже в обработке');
-    return;
-  }
-  _isProcessing = true;
-
-  final pricing = ref.read(pricingProvider);
-  final settings = ref.read(settingsProvider);
-
-  final totalTime = _calculateTotalTime();
-  final totalDistance = _calculateTotalDistance();
-  final totalCost = _calculateTotalCost(pricing);
-
-  final firstDelivery = _state.completedDeliveries.isNotEmpty 
-      ? _state.completedDeliveries.first 
-      : null;
-  final shopDistance = firstDelivery?.distanceToShop ?? 0.0;
-  final totalPaidDistance = _state.completedDeliveries.fold(0.0, (sum, d) => sum + d.distanceToClient);
-  final totalAllDistance = shopDistance + totalPaidDistance;
-
-  final fuelCostPerKm = (settings.fuelConsumption / 100) * settings.fuelPrice;
-  final totalFuelCost = totalAllDistance * fuelCostPerKm;
-  final totalRepairCost = totalAllDistance * settings.repairCost;
-  final totalExpenses = totalFuelCost + totalRepairCost;
-
-  logMessage('🟢 _showSummary: завершение заказа');
-  logMessage('   доставок: ${_state.completedDeliveries.length}');
-  logMessage('   paidDistance: $totalAllDistance');
-  logMessage('   income: $totalCost');
-  logMessage('   expenses: $totalExpenses');
-
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => OrderSummaryScreen(
-        serviceName: widget.serviceName,
-        coefficient: _state.coefficient,
-        deliveries: _state.completedDeliveries,
-        totalCost: totalCost,
-        totalTime: totalTime,
-        totalDistance: totalDistance,
-        shopAddress: _state.shopAddress,
-      ),
-    ),
-  ).then((result) async {
-    logMessage('🔵 [_showSummary] Возврат из OrderSummaryScreen, result=$result');
-    if (!mounted) { 
-      logMessage('⚠️ [_showSummary] виджет не смонтирован');
-      _isProcessing = false; 
-      return; 
-    }
+    logMessage('🔵 [_showSummary] ВХОД, completedDeliveries=${_state.completedDeliveries.length}');
     
-    if (result == true) {
-      logMessage('🟢 Добавление ещё доставки');
-      _isProcessing = false;
-      _addDelivery();
-    } else {
-      logMessage('🟢 Завершение заказа через API');
-      final shiftNotifier = ref.read(shiftProvider.notifier);
-      final orderDuration = Duration(seconds: totalTime);
-      
-      shiftNotifier.finishOrder(
-        paidDistance: totalAllDistance,
-        income: totalCost,
-        expenses: totalExpenses,
-        orderDuration: orderDuration,
-      );
-      
-      // ===== ОБНОВЛЯЕМ СТАТИСТИКУ С ПРОВЕРКОЙ mounted =====
-      if (mounted) {
-        try {
-          await ref.refreshStats();
-          logMessage('📊 Статистика обновлена после завершения заказа', category: 'STATS');
-        } catch (e) {
-          logMessage('⚠️ Ошибка обновления статистики: $e', category: 'STATS');
-        }
-      } else {
-        logMessage('⚠️ Виджет не смонтирован, пропускаем обновление статистики', category: 'STATS');
-      }
-      
-      try {
-        final apiService = ApiService();
-        final orderData = {
-          'serviceName': widget.serviceName,
-          'coefficient': _state.coefficient,
-          'deliveryNumber': _state.deliveryNumber,
-          'totalPaidDistance': totalAllDistance,
-          'totalIncome': totalCost,
-          'totalExpenses': totalExpenses,
-          'netProfit': totalCost - totalExpenses,
-          'totalTimeSeconds': totalTime,
-          'deliveries': _state.completedDeliveries.map((d) => {
-            'number': d.number,
-            'clientAddress': d.clientAddress,
-            'apartment': d.apartment,
-            'weight': d.weight,
-            'timeToShop': d.timeToShop,
-            'distanceToShop': d.distanceToShop,
-            'timeReceiving': d.timeReceiving,
-            'timeToClient': d.timeToClient,
-            'distanceToClient': d.distanceToClient,
-            'timeDelivery': d.timeDelivery,
-            'status': d.status,
-          }).toList(),
-        };
-        
-        logMessage('🔵 [_showSummary] Отправка заказа с ${_state.completedDeliveries.length} доставками');
-        await apiService.createOrder(orderData);
-        logMessage('✅ Заказ с ${_state.completedDeliveries.length} доставками создан на сервере');
-      } catch (e) {
-        logMessage('❌ Ошибка создания заказа: $e');
-      }
-      
-      if (mounted) {
-        setState(() {
-          _state = _state.copyWith(shouldNavigateToHome: true);
-        });
-      }
-      _isProcessing = false;
+    if (_isProcessing) {
+      logMessage('⚠️ [_showSummary] ПРОПУСК: уже в обработке');
+      return;
     }
-    logMessage('🔵 [_showSummary] ВЫХОД');
-  });
-}
+    _isProcessing = true;
+
+    final pricing = ref.read(pricingProvider);
+    final settings = ref.read(settingsProvider);
+
+    final totalTime = _calculateTotalTime();
+    final totalDistance = _calculateTotalDistance();
+    final totalCost = _calculateTotalCost(pricing);
+
+    final firstDelivery = _state.completedDeliveries.isNotEmpty 
+        ? _state.completedDeliveries.first 
+        : null;
+    final shopDistance = firstDelivery?.distanceToShop ?? 0.0;
+    final totalPaidDistance = _state.completedDeliveries.fold(0.0, (sum, d) => sum + d.distanceToClient);
+    final totalAllDistance = shopDistance + totalPaidDistance;
+
+    final fuelCostPerKm = (settings.fuelConsumption / 100) * settings.fuelPrice;
+    final totalFuelCost = totalAllDistance * fuelCostPerKm;
+    final totalRepairCost = totalAllDistance * settings.repairCost;
+    final totalExpenses = totalFuelCost + totalRepairCost;
+
+    logMessage('🟢 _showSummary: завершение заказа');
+    logMessage('   доставок: ${_state.completedDeliveries.length}');
+    logMessage('   paidDistance: $totalAllDistance');
+    logMessage('   income: $totalCost');
+    logMessage('   expenses: $totalExpenses');
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => OrderSummaryScreen(
+          serviceName: widget.serviceName,
+          coefficient: _state.coefficient,
+          deliveries: _state.completedDeliveries,
+          totalCost: totalCost,
+          totalTime: totalTime,
+          totalDistance: totalDistance,
+          shopAddress: _state.shopAddressForOrder, // <-- ПЕРЕДАЁМ АДРЕС МАГАЗИНА
+        ),
+      ),
+    ).then((result) async {
+      logMessage('🔵 [_showSummary] Возврат из OrderSummaryScreen, result=$result');
+      if (!mounted) { 
+        logMessage('⚠️ [_showSummary] виджет не смонтирован');
+        _isProcessing = false; 
+        return; 
+      }
+      
+      if (result == true) {
+        logMessage('🟢 Добавление ещё доставки');
+        _isProcessing = false;
+        _addDelivery();
+      } else {
+        logMessage('🟢 Завершение заказа через API');
+        final shiftNotifier = ref.read(shiftProvider.notifier);
+        final orderDuration = Duration(seconds: totalTime);
+        
+        shiftNotifier.finishOrder(
+          paidDistance: totalAllDistance,
+          income: totalCost,
+          expenses: totalExpenses,
+          orderDuration: orderDuration,
+        );
+        
+        if (mounted) {
+          try {
+            await ref.refreshStats();
+            logMessage('📊 Статистика обновлена после завершения заказа', category: 'STATS');
+          } catch (e) {
+            logMessage('⚠️ Ошибка обновления статистики: $e', category: 'STATS');
+          }
+        }
+        
+        try {
+          final apiService = ApiService();
+          final orderData = {
+            'serviceName': widget.serviceName,
+            'coefficient': _state.coefficient,
+            'deliveryNumber': _state.deliveryNumber,
+            'totalPaidDistance': totalAllDistance,
+            'totalIncome': totalCost,
+            'totalExpenses': totalExpenses,
+            'netProfit': totalCost - totalExpenses,
+            'totalTimeSeconds': totalTime,
+            'shopAddress': _state.shopAddressForOrder ?? '', // <-- ДОБАВЛЯЕМ АДРЕС МАГАЗИНА
+            'deliveries': _state.completedDeliveries.map((d) => {
+              'number': d.number,
+              'clientAddress': d.clientAddress,
+              'apartment': d.apartment,
+              'weight': d.weight,
+              'timeToShop': d.timeToShop,
+              'distanceToShop': d.distanceToShop,
+              'timeReceiving': d.timeReceiving,
+              'timeToClient': d.timeToClient,
+              'distanceToClient': d.distanceToClient,
+              'timeDelivery': d.timeDelivery,
+              'status': d.status,
+            }).toList(),
+          };
+          
+          logMessage('🔵 [_showSummary] Отправка заказа с ${_state.completedDeliveries.length} доставками');
+          logMessage('🔵 [_showSummary] shopAddress: ${_state.shopAddressForOrder}');
+          await apiService.createOrder(orderData);
+          logMessage('✅ Заказ с ${_state.completedDeliveries.length} доставками создан на сервере');
+        } catch (e) {
+          logMessage('❌ Ошибка создания заказа: $e');
+        }
+        
+        if (mounted) {
+          setState(() {
+            _state = _state.copyWith(shouldNavigateToHome: true);
+          });
+        }
+        _isProcessing = false;
+      }
+      logMessage('🔵 [_showSummary] ВЫХОД');
+    });
+  }
 
   int _calculateTotalTime() {
     if (_state.completedDeliveries.isEmpty) return 0;
