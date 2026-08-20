@@ -10,7 +10,7 @@ class Delivery {
   final int timeToClient;
   final double distanceToClient;
   final int timeDelivery;
-  final double tip; // <-- ДОБАВЛЯЕМ
+  final double tip;
   final String status;
 
   const Delivery({
@@ -35,14 +35,14 @@ class Delivery {
       number: json['number'] ?? 0,
       clientAddress: json['clientAddress'] ?? '',
       apartment: json['apartment'] ?? '',
-      weight: (json['weight'] ?? 0).toDouble(),
+      weight: _roundToTwo((json['weight'] ?? 0).toDouble()),
       timeToShop: json['timeToShop'] ?? 0,
-      distanceToShop: (json['distanceToShop'] ?? 0).toDouble(),
+      distanceToShop: _roundToTwo((json['distanceToShop'] ?? 0).toDouble()),
       timeReceiving: json['timeReceiving'] ?? 0,
       timeToClient: json['timeToClient'] ?? 0,
-      distanceToClient: (json['distanceToClient'] ?? 0).toDouble(),
+      distanceToClient: _roundToTwo((json['distanceToClient'] ?? 0).toDouble()),
       timeDelivery: json['timeDelivery'] ?? 0,
-      tip: (json['tip'] ?? 0).toDouble(),
+      tip: _roundToTwo((json['tip'] ?? 0).toDouble()),
       status: json['status'] ?? 'active',
     );
   }
@@ -52,15 +52,19 @@ class Delivery {
       'number': number,
       'clientAddress': clientAddress,
       'apartment': apartment,
-      'weight': weight,
+      'weight': _roundToTwo(weight),
       'timeToShop': timeToShop,
-      'distanceToShop': distanceToShop,
+      'distanceToShop': _roundToTwo(distanceToShop),
       'timeReceiving': timeReceiving,
       'timeToClient': timeToClient,
-      'distanceToClient': distanceToClient,
+      'distanceToClient': _roundToTwo(distanceToClient),
       'timeDelivery': timeDelivery,
-      'tip': tip,
+      'tip': _roundToTwo(tip),
       'status': status,
     };
+  }
+
+  static double _roundToTwo(double value) {
+    return double.parse(value.toStringAsFixed(2));
   }
 }

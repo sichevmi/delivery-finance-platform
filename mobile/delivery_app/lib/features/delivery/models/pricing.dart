@@ -28,12 +28,26 @@ class PricingConfig {
   factory PricingConfig.fromJson(Map<String, dynamic> json) {
     return PricingConfig(
       id: json['id'],
-      receivingFee: (json['receivingFee'] ?? 50.0).toDouble(),
-      deliveryFee: (json['deliveryFee'] ?? 100.0).toDouble(),
-      pricePerKg: (json['pricePerKg'] ?? 5.0).toDouble(),
-      pricePerKm: (json['pricePerKm'] ?? 10.0).toDouble(),
-      baseCoefficient: (json['baseCoefficient'] ?? 1.0).toDouble(),
+      receivingFee: _roundToTwo((json['receivingFee'] ?? 50.0).toDouble()),
+      deliveryFee: _roundToTwo((json['deliveryFee'] ?? 100.0).toDouble()),
+      pricePerKg: _roundToTwo((json['pricePerKg'] ?? 5.0).toDouble()),
+      pricePerKm: _roundToTwo((json['pricePerKm'] ?? 10.0).toDouble()),
+      baseCoefficient: _roundToTwo((json['baseCoefficient'] ?? 1.0).toDouble()),
       version: json['version'] ?? 1,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'receivingFee': _roundToTwo(receivingFee),
+      'deliveryFee': _roundToTwo(deliveryFee),
+      'pricePerKg': _roundToTwo(pricePerKg),
+      'pricePerKm': _roundToTwo(pricePerKm),
+      'baseCoefficient': _roundToTwo(baseCoefficient),
+    };
+  }
+
+  static double _roundToTwo(double value) {
+    return double.parse(value.toStringAsFixed(2));
   }
 }

@@ -25,11 +25,24 @@ class Settings {
   factory Settings.fromJson(Map<String, dynamic> json) {
     return Settings(
       id: json['id'],
-      fuelConsumption: (json['fuelConsumption'] ?? 10.0).toDouble(),
-      fuelPrice: (json['fuelPrice'] ?? 50.0).toDouble(),
-      repairCost: (json['repairCost'] ?? 2.0).toDouble(),
-      additionalCosts: (json['additionalCosts'] ?? 0.0).toDouble(),
+      fuelConsumption: _roundToTwo((json['fuelConsumption'] ?? 10.0).toDouble()),
+      fuelPrice: _roundToTwo((json['fuelPrice'] ?? 50.0).toDouble()),
+      repairCost: _roundToTwo((json['repairCost'] ?? 2.0).toDouble()),
+      additionalCosts: _roundToTwo((json['additionalCosts'] ?? 0.0).toDouble()),
       version: json['version'] ?? 1,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'fuelConsumption': _roundToTwo(fuelConsumption),
+      'fuelPrice': _roundToTwo(fuelPrice),
+      'repairCost': _roundToTwo(repairCost),
+      'additionalCosts': _roundToTwo(additionalCosts),
+    };
+  }
+
+  static double _roundToTwo(double value) {
+    return double.parse(value.toStringAsFixed(2));
   }
 }

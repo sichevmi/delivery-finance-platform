@@ -52,9 +52,9 @@ class DailyStats {
     );
   }
 
-  double get totalDistance => totalPaidDistance + totalIdleDistance;
-  double get avgDistancePerOrder => ordersCount > 0 ? totalPaidDistance / ordersCount : 0.0;
-  double get avgCheck => ordersCount > 0 ? totalIncome / ordersCount : 0.0;
+  double get totalDistance => _roundToTwo(totalPaidDistance + totalIdleDistance);
+  double get avgDistancePerOrder => ordersCount > 0 ? _roundToTwo(totalPaidDistance / ordersCount) : 0.0;
+  double get avgCheck => ordersCount > 0 ? _roundToTwo(totalIncome / ordersCount) : 0.0;
 
   Duration get avgTimePerOrder {
     if (ordersCount == 0) return Duration.zero;
@@ -87,12 +87,15 @@ class DailyStats {
       return '$seconds сек';
     }
   }
+
+  static double _roundToTwo(double value) {
+    return double.parse(value.toStringAsFixed(2));
+  }
 }
 
 // ===== NOTIFIER =====
 class DailyStatsNotifier extends StateNotifier<DailyStats> {
   final Ref _ref;
-  bool _isInitialized = false;
   bool _isDisposed = false;
 
   DailyStatsNotifier(this._ref) : super(DailyStats()) {
@@ -105,36 +108,27 @@ class DailyStatsNotifier extends StateNotifier<DailyStats> {
       final stats = await _calculateDailyStats(_ref);
       if (!_isDisposed) {
         state = stats;
-        _isInitialized = true;
-        logMessage('📊 [STATS] Статистика загружена', category: 'STATS');
       }
     } catch (e) {
       if (!_isDisposed) {
-        logMessage('❌ [STATS] Ошибка загрузки статистики: $e', category: 'STATS', level: LogLevel.error);
+        logMessage('❌ [STATS] Ошибка загрузки: $e', category: 'STATS', level: LogLevel.error);
       }
     }
   }
 
   Future<void> refresh() async {
-    if (_isDisposed) {
-      logMessage('⚠️ [STATS] Пропускаем refresh: notifier уже уничтожен', category: 'STATS');
-      return;
-    }
-    logMessage('🔄 [STATS] Принудительное обновление статистики', category: 'STATS');
+    if (_isDisposed) return;
     try {
       final stats = await _calculateDailyStats(_ref);
       if (!_isDisposed) {
         state = stats;
-        logMessage('✅ [STATS] Статистика обновлена', category: 'STATS');
       }
     } catch (e) {
       if (!_isDisposed) {
-        logMessage('❌ [STATS] Ошибка обновления статистики: $e', category: 'STATS', level: LogLevel.error);
+        logMessage('❌ [STATS] Ошибка обновления: $e', category: 'STATS', level: LogLevel.error);
       }
     }
   }
-
-  DailyStats get currentStats => state;
 
   @override
   void dispose() {
@@ -161,15 +155,6 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
   final shiftState = ref.watch(shiftProvider);
   final settings = ref.watch(settingsProvider);
 
-  logMessage('📊 [STATS] _calculateDailyStats() начат', category: 'STATS');
-  logMessage('📊 [STATS] cache.todayOrders.length=${cache.todayOrders.length}', category: 'STATS');
-  logMessage('📊 [STATS] cache.todayShifts.length=${cache.todayShifts.length}', category: 'STATS');
-  logMessage('📊 [STATS] shiftState.ordersCount=${shiftState.ordersCount}', category: 'STATS');
-  logMessage('📊 [STATS] shiftState.totalIncome=${shiftState.totalIncome}', category: 'STATS');
-  logMessage('📊 [STATS] shiftState.totalExpenses=${shiftState.totalExpenses}', category: 'STATS');
-  logMessage('📊 [STATS] shiftState.netProfit=${shiftState.netProfit}', category: 'STATS');
-  logMessage('📊 [STATS] shiftState.totalIdleDistance=${shiftState.totalIdleDistance}', category: 'STATS');
-
   // ===== 1. СЧИТАЕМ ИЗ КЭША =====
   int ordersCount = cache.todayOrders.length;
   double totalPaid = 0.0;
@@ -187,63 +172,39 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
     totalOrderTime += order.totalTime;
   }
 
-  logMessage('📊 [STATS] После кэша: ordersCount=$ordersCount, totalIncome=$totalIncome, totalExpenses=$totalExpenses, netProfit=$netProfit', category: 'STATS');
-
   // ===== 2. ПРИОРИТЕТНО ИСПОЛЬЗУЕМ ДАННЫЕ ИЗ shiftState =====
-  if (shiftState.totalIncome > 0 || shiftState.totalExpenses > 0 || shiftState.totalIdleDistance > 0) {
-    logMessage('📊 [STATS] Используем данные из shiftState (приоритет)', category: 'STATS');
-    if (shiftState.totalIncome > 0) totalIncome = shiftState.totalIncome;
-    if (shiftState.totalExpenses > 0) totalExpenses = shiftState.totalExpenses;
-    if (shiftState.netProfit != 0) netProfit = shiftState.netProfit;
-    if (shiftState.ordersCount > 0) ordersCount = shiftState.ordersCount;
-    if (shiftState.totalPaidDistance > 0) totalPaid = shiftState.totalPaidDistance;
-    if (shiftState.totalIdleDistance > 0) {
-      totalIdleDistance = shiftState.totalIdleDistance;
-      logMessage('📊 [STATS] Холостой пробег из shiftState: $totalIdleDistance', category: 'STATS');
-    }
-  }
+  if (shiftState.totalIncome > 0) totalIncome = shiftState.totalIncome;
+  if (shiftState.totalExpenses > 0) totalExpenses = shiftState.totalExpenses;
+  if (shiftState.netProfit != 0) netProfit = shiftState.netProfit;
+  if (shiftState.ordersCount > 0) ordersCount = shiftState.ordersCount;
+  if (shiftState.totalPaidDistance > 0) totalPaid = shiftState.totalPaidDistance;
+  if (shiftState.totalIdleDistance > 0) totalIdleDistance = shiftState.totalIdleDistance;
 
-  logMessage('📊 [STATS] После shiftState: ordersCount=$ordersCount, totalIncome=$totalIncome, totalExpenses=$totalExpenses, netProfit=$netProfit', category: 'STATS');
-
-  // ===== 3. ВРЕМЯ РАБОТЫ =====
+  // ===== 3. ВРЕМЯ РАБОТЫ И ПРОСТОЯ =====
   Duration totalWorkTime = Duration.zero;
   Duration totalIdleTime = Duration.zero;
 
-  if (shiftState.isActive) {
+  if (shiftState.isActive && !shiftState.isPaused && !shiftState.isCompleted) {
     totalWorkTime = shiftState.currentWorkTime;
     totalIdleTime = shiftState.currentIdleTime;
+  } else if (shiftState.isActive && shiftState.isPaused) {
+    totalWorkTime = shiftState.totalWorkTime;
+    totalIdleTime = shiftState.totalIdleTime;
   } else {
-    if (cache.activeShift != null) {
-      totalWorkTime = cache.activeShift!.duration ?? Duration.zero;
-    }
-    if (shiftState.totalWorkTime > Duration.zero) {
-      totalWorkTime = shiftState.totalWorkTime;
-    }
-    // Время простоя из кэша
-    Duration totalIdleTimeFromCache = Duration.zero;
-    for (final shift in cache.todayShifts) {
-      if (shift.totalIdleTime != null) {
-        totalIdleTimeFromCache += shift.totalIdleTime!;
-        logMessage('📊 [STATS] Смена ${shift.id}: idleTime=${shift.totalIdleTime!.inSeconds} сек', category: 'STATS');
-      }
-    }
-    if (totalIdleTimeFromCache > Duration.zero) {
-      totalIdleTime = totalIdleTimeFromCache;
-      logMessage('📊 [STATS] Восстановлено время простоя из кэша: ${totalIdleTime.inSeconds} сек', category: 'STATS');
-    } else if (shiftState.totalIdleTime > Duration.zero) {
-      totalIdleTime = shiftState.totalIdleTime;
-    }
+    totalWorkTime = shiftState.totalWorkTime;
+    totalIdleTime = shiftState.totalIdleTime;
   }
 
-  logMessage('📊 [STATS] ФИНАЛЬНЫЕ ДАННЫЕ: заказов=$ordersCount, пробег=$totalPaid, доход=$totalIncome, расходы=$totalExpenses, прибыль=$netProfit, холостой пробег=$totalIdleDistance, время простоя=${totalIdleTime.inSeconds} сек', category: 'STATS');
+  // ===== ОКРУГЛЯЕМ ВСЁ ДО 2 ЗНАКОВ =====
+  final roundToTwo = DailyStats._roundToTwo;
 
   return DailyStats(
-    totalPaidDistance: totalPaid,
-    totalIdleDistance: totalIdleDistance,
+    totalPaidDistance: roundToTwo(totalPaid),
+    totalIdleDistance: roundToTwo(totalIdleDistance),
     ordersCount: ordersCount,
-    totalIncome: totalIncome,
-    totalExpenses: totalExpenses,
-    netProfit: netProfit,
+    totalIncome: roundToTwo(totalIncome),
+    totalExpenses: roundToTwo(totalExpenses),
+    netProfit: roundToTwo(netProfit),
     totalWorkTime: totalWorkTime,
     totalIdleTime: totalIdleTime,
     totalOrderTime: totalOrderTime,

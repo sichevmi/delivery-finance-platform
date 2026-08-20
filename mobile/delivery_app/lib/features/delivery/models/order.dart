@@ -11,7 +11,7 @@ class Order {
   final double totalExpenses;
   final double netProfit;
   final Duration totalTime;
-  final String? shopAddress;  // <-- ДОБАВЛЯЕМ
+  final String? shopAddress;
   final String status;
   final List<Delivery> deliveries;
 
@@ -36,14 +36,14 @@ class Order {
       id: json['id'],
       shiftId: json['shiftId'],
       serviceName: json['serviceName'] ?? '',
-      coefficient: (json['coefficient'] ?? 1.0).toDouble(),
+      coefficient: _roundToTwo((json['coefficient'] ?? 1.0).toDouble()),
       deliveryNumber: json['deliveryNumber'] ?? 1,
-      totalPaidDistance: (json['totalPaidDistance'] ?? 0).toDouble(),
-      totalIncome: (json['totalIncome'] ?? 0).toDouble(),
-      totalExpenses: (json['totalExpenses'] ?? 0).toDouble(),
-      netProfit: (json['netProfit'] ?? 0).toDouble(),
+      totalPaidDistance: _roundToTwo((json['totalPaidDistance'] ?? 0).toDouble()),
+      totalIncome: _roundToTwo((json['totalIncome'] ?? 0).toDouble()),
+      totalExpenses: _roundToTwo((json['totalExpenses'] ?? 0).toDouble()),
+      netProfit: _roundToTwo((json['netProfit'] ?? 0).toDouble()),
       totalTime: json['totalTimeSeconds'] != null ? Duration(seconds: json['totalTimeSeconds']) : Duration.zero,
-      shopAddress: json['shopAddress'],  // <-- ДОБАВЛЯЕМ
+      shopAddress: json['shopAddress'],
       status: json['status'] ?? 'active',
       deliveries: (json['deliveries'] as List?)?.map((d) => Delivery.fromJson(d)).toList() ?? [],
     );
@@ -54,16 +54,20 @@ class Order {
       'id': id,
       'shiftId': shiftId,
       'serviceName': serviceName,
-      'coefficient': coefficient,
+      'coefficient': _roundToTwo(coefficient),
       'deliveryNumber': deliveryNumber,
-      'totalPaidDistance': totalPaidDistance,
-      'totalIncome': totalIncome,
-      'totalExpenses': totalExpenses,
-      'netProfit': netProfit,
+      'totalPaidDistance': _roundToTwo(totalPaidDistance),
+      'totalIncome': _roundToTwo(totalIncome),
+      'totalExpenses': _roundToTwo(totalExpenses),
+      'netProfit': _roundToTwo(netProfit),
       'totalTimeSeconds': totalTime.inSeconds,
-      'shopAddress': shopAddress,  // <-- ДОБАВЛЯЕМ
+      'shopAddress': shopAddress,
       'status': status,
       'deliveries': deliveries.map((d) => d.toJson()).toList(),
     };
+  }
+
+  static double _roundToTwo(double value) {
+    return double.parse(value.toStringAsFixed(2));
   }
 }

@@ -10,8 +10,8 @@ class Shift {
   final double totalExpenses;
   final double netProfit;
   final String status;
-  final Duration? totalIdleTime;      // <-- ДЛЯ ОТОБРАЖЕНИЯ
-  final Duration? totalOrderTime;     // <-- ДЛЯ ВЫЧИСЛЕНИЙ
+  final Duration? totalIdleTime;
+  final Duration? totalOrderTime;
 
   Shift({
     required this.id,
@@ -35,12 +35,12 @@ class Shift {
       startTime: DateTime.parse(json['startTime']),
       endTime: json['endTime'] != null ? DateTime.parse(json['endTime']) : null,
       duration: json['durationSeconds'] != null ? Duration(seconds: json['durationSeconds']) : null,
-      totalPaidDistance: (json['totalPaidDistance'] ?? 0).toDouble(),
-      totalIdleDistance: (json['totalIdleDistance'] ?? 0).toDouble(),
+      totalPaidDistance: _roundToTwo((json['totalPaidDistance'] ?? 0).toDouble()),
+      totalIdleDistance: _roundToTwo((json['totalIdleDistance'] ?? 0).toDouble()),
       ordersCount: json['ordersCount'] ?? 0,
-      totalIncome: (json['totalIncome'] ?? 0).toDouble(),
-      totalExpenses: (json['totalExpenses'] ?? 0).toDouble(),
-      netProfit: (json['netProfit'] ?? 0).toDouble(),
+      totalIncome: _roundToTwo((json['totalIncome'] ?? 0).toDouble()),
+      totalExpenses: _roundToTwo((json['totalExpenses'] ?? 0).toDouble()),
+      netProfit: _roundToTwo((json['netProfit'] ?? 0).toDouble()),
       status: json['status'] ?? 'active',
       totalIdleTime: json['totalIdleTimeSeconds'] != null 
           ? Duration(seconds: json['totalIdleTimeSeconds']) 
@@ -49,5 +49,9 @@ class Shift {
           ? Duration(seconds: json['totalOrderTimeSeconds']) 
           : null,
     );
+  }
+
+  static double _roundToTwo(double value) {
+    return double.parse(value.toStringAsFixed(2));
   }
 }
