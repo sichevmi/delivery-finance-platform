@@ -277,78 +277,82 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   }
 
   // ===== КНОПКА УПРАВЛЕНИЯ СМЕНОЙ =====
-  Widget _buildShiftButton(ShiftState shiftState) {
-    if (shiftState.isCompleted || !shiftState.isActive) {
-      return ElevatedButton(
-        onPressed: null,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.grey,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+  // В home_screen.dart, в _buildShiftButton:
+
+Widget _buildShiftButton(ShiftState shiftState) {
+  logMessage('🔄 [HOME] _buildShiftButton: isActive=${shiftState.isActive}, isPaused=${shiftState.isPaused}, isCompleted=${shiftState.isCompleted}', category: 'SYSTEM');
+  
+  if (shiftState.isCompleted || !shiftState.isActive) {
+    return ElevatedButton(
+      onPressed: null,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.grey,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
         ),
-        child: const Text(
-          'Смена завершена',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
-        ),
-      );
-    }
-    
-    if (shiftState.isPaused) {
-      return ElevatedButton(
-        onPressed: () async {
-          logMessage('🔄 [HOME] Возобновление работы', category: 'SYSTEM');
-          final notifier = ref.read(shiftProvider.notifier);
-          await notifier.resumeShift();
-          if (mounted) {
-            await ref.refreshStats();
-          }
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.green,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.play_arrow, size: 24),
-            SizedBox(width: 8),
-            Text('Возобновить работу', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-          ],
-        ),
-      );
-    } else {
-      return ElevatedButton(
-        onPressed: () async {
-          logMessage('🔄 [HOME] Приостановка работы', category: 'SYSTEM');
-          final notifier = ref.read(shiftProvider.notifier);
-          await notifier.pauseShift();
-          if (mounted) {
-            await ref.refreshStats();
-          }
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.orange,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.pause, size: 24),
-            SizedBox(width: 8),
-            Text('Приостановить работу', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-          ],
-        ),
-      );
-    }
+      ),
+      child: const Text(
+        'Смена завершена',
+        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+      ),
+    );
   }
+  
+  if (shiftState.isPaused) {
+    return ElevatedButton(
+      onPressed: () async {
+        logMessage('🔄 [HOME] Возобновление работы', category: 'SYSTEM');
+        final notifier = ref.read(shiftProvider.notifier);
+        await notifier.resumeShift();
+        if (mounted) {
+          await ref.refreshStats();
+        }
+      },
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.green,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+      child: const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.play_arrow, size: 24),
+          SizedBox(width: 8),
+          Text('Возобновить работу', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  } else {
+    return ElevatedButton(
+      onPressed: () async {
+        logMessage('🔄 [HOME] Приостановка работы', category: 'SYSTEM');
+        final notifier = ref.read(shiftProvider.notifier);
+        await notifier.pauseShift();
+        if (mounted) {
+          await ref.refreshStats();
+        }
+      },
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.orange,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+      child: const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.pause, size: 24),
+          SizedBox(width: 8),
+          Text('Приостановить работу', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+}
 
   // ===== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ =====
 
