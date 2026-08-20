@@ -170,6 +170,36 @@ class ApiService {
     }
   }
 
+  // В api_service.dart добавляем метод:
+
+Future<void> updateShiftState(
+  int shiftId, {
+  double? totalPaidDistance,
+  double? totalIdleDistance,
+  int? totalOrderTimeSeconds,
+  int? ordersCount,
+  double? totalIncome,
+  double? totalExpenses,
+  double? netProfit,
+}) async {
+  try {
+    logMessage('🔄 [API] Обновление состояния смены $shiftId', category: 'API');
+    await _apiClient.updateShiftState(
+      shiftId,
+      totalPaidDistance: totalPaidDistance,
+      totalIdleDistance: totalIdleDistance,
+      totalOrderTimeSeconds: totalOrderTimeSeconds,
+      ordersCount: ordersCount,
+      totalIncome: totalIncome,
+      totalExpenses: totalExpenses,
+      netProfit: netProfit,
+    );
+  } catch (e) {
+    logMessage('⚠️ [API] Ошибка обновления состояния смены: $e', category: 'API');
+    // Не выбрасываем исключение, чтобы не прерывать работу
+  }
+}
+
   Future<void> completeShift(
     int shiftId, {
     double? totalPaidDistance,

@@ -756,8 +756,8 @@ class _ProfitPerHourMetricState extends State<_ProfitPerHourMetric> {
   final stats = widget.ref.read(dailyStatsProvider);
   
   // ===== ЛОГИРУЕМ ДАННЫЕ =====
-  logMessage('📊 [PROFIT_PER_KM] netProfit=${stats.netProfit}, totalDistance=${stats.totalDistance}', category: 'HOME');
-  logMessage('📊 [PROFIT_PER_KM] totalIncome=${stats.totalIncome}, totalExpenses=${stats.totalExpenses}', category: 'HOME');
+  //logMessage('📊 [PROFIT_PER_KM] netProfit=${stats.netProfit}, totalDistance=${stats.totalDistance}', category: 'HOME');
+  //logMessage('📊 [PROFIT_PER_KM] totalIncome=${stats.totalIncome}, totalExpenses=${stats.totalExpenses}', category: 'HOME');
   
   String newValue;
   if (stats.totalDistance <= 0) {

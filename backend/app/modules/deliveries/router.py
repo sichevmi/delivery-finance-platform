@@ -769,3 +769,46 @@ async def start_shift(
         "totalIdleDistance": shift.total_idle_distance,
         "ordersCount": shift.orders_count,
     }
+
+@router.patch("/shifts/{shift_id}/state")
+async def update_shift_state(
+    shift_id: int,
+    request_data: Dict[str, Any],
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Обновить состояние смены (промежуточное сохранение)"""
+    try:
+        shift = db.query(Shift).filter(
+            Shift.id == shift_id,
+            Shift.user_id == current_user.id
+        ).first()
+        
+        if not shift:
+            raise HTTPException(status_code=404, detail="Смена не найдена")
+        
+        # Обновляем только переданные поля
+        if 'totalPaidDistance' in request_data:
+            shift.total_paid_distance = request_data['totalPaidDistance']
+        if 'totalIdleDistance' in request_data:
+            shift.total_idle_distance = request_data['totalIdleDistance']
+        if 'totalOrderTimeSeconds' in request_data:
+            shift.total_order_time_seconds = request_data['totalOrderTimeSeconds']
+        if 'ordersCount' in request_data:
+            shift.orders_count = request_data['ordersCount']
+        if 'totalIncome' in request_data:
+            shift.total_income = request_data['totalIncome']
+        if 'totalExpenses' in request_data:
+            shift.total_expenses = request_data['totalExpenses']
+        if 'netProfit' in request_data:
+            shift.net_profit = request_data['netProfit']
+        
+        shift.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        
+        logger.info(f"🔄 Обновлено состояние смены {shift_id}")
+        
+        return {"status": "ok", "shift": {"id": shift.id}}
+    except Exception as e:
+        logger.error(f"❌ Ошибка обновления состояния смены: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
