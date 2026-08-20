@@ -215,52 +215,67 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           ),
           const SizedBox(height: 4),
 
-          // Строка: Время работы + Стоимость пробега
+          // ===== ВЕРХНЯЯ СТРОКА: Время работы | Стоимость км | Время простоя =====
           Row(
             children: [
               const _TimeDisplay(),
               const Spacer(),
               _buildCostPerKm(totalCostPerKm),
+              const Spacer(),
+              const _IdleTimeDisplay(),
             ],
           ),
           const SizedBox(height: 8),
 
-          // ===== ПЕРВАЯ СТРОКА: Доход + Расход =====
-          Row(
-            children: [
-              const _ProfitMetric(),
-              const SizedBox(width: 8),
-              const _ExpensesMetric(),
-            ],
-          ),
+          // ===== ПЕРВАЯ СТРОКА: Количество заказов (на всю ширину) =====
+          const _OrdersCountMetric(),
           const SizedBox(height: 6),
 
-          // ===== ВТОРАЯ СТРОКА: Пробег всего + Заказы =====
-          Row(
-            children: [
-              const _TotalDistanceMetric(),
-              const SizedBox(width: 8),
-              const _OrdersCountMetric(),
-            ],
-          ),
-          const SizedBox(height: 6),
-
-          // ===== ТРЕТЬЯ СТРОКА: Холостой пробег + Время простоя =====
-          Row(
-            children: [
-              const _IdleDistanceMetric(),
-              const SizedBox(width: 8),
-              const _IdleTimeMetric(),
-            ],
+          // ===== ВТОРАЯ И ТРЕТЬЯ СТРОКИ: ДОХОД ПОСЕРЕДИНЕ =====
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Левая колонка (2 строки)
+                Expanded(
+                  flex: 1,
+                  child: Column(
+                    children: [
+                      const _TotalDistanceMetric(),
+                      const SizedBox(height: 6),
+                      const _IdleDistanceMetric(),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                // Центральная колонка (доход) — на 2 строки
+                Expanded(
+                  flex: 1,
+                  child: const _ProfitMetric(),
+                ),
+                const SizedBox(width: 6),
+                // Правая колонка (2 строки)
+                Expanded(
+                  flex: 1,
+                  child: Column(
+                    children: [
+                      const _ExpensesMetric(),
+                      const SizedBox(height: 6),
+                      const _IdleTimeMetric(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 6),
 
           // ===== ЧЕТВЁРТАЯ СТРОКА: Прибыль на км + Прибыль за час =====
           Row(
             children: [
-              const _ProfitPerKmMetric(),
+              Expanded(child: const _ProfitPerKmMetric()),
               const SizedBox(width: 8),
-              const _ProfitPerHourMetric(),
+              Expanded(child: const _ProfitPerHourMetric()),
             ],
           ),
           const Spacer(),
@@ -277,82 +292,78 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   }
 
   // ===== КНОПКА УПРАВЛЕНИЯ СМЕНОЙ =====
-  // В home_screen.dart, в _buildShiftButton:
-
-Widget _buildShiftButton(ShiftState shiftState) {
-  logMessage('🔄 [HOME] _buildShiftButton: isActive=${shiftState.isActive}, isPaused=${shiftState.isPaused}, isCompleted=${shiftState.isCompleted}', category: 'SYSTEM');
-  
-  if (shiftState.isCompleted || !shiftState.isActive) {
-    return ElevatedButton(
-      onPressed: null,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.grey,
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+  Widget _buildShiftButton(ShiftState shiftState) {
+    if (shiftState.isCompleted || !shiftState.isActive) {
+      return ElevatedButton(
+        onPressed: null,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.grey,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
-      ),
-      child: const Text(
-        'Смена завершена',
-        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
-      ),
-    );
+        child: const Text(
+          'Смена завершена',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+        ),
+      );
+    }
+    
+    if (shiftState.isPaused) {
+      return ElevatedButton(
+        onPressed: () async {
+          logMessage('🔄 [HOME] Возобновление работы', category: 'SYSTEM');
+          final notifier = ref.read(shiftProvider.notifier);
+          await notifier.resumeShift();
+          if (mounted) {
+            await ref.refreshStats();
+          }
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.green,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.play_arrow, size: 24),
+            SizedBox(width: 8),
+            Text('Возобновить работу', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      );
+    } else {
+      return ElevatedButton(
+        onPressed: () async {
+          logMessage('🔄 [HOME] Приостановка работы', category: 'SYSTEM');
+          final notifier = ref.read(shiftProvider.notifier);
+          await notifier.pauseShift();
+          if (mounted) {
+            await ref.refreshStats();
+          }
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.orange,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.pause, size: 24),
+            SizedBox(width: 8),
+            Text('Приостановить работу', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      );
+    }
   }
-  
-  if (shiftState.isPaused) {
-    return ElevatedButton(
-      onPressed: () async {
-        logMessage('🔄 [HOME] Возобновление работы', category: 'SYSTEM');
-        final notifier = ref.read(shiftProvider.notifier);
-        await notifier.resumeShift();
-        if (mounted) {
-          await ref.refreshStats();
-        }
-      },
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.green,
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-      child: const Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.play_arrow, size: 24),
-          SizedBox(width: 8),
-          Text('Возобновить работу', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
-  } else {
-    return ElevatedButton(
-      onPressed: () async {
-        logMessage('🔄 [HOME] Приостановка работы', category: 'SYSTEM');
-        final notifier = ref.read(shiftProvider.notifier);
-        await notifier.pauseShift();
-        if (mounted) {
-          await ref.refreshStats();
-        }
-      },
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.orange,
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-      child: const Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.pause, size: 24),
-          SizedBox(width: 8),
-          Text('Приостановить работу', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
-  }
-}
 
   // ===== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ =====
 
@@ -363,74 +374,77 @@ Widget _buildShiftButton(ShiftState shiftState) {
     return '${weekdays[now.weekday - 1]}, ${now.day} ${months[now.month - 1]}';
   }
 
-  // ===== ВИДЖЕТЫ =====
+  // ===== ВСПОМОГАТЕЛЬНЫЙ ВИДЖЕТ =====
 
   Widget _buildCostPerKm(double totalCostPerKm) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(Icons.local_gas_station, size: 14, color: Color(0xFF6C63FF)),
-        const SizedBox(width: 4),
-        Text(
-          '${totalCostPerKm.toStringAsFixed(2)} ₽/км',
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      ],
+    return Text(
+      '${totalCostPerKm.toStringAsFixed(2)} ₽/км',
+      style: const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.bold,
+        color: Colors.white,
+      ),
     );
   }
 }
 
 // ============================================================
-// КАРТОЧКА МЕТРИКИ
+// КАРТОЧКА МЕТРИКИ С ИКОНКОЙ
 // ============================================================
 class _MetricCard extends StatelessWidget {
   final String value;
   final String label;
+  final IconData icon;
   final Color color;
+  final double? fontSize;
 
   const _MetricCard({
     required this.value,
     required this.label,
+    required this.icon,
     required this.color,
+    this.fontSize,
   });
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
         decoration: BoxDecoration(
           color: const Color(0xFF1E1E1E),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(color: const Color(0xFF2C2C2C), width: 0.5),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 10,
-                color: Color(0xFF888888),
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 6),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: fontSize ?? 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    color: Color(0xFF888888),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ],
         ),
@@ -440,10 +454,8 @@ class _MetricCard extends StatelessWidget {
 }
 
 // ============================================================
-// МЕТРИКИ С ТАЙМЕРАМИ (ConsumerStatefulWidget)
+// ДОХОД (БОЛЬШАЯ КАРТОЧКА)
 // ============================================================
-
-// ---- ДОХОД ----
 class _ProfitMetric extends ConsumerStatefulWidget {
   const _ProfitMetric();
 
@@ -479,103 +491,60 @@ class _ProfitMetricState extends ConsumerState<_ProfitMetric> {
 
   @override
   Widget build(BuildContext context) {
-    return _MetricCard(
-      value: _value,
-      label: 'Доход',
-      color: Colors.green,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF6C63FF).withOpacity(0.15),
+            const Color(0xFF6C63FF).withOpacity(0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF6C63FF).withOpacity(0.3), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.trending_up, size: 16, color: Color(0xFF6C63FF)),
+              const SizedBox(width: 6),
+              Text(
+                _value,
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+          const Text(
+            'Доход',
+            style: TextStyle(
+              fontSize: 10,
+              color: Color(0xFF888888),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
     );
   }
 }
 
-// ---- РАСХОД ----
-class _ExpensesMetric extends ConsumerStatefulWidget {
-  const _ExpensesMetric();
-
-  @override
-  ConsumerState<_ExpensesMetric> createState() => _ExpensesMetricState();
-}
-
-class _ExpensesMetricState extends ConsumerState<_ExpensesMetric> {
-  Timer? _timer;
-  String _value = '0 ₽';
-
-  @override
-  void initState() {
-    super.initState();
-    _updateValue();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      _updateValue();
-    });
-  }
-
-  void _updateValue() {
-    final stats = ref.read(dailyStatsProvider);
-    setState(() {
-      _value = '${stats.totalExpenses.toStringAsFixed(0)} ₽';
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return _MetricCard(
-      value: _value,
-      label: 'Расход',
-      color: Colors.red,
-    );
-  }
-}
-
-// ---- ПРОБЕГ ВСЕГО ----
-class _TotalDistanceMetric extends ConsumerStatefulWidget {
-  const _TotalDistanceMetric();
-
-  @override
-  ConsumerState<_TotalDistanceMetric> createState() => _TotalDistanceMetricState();
-}
-
-class _TotalDistanceMetricState extends ConsumerState<_TotalDistanceMetric> {
-  Timer? _timer;
-  String _value = '0.0 км';
-
-  @override
-  void initState() {
-    super.initState();
-    _updateValue();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      _updateValue();
-    });
-  }
-
-  void _updateValue() {
-    final stats = ref.read(dailyStatsProvider);
-    setState(() {
-      _value = '${stats.totalDistance.toStringAsFixed(1)} км';
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return _MetricCard(
-      value: _value,
-      label: 'Пробег всего',
-      color: Colors.white,
-    );
-  }
-}
-
-// ---- КОЛИЧЕСТВО ЗАКАЗОВ ----
+// ============================================================
+// КОЛИЧЕСТВО ЗАКАЗОВ
+// ============================================================
 class _OrdersCountMetric extends ConsumerStatefulWidget {
   const _OrdersCountMetric();
 
@@ -611,10 +580,86 @@ class _OrdersCountMetricState extends ConsumerState<_OrdersCountMetric> {
 
   @override
   Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF2C2C2C), width: 0.5),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.shopping_bag, size: 20, color: Color(0xFF6C63FF)),
+          const SizedBox(width: 8),
+          Text(
+            _value,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Text(
+            'Заказов',
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF888888),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// ОСТАЛЬНЫЕ МЕТРИКИ С ИКОНКАМИ
+// ============================================================
+
+// ---- ПРОБЕГ ВСЕГО ----
+class _TotalDistanceMetric extends ConsumerStatefulWidget {
+  const _TotalDistanceMetric();
+
+  @override
+  ConsumerState<_TotalDistanceMetric> createState() => _TotalDistanceMetricState();
+}
+
+class _TotalDistanceMetricState extends ConsumerState<_TotalDistanceMetric> {
+  Timer? _timer;
+  String _value = '0.0';
+
+  @override
+  void initState() {
+    super.initState();
+    _updateValue();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      _updateValue();
+    });
+  }
+
+  void _updateValue() {
+    final stats = ref.read(dailyStatsProvider);
+    setState(() {
+      _value = stats.totalDistance.toStringAsFixed(1);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return _MetricCard(
       value: _value,
-      label: 'Заказы',
+      label: 'км пробег',
+      icon: Icons.route,
       color: Colors.blue,
+      fontSize: 16,
     );
   }
 }
@@ -629,7 +674,7 @@ class _IdleDistanceMetric extends ConsumerStatefulWidget {
 
 class _IdleDistanceMetricState extends ConsumerState<_IdleDistanceMetric> {
   Timer? _timer;
-  String _value = '0.0 км';
+  String _value = '0.0';
 
   @override
   void initState() {
@@ -643,7 +688,7 @@ class _IdleDistanceMetricState extends ConsumerState<_IdleDistanceMetric> {
   void _updateValue() {
     final stats = ref.read(dailyStatsProvider);
     setState(() {
-      _value = '${stats.totalIdleDistance.toStringAsFixed(1)} км';
+      _value = stats.totalIdleDistance.toStringAsFixed(1);
     });
   }
 
@@ -657,13 +702,61 @@ class _IdleDistanceMetricState extends ConsumerState<_IdleDistanceMetric> {
   Widget build(BuildContext context) {
     return _MetricCard(
       value: _value,
-      label: 'Холостой пробег',
+      label: 'км холостой',
+      icon: Icons.ev_station,
       color: Colors.orange,
+      fontSize: 16,
     );
   }
 }
 
-// ---- ВРЕМЯ ПРОСТОЯ ----
+// ---- РАСХОД ----
+class _ExpensesMetric extends ConsumerStatefulWidget {
+  const _ExpensesMetric();
+
+  @override
+  ConsumerState<_ExpensesMetric> createState() => _ExpensesMetricState();
+}
+
+class _ExpensesMetricState extends ConsumerState<_ExpensesMetric> {
+  Timer? _timer;
+  String _value = '0';
+
+  @override
+  void initState() {
+    super.initState();
+    _updateValue();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      _updateValue();
+    });
+  }
+
+  void _updateValue() {
+    final stats = ref.read(dailyStatsProvider);
+    setState(() {
+      _value = stats.totalExpenses.toStringAsFixed(0);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _MetricCard(
+      value: _value,
+      label: '₽ расход',
+      icon: Icons.money_off,
+      color: Colors.red,
+      fontSize: 16,
+    );
+  }
+}
+
+// ---- ВРЕМЯ ПРОСТОЯ (В КАРТОЧКЕ) ----
 class _IdleTimeMetric extends ConsumerStatefulWidget {
   const _IdleTimeMetric();
 
@@ -701,8 +794,10 @@ class _IdleTimeMetricState extends ConsumerState<_IdleTimeMetric> {
   Widget build(BuildContext context) {
     return _MetricCard(
       value: _value,
-      label: 'Время простоя',
+      label: 'время простоя',
+      icon: Icons.timer_off,
       color: Colors.purple,
+      fontSize: 14,
     );
   }
 }
@@ -717,7 +812,7 @@ class _ProfitPerKmMetric extends ConsumerStatefulWidget {
 
 class _ProfitPerKmMetricState extends ConsumerState<_ProfitPerKmMetric> {
   Timer? _timer;
-  String _value = '0.00 ₽/км';
+  String _value = '0.00';
 
   @override
   void initState() {
@@ -732,10 +827,9 @@ class _ProfitPerKmMetricState extends ConsumerState<_ProfitPerKmMetric> {
     final stats = ref.read(dailyStatsProvider);
     setState(() {
       if (stats.totalDistance <= 0) {
-        _value = '0.00 ₽/км';
+        _value = '0.00';
       } else {
-        final profitPerKm = stats.netProfit / stats.totalDistance;
-        _value = '${profitPerKm.toStringAsFixed(2)} ₽/км';
+        _value = (stats.netProfit / stats.totalDistance).toStringAsFixed(2);
       }
     });
   }
@@ -750,8 +844,10 @@ class _ProfitPerKmMetricState extends ConsumerState<_ProfitPerKmMetric> {
   Widget build(BuildContext context) {
     return _MetricCard(
       value: _value,
-      label: 'Прибыль на км',
+      label: '₽/км прибыль',
+      icon: Icons.speed,
       color: Colors.cyan,
+      fontSize: 16,
     );
   }
 }
@@ -787,8 +883,7 @@ class _ProfitPerHourMetricState extends ConsumerState<_ProfitPerHourMetric> {
         if (hours <= 0) {
           _value = '—';
         } else {
-          final profitPerHour = stats.netProfit / hours;
-          _value = '${profitPerHour.toStringAsFixed(2)} ₽/ч';
+          _value = (stats.netProfit / hours).toStringAsFixed(2);
         }
       }
     });
@@ -804,14 +899,16 @@ class _ProfitPerHourMetricState extends ConsumerState<_ProfitPerHourMetric> {
   Widget build(BuildContext context) {
     return _MetricCard(
       value: _value,
-      label: 'Прибыль за час',
-      color: Colors.purple,
+      label: '₽/ч прибыль',
+      icon: Icons.access_time,
+      color: Colors.purpleAccent,
+      fontSize: 16,
     );
   }
 }
 
 // ============================================================
-// ВРЕМЯ РАБОТЫ
+// ВРЕМЯ РАБОТЫ (В ВЕРХНЕЙ СТРОКЕ)
 // ============================================================
 class _TimeDisplay extends ConsumerStatefulWidget {
   const _TimeDisplay();
@@ -848,26 +945,62 @@ class _TimeDisplayState extends ConsumerState<_TimeDisplay> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          _formattedTime,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        const Text(
-          'Время работы',
-          style: TextStyle(
-            fontSize: 10,
-            color: Color(0xFF888888),
-          ),
-        ),
-      ],
+    return Text(
+      _formattedTime,
+      style: const TextStyle(
+        fontSize: 20,
+        fontWeight: FontWeight.bold,
+        color: Colors.white,
+      ),
+    );
+  }
+}
+
+// ============================================================
+// ВРЕМЯ ПРОСТОЯ (В ВЕРХНЕЙ СТРОКЕ)
+// ============================================================
+class _IdleTimeDisplay extends ConsumerStatefulWidget {
+  const _IdleTimeDisplay();
+
+  @override
+  ConsumerState<_IdleTimeDisplay> createState() => _IdleTimeDisplayState();
+}
+
+class _IdleTimeDisplayState extends ConsumerState<_IdleTimeDisplay> {
+  Timer? _timer;
+  String _formattedTime = '00:00:00';
+
+  @override
+  void initState() {
+    super.initState();
+    _updateTime();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      _updateTime();
+    });
+  }
+
+  void _updateTime() {
+    final shiftState = ref.read(shiftProvider);
+    setState(() {
+      _formattedTime = shiftState.formattedIdleTime;
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      _formattedTime,
+      style: const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.bold,
+        color: Colors.white,
+      ),
     );
   }
 }
