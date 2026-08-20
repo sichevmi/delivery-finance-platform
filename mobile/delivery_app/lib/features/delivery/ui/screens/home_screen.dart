@@ -70,11 +70,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       if (mounted) {
         await ref.refreshStats();
         logMessage('🔄 [HOME] Статистика обновлена', category: 'SYSTEM');
-        
-        // ===== ПРИНУДИТЕЛЬНО ОБНОВЛЯЕМ ВСЕ МЕТРИКИ =====
-        // Триггерим перестройку всех виджетов с таймерами
-        await Future.delayed(Duration.zero);
-        setState(() {});
       }
       
       if (mounted) {
@@ -223,43 +218,51 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           // Строка: Время работы + Стоимость пробега
           Row(
             children: [
-              _TimeDisplay(ref: ref),
+              const _TimeDisplay(),
               const Spacer(),
               _buildCostPerKm(totalCostPerKm),
             ],
           ),
           const SizedBox(height: 8),
 
-          // ===== МЕТРИКИ С ПЕРЕДАЧЕЙ ref =====
+          // ===== ПЕРВАЯ СТРОКА: Доход + Расход =====
           Row(
             children: [
-              _ProfitMetric(ref: ref),
+              const _ProfitMetric(),
               const SizedBox(width: 8),
-              _ExpensesMetric(ref: ref),
+              const _ExpensesMetric(),
             ],
           ),
           const SizedBox(height: 6),
 
+          // ===== ВТОРАЯ СТРОКА: Пробег всего + Заказы =====
           Row(
             children: [
-              _TotalDistanceMetric(ref: ref),
+              const _TotalDistanceMetric(),
               const SizedBox(width: 8),
-              _IdleDistanceMetric(ref: ref),
+              const _OrdersCountMetric(),
             ],
           ),
           const SizedBox(height: 6),
 
+          // ===== ТРЕТЬЯ СТРОКА: Холостой пробег + Время простоя =====
           Row(
             children: [
-              _ProfitPerKmMetric(ref: ref),
+              const _IdleDistanceMetric(),
               const SizedBox(width: 8),
-              _ProfitPerHourMetric(ref: ref),
+              const _IdleTimeMetric(),
             ],
           ),
           const SizedBox(height: 6),
 
-          // Время простоя
-          _buildCompactIdleTimeCard(ref),
+          // ===== ЧЕТВЁРТАЯ СТРОКА: Прибыль на км + Прибыль за час =====
+          Row(
+            children: [
+              const _ProfitPerKmMetric(),
+              const SizedBox(width: 8),
+              const _ProfitPerHourMetric(),
+            ],
+          ),
           const Spacer(),
 
           // Кнопка управления сменой
@@ -375,33 +378,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       ],
     );
   }
-
-  Widget _buildCompactIdleTimeCard(WidgetRef ref) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF2C2C2C), width: 0.5),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.pause_circle_outline, size: 16, color: Color(0xFF6C63FF)),
-          const SizedBox(width: 6),
-          const Text(
-            'Время простоя',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF888888),
-            ),
-          ),
-          const Spacer(),
-          _IdleTimeDisplay(ref: ref),
-        ],
-      ),
-    );
-  }
 }
 
 // ============================================================
@@ -411,13 +387,11 @@ class _MetricCard extends StatelessWidget {
   final String value;
   final String label;
   final Color color;
-  final String suffix;
 
   const _MetricCard({
     required this.value,
     required this.label,
     required this.color,
-    this.suffix = '',
   });
 
   @override
@@ -435,7 +409,7 @@ class _MetricCard extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '$value$suffix',
+              value,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -462,22 +436,20 @@ class _MetricCard extends StatelessWidget {
 }
 
 // ============================================================
-// МЕТРИКИ С ЛОКАЛЬНЫМИ ТАЙМЕРАМИ
+// МЕТРИКИ С ТАЙМЕРАМИ (ConsumerStatefulWidget)
 // ============================================================
 
 // ---- ДОХОД ----
-class _ProfitMetric extends StatefulWidget {
-  final WidgetRef ref;
-  const _ProfitMetric({required this.ref});
+class _ProfitMetric extends ConsumerStatefulWidget {
+  const _ProfitMetric();
 
   @override
-  State<_ProfitMetric> createState() => _ProfitMetricState();
+  ConsumerState<_ProfitMetric> createState() => _ProfitMetricState();
 }
 
-class _ProfitMetricState extends State<_ProfitMetric> {
+class _ProfitMetricState extends ConsumerState<_ProfitMetric> {
   Timer? _timer;
-  String _value = '0';
-  bool _firstUpdate = true;
+  String _value = '0 ₽';
 
   @override
   void initState() {
@@ -489,14 +461,10 @@ class _ProfitMetricState extends State<_ProfitMetric> {
   }
 
   void _updateValue() {
-    final stats = widget.ref.read(dailyStatsProvider);
-    final newValue = stats.netProfit.toStringAsFixed(0);
-    if (_value != newValue || _firstUpdate) {
-      _firstUpdate = false;
-      setState(() {
-        _value = newValue;
-      });
-    }
+    final stats = ref.read(dailyStatsProvider);
+    setState(() {
+      _value = '${stats.netProfit.toStringAsFixed(0)} ₽';
+    });
   }
 
   @override
@@ -511,24 +479,21 @@ class _ProfitMetricState extends State<_ProfitMetric> {
       value: _value,
       label: 'Доход',
       color: Colors.green,
-      suffix: ' ₽',
     );
   }
 }
 
 // ---- РАСХОД ----
-class _ExpensesMetric extends StatefulWidget {
-  final WidgetRef ref;
-  const _ExpensesMetric({required this.ref});
+class _ExpensesMetric extends ConsumerStatefulWidget {
+  const _ExpensesMetric();
 
   @override
-  State<_ExpensesMetric> createState() => _ExpensesMetricState();
+  ConsumerState<_ExpensesMetric> createState() => _ExpensesMetricState();
 }
 
-class _ExpensesMetricState extends State<_ExpensesMetric> {
+class _ExpensesMetricState extends ConsumerState<_ExpensesMetric> {
   Timer? _timer;
-  String _value = '0';
-  bool _firstUpdate = true;
+  String _value = '0 ₽';
 
   @override
   void initState() {
@@ -540,14 +505,10 @@ class _ExpensesMetricState extends State<_ExpensesMetric> {
   }
 
   void _updateValue() {
-    final stats = widget.ref.read(dailyStatsProvider);
-    final newValue = stats.totalExpenses.toStringAsFixed(0);
-    if (_value != newValue || _firstUpdate) {
-      _firstUpdate = false;
-      setState(() {
-        _value = newValue;
-      });
-    }
+    final stats = ref.read(dailyStatsProvider);
+    setState(() {
+      _value = '${stats.totalExpenses.toStringAsFixed(0)} ₽';
+    });
   }
 
   @override
@@ -562,24 +523,21 @@ class _ExpensesMetricState extends State<_ExpensesMetric> {
       value: _value,
       label: 'Расход',
       color: Colors.red,
-      suffix: ' ₽',
     );
   }
 }
 
 // ---- ПРОБЕГ ВСЕГО ----
-class _TotalDistanceMetric extends StatefulWidget {
-  final WidgetRef ref;
-  const _TotalDistanceMetric({required this.ref});
+class _TotalDistanceMetric extends ConsumerStatefulWidget {
+  const _TotalDistanceMetric();
 
   @override
-  State<_TotalDistanceMetric> createState() => _TotalDistanceMetricState();
+  ConsumerState<_TotalDistanceMetric> createState() => _TotalDistanceMetricState();
 }
 
-class _TotalDistanceMetricState extends State<_TotalDistanceMetric> {
+class _TotalDistanceMetricState extends ConsumerState<_TotalDistanceMetric> {
   Timer? _timer;
-  String _value = '0.0';
-  bool _firstUpdate = true;
+  String _value = '0.0 км';
 
   @override
   void initState() {
@@ -591,14 +549,10 @@ class _TotalDistanceMetricState extends State<_TotalDistanceMetric> {
   }
 
   void _updateValue() {
-    final stats = widget.ref.read(dailyStatsProvider);
-    final newValue = stats.totalDistance.toStringAsFixed(1);
-    if (_value != newValue || _firstUpdate) {
-      _firstUpdate = false;
-      setState(() {
-        _value = newValue;
-      });
-    }
+    final stats = ref.read(dailyStatsProvider);
+    setState(() {
+      _value = '${stats.totalDistance.toStringAsFixed(1)} км';
+    });
   }
 
   @override
@@ -613,24 +567,21 @@ class _TotalDistanceMetricState extends State<_TotalDistanceMetric> {
       value: _value,
       label: 'Пробег всего',
       color: Colors.white,
-      suffix: ' км',
     );
   }
 }
 
-// ---- ХОЛОСТОЙ ПРОБЕГ ----
-class _IdleDistanceMetric extends StatefulWidget {
-  final WidgetRef ref;
-  const _IdleDistanceMetric({required this.ref});
+// ---- КОЛИЧЕСТВО ЗАКАЗОВ ----
+class _OrdersCountMetric extends ConsumerStatefulWidget {
+  const _OrdersCountMetric();
 
   @override
-  State<_IdleDistanceMetric> createState() => _IdleDistanceMetricState();
+  ConsumerState<_OrdersCountMetric> createState() => _OrdersCountMetricState();
 }
 
-class _IdleDistanceMetricState extends State<_IdleDistanceMetric> {
+class _OrdersCountMetricState extends ConsumerState<_OrdersCountMetric> {
   Timer? _timer;
-  String _value = '0.0';
-  bool _firstUpdate = true;
+  String _value = '0';
 
   @override
   void initState() {
@@ -642,14 +593,54 @@ class _IdleDistanceMetricState extends State<_IdleDistanceMetric> {
   }
 
   void _updateValue() {
-    final stats = widget.ref.read(dailyStatsProvider);
-    final newValue = stats.totalIdleDistance.toStringAsFixed(1);
-    if (_value != newValue || _firstUpdate) {
-      _firstUpdate = false;
-      setState(() {
-        _value = newValue;
-      });
-    }
+    final stats = ref.read(dailyStatsProvider);
+    setState(() {
+      _value = stats.ordersCount.toString();
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _MetricCard(
+      value: _value,
+      label: 'Заказы',
+      color: Colors.blue,
+    );
+  }
+}
+
+// ---- ХОЛОСТОЙ ПРОБЕГ ----
+class _IdleDistanceMetric extends ConsumerStatefulWidget {
+  const _IdleDistanceMetric();
+
+  @override
+  ConsumerState<_IdleDistanceMetric> createState() => _IdleDistanceMetricState();
+}
+
+class _IdleDistanceMetricState extends ConsumerState<_IdleDistanceMetric> {
+  Timer? _timer;
+  String _value = '0.0 км';
+
+  @override
+  void initState() {
+    super.initState();
+    _updateValue();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      _updateValue();
+    });
+  }
+
+  void _updateValue() {
+    final stats = ref.read(dailyStatsProvider);
+    setState(() {
+      _value = '${stats.totalIdleDistance.toStringAsFixed(1)} км';
+    });
   }
 
   @override
@@ -664,25 +655,21 @@ class _IdleDistanceMetricState extends State<_IdleDistanceMetric> {
       value: _value,
       label: 'Холостой пробег',
       color: Colors.orange,
-      suffix: ' км',
     );
   }
 }
 
-// ---- ПРИБЫЛЬ НА КМ ----
-// ---- ПРИБЫЛЬ НА КМ (используем правильные данные) ----
-class _ProfitPerKmMetric extends StatefulWidget {
-  final WidgetRef ref;
-  const _ProfitPerKmMetric({required this.ref});
+// ---- ВРЕМЯ ПРОСТОЯ ----
+class _IdleTimeMetric extends ConsumerStatefulWidget {
+  const _IdleTimeMetric();
 
   @override
-  State<_ProfitPerKmMetric> createState() => _ProfitPerKmMetricState();
+  ConsumerState<_IdleTimeMetric> createState() => _IdleTimeMetricState();
 }
 
-class _ProfitPerKmMetricState extends State<_ProfitPerKmMetric> {
+class _IdleTimeMetricState extends ConsumerState<_IdleTimeMetric> {
   Timer? _timer;
-  String _value = '0.00';
-  bool _firstUpdate = true;
+  String _value = '00:00:00';
 
   @override
   void initState() {
@@ -694,22 +681,10 @@ class _ProfitPerKmMetricState extends State<_ProfitPerKmMetric> {
   }
 
   void _updateValue() {
-    final stats = widget.ref.read(dailyStatsProvider);
-    String newValue;
-    if (stats.totalDistance <= 0) {
-      newValue = '0.00';
-    } else {
-      // ===== ИСПОЛЬЗУЕМ ПРИБЫЛЬ (netProfit) ДЛЯ РАСЧЁТА =====
-      // Либо используйте totalIncome если хотите доход на км
-      final profit = stats.netProfit; // или stats.totalIncome
-      newValue = (profit / stats.totalDistance).toStringAsFixed(2);
-    }
-    if (_value != newValue || _firstUpdate) {
-      _firstUpdate = false;
-      setState(() {
-        _value = newValue;
-      });
-    }
+    final shiftState = ref.read(shiftProvider);
+    setState(() {
+      _value = shiftState.formattedIdleTime;
+    });
   }
 
   @override
@@ -722,26 +697,23 @@ class _ProfitPerKmMetricState extends State<_ProfitPerKmMetric> {
   Widget build(BuildContext context) {
     return _MetricCard(
       value: _value,
-      label: 'Прибыль на км',  // или 'Доход на км'
-      color: Colors.cyan,
-      suffix: ' ₽/км',
+      label: 'Время простоя',
+      color: Colors.purple,
     );
   }
 }
 
-// ---- ПРИБЫЛЬ ЗА ЧАС ----
-class _ProfitPerHourMetric extends StatefulWidget {
-  final WidgetRef ref;
-  const _ProfitPerHourMetric({required this.ref});
+// ---- ПРИБЫЛЬ НА КМ ----
+class _ProfitPerKmMetric extends ConsumerStatefulWidget {
+  const _ProfitPerKmMetric();
 
   @override
-  State<_ProfitPerHourMetric> createState() => _ProfitPerHourMetricState();
+  ConsumerState<_ProfitPerKmMetric> createState() => _ProfitPerKmMetricState();
 }
 
-class _ProfitPerHourMetricState extends State<_ProfitPerHourMetric> {
+class _ProfitPerKmMetricState extends ConsumerState<_ProfitPerKmMetric> {
   Timer? _timer;
-  String _value = '—';
-  bool _firstUpdate = true;
+  String _value = '0.00 ₽/км';
 
   @override
   void initState() {
@@ -753,26 +725,70 @@ class _ProfitPerHourMetricState extends State<_ProfitPerHourMetric> {
   }
 
   void _updateValue() {
-  final stats = widget.ref.read(dailyStatsProvider);
-  
-  // ===== ЛОГИРУЕМ ДАННЫЕ =====
-  //logMessage('📊 [PROFIT_PER_KM] netProfit=${stats.netProfit}, totalDistance=${stats.totalDistance}', category: 'HOME');
-  //logMessage('📊 [PROFIT_PER_KM] totalIncome=${stats.totalIncome}, totalExpenses=${stats.totalExpenses}', category: 'HOME');
-  
-  String newValue;
-  if (stats.totalDistance <= 0) {
-    newValue = '0.00';
-  } else {
-    final profit = stats.netProfit; // или stats.totalIncome
-    newValue = (profit / stats.totalDistance).toStringAsFixed(2);
-  }
-  if (_value != newValue || _firstUpdate) {
-    _firstUpdate = false;
+    final stats = ref.read(dailyStatsProvider);
     setState(() {
-      _value = newValue;
+      if (stats.totalDistance <= 0) {
+        _value = '0.00 ₽/км';
+      } else {
+        final profitPerKm = stats.netProfit / stats.totalDistance;
+        _value = '${profitPerKm.toStringAsFixed(2)} ₽/км';
+      }
     });
   }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _MetricCard(
+      value: _value,
+      label: 'Прибыль на км',
+      color: Colors.cyan,
+    );
+  }
 }
+
+// ---- ПРИБЫЛЬ ЗА ЧАС ----
+class _ProfitPerHourMetric extends ConsumerStatefulWidget {
+  const _ProfitPerHourMetric();
+
+  @override
+  ConsumerState<_ProfitPerHourMetric> createState() => _ProfitPerHourMetricState();
+}
+
+class _ProfitPerHourMetricState extends ConsumerState<_ProfitPerHourMetric> {
+  Timer? _timer;
+  String _value = '—';
+
+  @override
+  void initState() {
+    super.initState();
+    _updateValue();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      _updateValue();
+    });
+  }
+
+  void _updateValue() {
+    final stats = ref.read(dailyStatsProvider);
+    setState(() {
+      if (stats.totalWorkTime.inSeconds < 3600) {
+        _value = '—';
+      } else {
+        final hours = stats.totalWorkTime.inSeconds / 3600.0;
+        if (hours <= 0) {
+          _value = '—';
+        } else {
+          final profitPerHour = stats.netProfit / hours;
+          _value = '${profitPerHour.toStringAsFixed(2)} ₽/ч';
+        }
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -786,7 +802,6 @@ class _ProfitPerHourMetricState extends State<_ProfitPerHourMetric> {
       value: _value,
       label: 'Прибыль за час',
       color: Colors.purple,
-      suffix: _value == '—' ? '' : ' ₽/ч',
     );
   }
 }
@@ -794,18 +809,16 @@ class _ProfitPerHourMetricState extends State<_ProfitPerHourMetric> {
 // ============================================================
 // ВРЕМЯ РАБОТЫ
 // ============================================================
-class _TimeDisplay extends StatefulWidget {
-  final WidgetRef ref;
-  const _TimeDisplay({required this.ref});
+class _TimeDisplay extends ConsumerStatefulWidget {
+  const _TimeDisplay();
 
   @override
-  State<_TimeDisplay> createState() => _TimeDisplayState();
+  ConsumerState<_TimeDisplay> createState() => _TimeDisplayState();
 }
 
-class _TimeDisplayState extends State<_TimeDisplay> {
+class _TimeDisplayState extends ConsumerState<_TimeDisplay> {
   Timer? _timer;
   String _formattedTime = '00:00:00';
-  bool _firstUpdate = true;
 
   @override
   void initState() {
@@ -817,14 +830,10 @@ class _TimeDisplayState extends State<_TimeDisplay> {
   }
 
   void _updateTime() {
-    final shiftState = widget.ref.read(shiftProvider);
-    final newValue = shiftState.formattedWorkTime;
-    if (_formattedTime != newValue || _firstUpdate) {
-      _firstUpdate = false;
-      setState(() {
-        _formattedTime = newValue;
-      });
-    }
+    final shiftState = ref.read(shiftProvider);
+    setState(() {
+      _formattedTime = shiftState.formattedWorkTime;
+    });
   }
 
   @override
@@ -855,61 +864,6 @@ class _TimeDisplayState extends State<_TimeDisplay> {
           ),
         ),
       ],
-    );
-  }
-}
-
-// ============================================================
-// ВРЕМЯ ПРОСТОЯ
-// ============================================================
-class _IdleTimeDisplay extends StatefulWidget {
-  final WidgetRef ref;
-  const _IdleTimeDisplay({required this.ref});
-
-  @override
-  State<_IdleTimeDisplay> createState() => _IdleTimeDisplayState();
-}
-
-class _IdleTimeDisplayState extends State<_IdleTimeDisplay> {
-  Timer? _timer;
-  String _formattedTime = '00:00:00';
-  bool _firstUpdate = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _updateTime();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      _updateTime();
-    });
-  }
-
-  void _updateTime() {
-    final shiftState = widget.ref.read(shiftProvider);
-    final newValue = shiftState.formattedIdleTime;
-    if (_formattedTime != newValue || _firstUpdate) {
-      _firstUpdate = false;
-      setState(() {
-        _formattedTime = newValue;
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      _formattedTime,
-      style: const TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.bold,
-        color: Colors.white,
-      ),
     );
   }
 }
