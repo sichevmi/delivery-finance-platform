@@ -1,6 +1,4 @@
-# app/modules/deliveries/models.py
-
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Text, Numeric
+from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.core.database import Base
@@ -15,14 +13,16 @@ class Shift(Base):
     
     start_time = Column(String, nullable=True)
     end_time = Column(String, nullable=True)
+    paused_at = Column(String, nullable=True)      # <-- ДОБАВЛЯЕМ
+    resumed_at = Column(String, nullable=True)     # <-- ДОБАВЛЯЕМ
     duration_seconds = Column(Integer, default=0)
-    total_paid_distance = Column(Numeric(10, 2), default=0.0)  # 2 знака
-    total_idle_distance = Column(Numeric(10, 2), default=0.0)  # 2 знака
+    total_paid_distance = Column(Float, default=0)
+    total_idle_distance = Column(Float, default=0)
     total_order_time_seconds = Column(Integer, default=0)
     orders_count = Column(Integer, default=0)
-    total_income = Column(Numeric(10, 2), default=0.0)         # 2 знака
-    total_expenses = Column(Numeric(10, 2), default=0.0)       # 2 знака
-    net_profit = Column(Numeric(10, 2), default=0.0)           # 2 знака
+    total_income = Column(Float, default=0)
+    total_expenses = Column(Float, default=0)
+    net_profit = Column(Float, default=0)
     status = Column(String, default="active")
     
     is_synced = Column(Boolean, default=False)
@@ -42,12 +42,12 @@ class Order(Base):
     shift_id = Column(Integer, ForeignKey("shifts.id"), nullable=True)
     
     service_name = Column(String, nullable=True)
-    coefficient = Column(Numeric(5, 2), default=1.0)           # 2 знака
+    coefficient = Column(Float, default=1.0)
     delivery_number = Column(Integer, default=1)
-    total_paid_distance = Column(Numeric(10, 2), default=0.0)  # 2 знака
-    total_income = Column(Numeric(10, 2), default=0.0)         # 2 знака
-    total_expenses = Column(Numeric(10, 2), default=0.0)       # 2 знака
-    net_profit = Column(Numeric(10, 2), default=0.0)           # 2 знака
+    total_paid_distance = Column(Float, default=0)
+    total_income = Column(Float, default=0)
+    total_expenses = Column(Float, default=0)
+    net_profit = Column(Float, default=0)
     total_time_seconds = Column(Integer, default=0)
     shop_address = Column(String(500), nullable=True)
     status = Column(String, default="active")
@@ -71,14 +71,14 @@ class Delivery(Base):
     number = Column(Integer, default=0)
     client_address = Column(String, nullable=True)
     apartment = Column(String, nullable=True)
-    weight = Column(Numeric(8, 2), default=0.0)                # 2 знака
+    weight = Column(Float, default=0)
     time_to_shop = Column(Integer, default=0)
-    distance_to_shop = Column(Numeric(8, 2), default=0.0)      # 2 знака
+    distance_to_shop = Column(Float, default=0)
     time_receiving = Column(Integer, default=0)
     time_to_client = Column(Integer, default=0)
-    distance_to_client = Column(Numeric(8, 2), default=0.0)    # 2 знака
+    distance_to_client = Column(Float, default=0)
     time_delivery = Column(Integer, default=0)
-    tip = Column(Numeric(8, 2), default=0.0)                  # 2 знака
+    tip = Column(Float, default=0.0)
     status = Column(String, default="active")
     
     is_synced = Column(Boolean, default=False)
@@ -97,10 +97,10 @@ class Settings(Base):
     __tablename__ = "settings"
     
     id = Column(Integer, primary_key=True, index=True)
-    fuel_consumption = Column(Numeric(6, 2), default=10.0)     # 2 знака
-    fuel_price = Column(Numeric(10, 2), default=50.0)         # 2 знака
-    repair_cost = Column(Numeric(8, 2), default=2.0)          # 2 знака
-    additional_costs = Column(Numeric(10, 2), default=0.0)    # 2 знака
+    fuel_consumption = Column(Float, default=10.0)
+    fuel_price = Column(Float, default=50.0)
+    repair_cost = Column(Float, default=2.0)
+    additional_costs = Column(Float, default=0.0)
     version = Column(Integer, default=1)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -111,11 +111,11 @@ class Pricing(Base):
     __tablename__ = "pricing"
     
     id = Column(Integer, primary_key=True, index=True)
-    receiving_fee = Column(Numeric(10, 2), default=50.0)      # 2 знака
-    delivery_fee = Column(Numeric(10, 2), default=100.0)      # 2 знака
-    price_per_kg = Column(Numeric(8, 2), default=5.0)         # 2 знака
-    price_per_km = Column(Numeric(8, 2), default=10.0)        # 2 знака
-    base_coefficient = Column(Numeric(5, 2), default=1.0)     # 2 знака
+    receiving_fee = Column(Float, default=50.0)
+    delivery_fee = Column(Float, default=100.0)
+    price_per_kg = Column(Float, default=5.0)
+    price_per_km = Column(Float, default=10.0)
+    base_coefficient = Column(Float, default=1.0)
     version = Column(Integer, default=1)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -126,10 +126,10 @@ class X5Settings(Base):
     __tablename__ = "x5_settings"
     
     id = Column(Integer, primary_key=True, index=True)
-    pickup_price = Column(Numeric(10, 2), default=250.0)      # 2 знака
-    delivery_price = Column(Numeric(10, 2), default=150.0)    # 2 знака
-    per_km_price = Column(Numeric(8, 2), default=25.0)        # 2 знака
-    per_kg_price = Column(Numeric(8, 2), default=10.0)        # 2 знака
+    pickup_price = Column(Float, default=250.0)
+    delivery_price = Column(Float, default=150.0)
+    per_km_price = Column(Float, default=25.0)
+    per_kg_price = Column(Float, default=10.0)
     version = Column(Integer, default=1)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
