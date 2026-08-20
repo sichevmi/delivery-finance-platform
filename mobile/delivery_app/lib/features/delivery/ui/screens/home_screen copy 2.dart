@@ -110,15 +110,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     return Scaffold(
       appBar: AppBar(
         title: const Text('FinFlow Доставка'),
-        toolbarHeight: 44,
+        toolbarHeight: 48,
         actions: [
-          IconButton(icon: const Icon(Icons.notifications_outlined, size: 20), onPressed: () {}, padding: EdgeInsets.zero),
+          IconButton(icon: const Icon(Icons.notifications_outlined), onPressed: () {}, padding: EdgeInsets.zero),
           CircleAvatar(
-            radius: 12,
+            radius: 14,
             backgroundColor: const Color(0xFF6C63FF),
             child: Text(
               authState.user?.name.isNotEmpty == true ? authState.user!.name[0].toUpperCase() : 'К',
-              style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
             ),
           ),
           const SizedBox(width: 6),
@@ -157,35 +157,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final totalCostPerKm = fuelCostPerKm + settings.repairCost;
 
     return Container(
-      padding: const EdgeInsets.all(6.0),
+      padding: const EdgeInsets.all(10.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Дата и статус смены
           Row(
             children: [
-              const Icon(Icons.calendar_today, size: 11, color: Color(0xFF888888)),
-              const SizedBox(width: 4),
+              const Icon(Icons.calendar_today, size: 13, color: Color(0xFF888888)),
+              const SizedBox(width: 6),
               Text(
                 _getTodayDate(),
-                style: const TextStyle(fontSize: 10, color: Color(0xFF888888)),
+                style: const TextStyle(fontSize: 12, color: Color(0xFF888888)),
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: shiftState.isActive && !shiftState.isPaused && !shiftState.isCompleted 
                       ? Colors.green.withOpacity(0.15) 
                       : shiftState.isPaused 
                           ? Colors.orange.withOpacity(0.15) 
                           : Colors.grey.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
                     Container(
-                      width: 5,
-                      height: 5,
+                      width: 6,
+                      height: 6,
                       decoration: BoxDecoration(
                         color: shiftState.isActive && !shiftState.isPaused && !shiftState.isCompleted 
                             ? Colors.green 
@@ -195,13 +195,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                         shape: BoxShape.circle,
                       ),
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 6),
                     Text(
                       shiftState.isCompleted ? 'Завершена' :
                       shiftState.isPaused ? 'Приостановлена' : 
                       shiftState.isActive ? 'Активна' : 'Не начата',
                       style: TextStyle(
-                        fontSize: 9,
+                        fontSize: 11,
                         color: shiftState.isCompleted ? Colors.grey :
                                shiftState.isPaused ? Colors.orange : 
                                shiftState.isActive ? Colors.green : Colors.grey,
@@ -213,7 +213,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
 
           // ===== ВЕРХНЯЯ СТРОКА: Время работы | Стоимость км | Время простоя =====
           Row(
@@ -224,11 +224,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
               const _IdleTimeDisplay(),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 12),
 
           // ===== ПЕРВАЯ СТРОКА: Количество заказов =====
           const _OrdersCountMetric(),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
 
           // ===== ВТОРАЯ И ТРЕТЬЯ СТРОКИ =====
           IntrinsicHeight(
@@ -240,23 +240,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                   child: Column(
                     children: [
                       const _TotalDistanceMetric(),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 8),
                       const _IdleDistanceMetric(),
                     ],
                   ),
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: 8),
                 Expanded(
                   flex: 1,
                   child: const _ProfitMetric(),
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: 8),
                 Expanded(
                   flex: 1,
                   child: Column(
                     children: [
                       const _ProfitPerKmMetric(),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 8),
                       const _ProfitPerHourMetric(),
                     ],
                   ),
@@ -264,14 +264,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
               ],
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
 
           const _ExpensesMetric(),
           
           const Expanded(child: SizedBox()),
 
           SizedBox(
-            height: 48,
+            height: 56,
             width: double.infinity,
             child: _buildShiftButton(shiftState),
           ),
@@ -288,12 +288,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           backgroundColor: Colors.grey,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
           ),
         ),
         child: const Text(
           'Смена завершена',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
         ),
       );
     }
@@ -312,15 +312,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           backgroundColor: Colors.green,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
           ),
         ),
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.play_arrow, size: 20),
-            SizedBox(width: 6),
-            Text('Возобновить работу', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            Icon(Icons.play_arrow, size: 24),
+            SizedBox(width: 8),
+            Text('Возобновить работу', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
           ],
         ),
       );
@@ -338,15 +338,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           backgroundColor: Colors.orange,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
           ),
         ),
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.pause, size: 20),
-            SizedBox(width: 6),
-            Text('Приостановить работу', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            Icon(Icons.pause, size: 24),
+            SizedBox(width: 8),
+            Text('Приостановить работу', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
           ],
         ),
       );
@@ -364,7 +364,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     return Text(
       '${totalCostPerKm.toStringAsFixed(2)} ₽/км',
       style: const TextStyle(
-        fontSize: 13,
+        fontSize: 16,
         fontWeight: FontWeight.bold,
         color: Colors.white,
       ),
@@ -393,17 +393,17 @@ class _MetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFF2C2C2C), width: 0.5),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 4),
+          Icon(icon, size: 20, color: color),
+          const SizedBox(width: 8),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -411,7 +411,7 @@ class _MetricCard extends StatelessWidget {
               Text(
                 value,
                 style: TextStyle(
-                  fontSize: fontSize ?? 13,
+                  fontSize: fontSize ?? 18,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
@@ -421,7 +421,7 @@ class _MetricCard extends StatelessWidget {
               Text(
                 label,
                 style: const TextStyle(
-                  fontSize: 8,
+                  fontSize: 10,
                   color: Color(0xFF888888),
                 ),
                 maxLines: 1,
@@ -436,42 +436,43 @@ class _MetricCard extends StatelessWidget {
 }
 
 // ============================================================
-// КОЛИЧЕСТВО ЗАКАЗОВ
+// КОЛИЧЕСТВО ЗАКАЗОВ (ОБНОВЛЯЕТСЯ ТОЛЬКО ПРИ ИЗМЕНЕНИИ)
 // ============================================================
 class _OrdersCountMetric extends ConsumerWidget {
   const _OrdersCountMetric({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Подписываемся только на ordersCount через select
     final count = ref.watch(
       dailyStatsProvider.select((stats) => stats.ordersCount),
     );
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFF2C2C2C), width: 0.5),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.shopping_bag, size: 18, color: Color(0xFF6C63FF)),
-          const SizedBox(width: 6),
+          const Icon(Icons.shopping_bag, size: 24, color: Color(0xFF6C63FF)),
+          const SizedBox(width: 10),
           Text(
             '$count',
             style: const TextStyle(
-              fontSize: 20,
+              fontSize: 28,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 10),
           Text(
             _getOrdersText(count),
             style: const TextStyle(
-              fontSize: 13,
+              fontSize: 16,
               color: Color(0xFF888888),
             ),
           ),
@@ -488,95 +489,7 @@ class _OrdersCountMetric extends ConsumerWidget {
 }
 
 // ============================================================
-// ДОХОД
-// ============================================================
-class _ProfitMetric extends ConsumerStatefulWidget {
-  const _ProfitMetric({super.key});
-
-  @override
-  ConsumerState<_ProfitMetric> createState() => _ProfitMetricState();
-}
-
-class _ProfitMetricState extends ConsumerState<_ProfitMetric> {
-  Timer? _timer;
-  String _value = '0 ₽';
-
-  @override
-  void initState() {
-    super.initState();
-    _updateValue();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) => _updateValue());
-  }
-
-  void _updateValue() {
-    final stats = ref.read(dailyStatsProvider);
-    final newValue = '${stats.netProfit.toStringAsFixed(0)} ₽';
-    if (_value != newValue) {
-      setState(() => _value = newValue);
-    }
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFF6C63FF).withOpacity(0.2),
-            const Color(0xFF6C63FF).withOpacity(0.05),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF6C63FF).withOpacity(0.3), width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.trending_up, size: 16, color: Color(0xFF6C63FF)),
-              const SizedBox(width: 4),
-              Text(
-                _value,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-          const Text(
-            'Доход',
-            style: TextStyle(
-              fontSize: 8,
-              color: Color(0xFF888888),
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================
-// ПРОБЕГ
+// ПРОБЕГ (НЕЗАВИСИМЫЙ ВИДЖЕТ)
 // ============================================================
 class _TotalDistanceMetric extends ConsumerStatefulWidget {
   const _TotalDistanceMetric({super.key});
@@ -618,14 +531,14 @@ class _TotalDistanceMetricState extends ConsumerState<_TotalDistanceMetric> {
         label: 'Пробег',
         icon: Icons.route,
         color: Colors.blue,
-        fontSize: 13,
+        fontSize: 18,
       ),
     );
   }
 }
 
 // ============================================================
-// ХОЛОСТОЙ ПРОБЕГ
+// ХОЛОСТОЙ ПРОБЕГ (НЕЗАВИСИМЫЙ ВИДЖЕТ)
 // ============================================================
 class _IdleDistanceMetric extends ConsumerStatefulWidget {
   const _IdleDistanceMetric({super.key});
@@ -667,14 +580,102 @@ class _IdleDistanceMetricState extends ConsumerState<_IdleDistanceMetric> {
         label: 'Холостой',
         icon: Icons.ev_station,
         color: Colors.orange,
-        fontSize: 13,
+        fontSize: 18,
       ),
     );
   }
 }
 
 // ============================================================
-// ПРИБЫЛЬ НА КМ
+// ДОХОД (НЕЗАВИСИМЫЙ ВИДЖЕТ)
+// ============================================================
+class _ProfitMetric extends ConsumerStatefulWidget {
+  const _ProfitMetric({super.key});
+
+  @override
+  ConsumerState<_ProfitMetric> createState() => _ProfitMetricState();
+}
+
+class _ProfitMetricState extends ConsumerState<_ProfitMetric> {
+  Timer? _timer;
+  String _value = '0 ₽';
+
+  @override
+  void initState() {
+    super.initState();
+    _updateValue();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) => _updateValue());
+  }
+
+  void _updateValue() {
+    final stats = ref.read(dailyStatsProvider);
+    final newValue = '${stats.netProfit.toStringAsFixed(0)} ₽';
+    if (_value != newValue) {
+      setState(() => _value = newValue);
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF6C63FF).withOpacity(0.2),
+            const Color(0xFF6C63FF).withOpacity(0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF6C63FF).withOpacity(0.3), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.trending_up, size: 22, color: Color(0xFF6C63FF)),
+              const SizedBox(width: 8),
+              Text(
+                _value,
+                style: const TextStyle(
+                  fontSize: 34,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+          const Text(
+            'Доход',
+            style: TextStyle(
+              fontSize: 11,
+              color: Color(0xFF888888),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// ПРИБЫЛЬ НА КМ (НЕЗАВИСИМЫЙ ВИДЖЕТ)
 // ============================================================
 class _ProfitPerKmMetric extends ConsumerStatefulWidget {
   const _ProfitPerKmMetric({super.key});
@@ -721,14 +722,14 @@ class _ProfitPerKmMetricState extends ConsumerState<_ProfitPerKmMetric> {
         label: 'Прибыль на км',
         icon: Icons.speed,
         color: Colors.cyan,
-        fontSize: 12,
+        fontSize: 16,
       ),
     );
   }
 }
 
 // ============================================================
-// ПРИБЫЛЬ ЗА ЧАС
+// ПРИБЫЛЬ ЗА ЧАС (НЕЗАВИСИМЫЙ ВИДЖЕТ)
 // ============================================================
 class _ProfitPerHourMetric extends ConsumerStatefulWidget {
   const _ProfitPerHourMetric({super.key});
@@ -780,14 +781,14 @@ class _ProfitPerHourMetricState extends ConsumerState<_ProfitPerHourMetric> {
         label: 'Прибыль за час',
         icon: Icons.access_time,
         color: Colors.purpleAccent,
-        fontSize: 12,
+        fontSize: 16,
       ),
     );
   }
 }
 
 // ============================================================
-// РАСХОД
+// РАСХОД (НЕЗАВИСИМЫЙ ВИДЖЕТ)
 // ============================================================
 class _ExpensesMetric extends ConsumerStatefulWidget {
   const _ExpensesMetric({super.key});
@@ -824,30 +825,30 @@ class _ExpensesMetricState extends ConsumerState<_ExpensesMetric> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFF2C2C2C), width: 0.5),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.money_off, size: 18, color: Colors.red),
-          const SizedBox(width: 6),
+          const Icon(Icons.money_off, size: 24, color: Colors.red),
+          const SizedBox(width: 10),
           Text(
             _value,
             style: const TextStyle(
-              fontSize: 20,
+              fontSize: 28,
               fontWeight: FontWeight.bold,
               color: Colors.red,
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 10),
           const Text(
             'Расход',
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 16,
               color: Color(0xFF888888),
             ),
           ),
@@ -858,7 +859,7 @@ class _ExpensesMetricState extends ConsumerState<_ExpensesMetric> {
 }
 
 // ============================================================
-// ВРЕМЯ РАБОТЫ
+// ВРЕМЯ РАБОТЫ (НЕЗАВИСИМЫЙ ВИДЖЕТ)
 // ============================================================
 class _TimeDisplay extends ConsumerStatefulWidget {
   const _TimeDisplay({super.key});
@@ -897,12 +898,12 @@ class _TimeDisplayState extends ConsumerState<_TimeDisplay> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.access_time, size: 14, color: Color(0xFF888888)),
-        const SizedBox(width: 4),
+        const Icon(Icons.access_time, size: 18, color: Color(0xFF888888)),
+        const SizedBox(width: 6),
         Text(
           _formattedTime,
           style: const TextStyle(
-            fontSize: 16,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
@@ -913,7 +914,7 @@ class _TimeDisplayState extends ConsumerState<_TimeDisplay> {
 }
 
 // ============================================================
-// ВРЕМЯ ПРОСТОЯ
+// ВРЕМЯ ПРОСТОЯ (НЕЗАВИСИМЫЙ ВИДЖЕТ)
 // ============================================================
 class _IdleTimeDisplay extends ConsumerStatefulWidget {
   const _IdleTimeDisplay({super.key});
@@ -952,12 +953,12 @@ class _IdleTimeDisplayState extends ConsumerState<_IdleTimeDisplay> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.timer_off, size: 14, color: Color(0xFF888888)),
-        const SizedBox(width: 4),
+        const Icon(Icons.timer_off, size: 18, color: Color(0xFF888888)),
+        const SizedBox(width: 6),
         Text(
           _formattedTime,
           style: const TextStyle(
-            fontSize: 16,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
