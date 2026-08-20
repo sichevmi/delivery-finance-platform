@@ -25,17 +25,25 @@ class AppCache {
     todayShifts.clear();
   }
 
-  void updateTodayData(Map<String, dynamic> data) {
-    final shiftsList = data['shifts'] as List? ?? [];
-    todayShifts = shiftsList.map((s) => Shift.fromJson(s)).toList();
-    // Ищем смену со статусом active или paused
-    activeShift = todayShifts.cast<Shift?>().firstWhere(
-      (s) => s?.status == 'active' || s?.status == 'paused',
-      orElse: () => null,
-    );
-    final ordersList = data['orders'] as List? ?? [];
-    todayOrders = ordersList.map((o) => Order.fromJson(o)).toList();
+  // В api_service.dart, в updateTodayData:
+
+void updateTodayData(Map<String, dynamic> data) {
+  final shiftsList = data['shifts'] as List? ?? [];
+  todayShifts = shiftsList.map((s) => Shift.fromJson(s)).toList();
+  // Ищем смену со статусом active или paused
+  activeShift = todayShifts.cast<Shift?>().firstWhere(
+    (s) => s?.status == 'active' || s?.status == 'paused',
+    orElse: () => null,
+  );
+  
+  // Если есть активная смена — обновляем её данные
+  if (activeShift != null) {
+    logMessage('🔄 [API] Активная смена: id=${activeShift!.id}, durationSeconds=${activeShift!.durationSeconds}', category: 'API');
   }
+  
+  final ordersList = data['orders'] as List? ?? [];
+  todayOrders = ordersList.map((o) => Order.fromJson(o)).toList();
+}
 
   void updateDirectories(Map<String, dynamic> data) {
     if (data['settings'] != null) {

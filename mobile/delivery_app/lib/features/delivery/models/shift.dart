@@ -1,3 +1,4 @@
+// models/shift.dart
 class Shift {
   final int id;
   final DateTime startTime;
@@ -12,6 +13,8 @@ class Shift {
   final String status;
   final Duration? totalIdleTime;
   final Duration? totalOrderTime;
+  final int? durationSeconds;      // <-- ДОБАВЛЯЕМ
+  final int? totalOrderTimeSeconds; // <-- ДОБАВЛЯЕМ
 
   Shift({
     required this.id,
@@ -27,6 +30,8 @@ class Shift {
     required this.status,
     this.totalIdleTime,
     this.totalOrderTime,
+    this.durationSeconds,
+    this.totalOrderTimeSeconds,
   });
 
   factory Shift.fromJson(Map<String, dynamic> json) {
@@ -48,6 +53,8 @@ class Shift {
       totalOrderTime: json['totalOrderTimeSeconds'] != null 
           ? Duration(seconds: json['totalOrderTimeSeconds']) 
           : null,
+      durationSeconds: json['durationSeconds'],
+      totalOrderTimeSeconds: json['totalOrderTimeSeconds'],
     );
   }
 

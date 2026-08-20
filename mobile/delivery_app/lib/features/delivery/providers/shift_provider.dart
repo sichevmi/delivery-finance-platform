@@ -218,7 +218,7 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     
     await _apiService.updateShiftState(
       state.shiftId!,
-      durationSeconds: currentWorkSeconds,  // <-- ДОБАВЛЯЕМ
+      durationSeconds: currentWorkSeconds,  // <-- ОТПРАВЛЯЕМ ТЕКУЩЕЕ ВРЕМЯ
       totalPaidDistance: _roundToTwo(state.totalPaidDistance),
       totalIdleDistance: _roundToTwo(state.totalIdleDistance),
       totalOrderTimeSeconds: state.totalOrderTime.inSeconds,
@@ -260,20 +260,47 @@ Future<void> _loadFromCache() async {
     logMessage('🔵 [SHIFT] Найдена смена на сервере: id=${shift.id}, status=${shift.status}', category: 'SHIFT');
     
     // ===== ПРАВИЛЬНО ОПРЕДЕЛЯЕМ СТАТУС =====
-    // Статусы: 'active' - активна, 'paused' - на паузе, 'completed' - завершена
     bool isCompleted = shift.status == 'completed';
     bool isActive = !isCompleted && (shift.status == 'active' || shift.status == 'paused');
     bool isPaused = shift.status == 'paused';
     
     logMessage('🔵 [SHIFT] Определены статусы: isActive=$isActive, isPaused=$isPaused, isCompleted=$isCompleted', category: 'SHIFT');
     
-    // Используем сохранённое состояние если ID совпадает
+    // ===== ВОССТАНАВЛИВАЕМ ВРЕМЯ ИЗ БАЗЫ =====
+    // duration_seconds хранится в базе в секундах
+    Duration dbWorkTime = Duration.zero;
+    if (shift.durationSeconds != null && shift.durationSeconds! > 0) {
+      dbWorkTime = Duration(seconds: shift.durationSeconds!);
+      logMessage('🔵 [SHIFT] Время работы из базы: ${dbWorkTime.inSeconds} сек', category: 'SHIFT');
+    }
+    
+    // total_order_time_seconds из базы
+    Duration dbOrderTime = Duration.zero;
+    if (shift.totalOrderTimeSeconds != null && shift.totalOrderTimeSeconds! > 0) {
+      dbOrderTime = Duration(seconds: shift.totalOrderTimeSeconds!);
+      logMessage('🔵 [SHIFT] Время заказов из базы: ${dbOrderTime.inSeconds} сек', category: 'SHIFT');
+    }
+    
+    // Используем сохранённое состояние из SharedPreferences если оно есть и ID совпадает
     final savedShiftId = savedState['shiftId'] as int?;
     bool useSavedData = savedShiftId != null && savedShiftId == shift.id;
     
-    if (useSavedData) {
-      logMessage('🔵 [SHIFT] Используем сохранённые данные из SharedPreferences', category: 'SHIFT');
-    }
+    // Если сохранённое состояние есть — используем его, иначе берём из базы
+    Duration workTime = useSavedData 
+        ? (savedState['totalWorkTime'] ?? Duration.zero) 
+        : dbWorkTime;
+    
+    Duration orderTime = useSavedData 
+        ? (savedState['totalOrderTime'] ?? Duration.zero) 
+        : dbOrderTime;
+    
+    Duration idleTime = useSavedData 
+        ? restoredIdleTime 
+        : (shift.totalIdleTime ?? Duration.zero);
+    
+    logMessage('🔵 [SHIFT] Итоговое время работы: ${workTime.inSeconds} сек', category: 'SHIFT');
+    logMessage('🔵 [SHIFT] Итоговое время заказов: ${orderTime.inSeconds} сек', category: 'SHIFT');
+    logMessage('🔵 [SHIFT] Итоговое время простоя: ${idleTime.inSeconds} сек', category: 'SHIFT');
     
     state = state.copyWith(
       isActive: isActive,
@@ -287,16 +314,16 @@ Future<void> _loadFromCache() async {
       totalIncome: useSavedData ? (savedState['totalIncome'] ?? 0.0) : shift.totalIncome,
       totalExpenses: useSavedData ? (savedState['totalExpenses'] ?? 0.0) : shift.totalExpenses,
       netProfit: useSavedData ? (savedState['netProfit'] ?? 0.0) : shift.netProfit,
-      totalWorkTime: savedState['totalWorkTime'] ?? Duration.zero,
-      totalIdleTime: restoredIdleTime,
-      totalOrderTime: savedState['totalOrderTime'] ?? Duration.zero,
+      totalWorkTime: workTime,
+      totalIdleTime: idleTime,
+      totalOrderTime: orderTime,
       processedIdleDistance: savedState['processedIdleDistance'] ?? 0.0,
-      // Если смена активна (не на паузе) — устанавливаем resumedAt
+      // Если смена активна (не на паузе) — устанавливаем resumedAt для продолжения счёта
       resumedAt: (isActive && !isPaused && !isCompleted) ? DateTime.now() : null,
       idleStartTime: (isActive && !isPaused && !isCompleted) ? DateTime.now() : null,
     );
     
-    logMessage('📁 [SHIFT] Смена восстановлена: id=${shift.id}, статус=${shift.status}, isPaused=${state.isPaused}', category: 'SHIFT');
+    logMessage('📁 [SHIFT] Смена восстановлена: id=${shift.id}, статус=${shift.status}, workTime=${state.totalWorkTime.inSeconds} сек', category: 'SHIFT');
     
     // ===== ЗАПУСКАЕМ GPS И ТАЙМЕРЫ В ЗАВИСИМОСТИ ОТ СТАТУСА =====
     if (isActive && !isPaused && !isCompleted) {
