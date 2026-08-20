@@ -124,37 +124,39 @@ class ApiService {
   }
 
   Future<void> pauseShift(
-    int shiftId, {
-    required int addedWorkSeconds,
-    required int addedIdleSeconds,
-    required double totalPaidDistance,
-    required double totalIdleDistance,
-    required int totalOrderTimeSeconds,
-    required int ordersCount,
-    required double totalIncome,
-    required double totalExpenses,
-    required double netProfit,
-  }) async {
-    try {
-      await _apiClient.pauseShift(
-        shiftId,
-        addedWorkSeconds: addedWorkSeconds,
-        addedIdleSeconds: addedIdleSeconds,
-        totalPaidDistance: totalPaidDistance,
-        totalIdleDistance: totalIdleDistance,
-        totalOrderTimeSeconds: totalOrderTimeSeconds,
-        ordersCount: ordersCount,
-        totalIncome: totalIncome,
-        totalExpenses: totalExpenses,
-        netProfit: netProfit,
-      );
-      await loadAllData();
-      logMessage('✅ [API] Смена приостановлена', category: 'API');
-    } catch (e) {
-      logMessage('❌ [API] Ошибка приостановки: $e', category: 'API', level: LogLevel.error);
-      rethrow;
-    }
+  int shiftId, {
+  int? durationSeconds,
+  required int addedWorkSeconds,
+  required int addedIdleSeconds,
+  required double totalPaidDistance,
+  required double totalIdleDistance,
+  required int totalOrderTimeSeconds,
+  required int ordersCount,
+  required double totalIncome,
+  required double totalExpenses,
+  required double netProfit,
+}) async {
+  try {
+    await _apiClient.pauseShift(
+      shiftId,
+      durationSeconds: durationSeconds,
+      addedWorkSeconds: addedWorkSeconds,
+      addedIdleSeconds: addedIdleSeconds,
+      totalPaidDistance: totalPaidDistance,
+      totalIdleDistance: totalIdleDistance,
+      totalOrderTimeSeconds: totalOrderTimeSeconds,
+      ordersCount: ordersCount,
+      totalIncome: totalIncome,
+      totalExpenses: totalExpenses,
+      netProfit: netProfit,
+    );
+    await loadAllData();
+    logMessage('✅ [API] Смена приостановлена', category: 'API');
+  } catch (e) {
+    logMessage('❌ [API] Ошибка приостановки: $e', category: 'API', level: LogLevel.error);
+    rethrow;
   }
+}
 
   Future<void> resumeShift(int shiftId) async {
     try {
@@ -168,62 +170,66 @@ class ApiService {
   }
 
   Future<void> updateShiftState(
-    int shiftId, {
-    double? totalPaidDistance,
-    double? totalIdleDistance,
-    int? totalOrderTimeSeconds,
-    int? ordersCount,
-    double? totalIncome,
-    double? totalExpenses,
-    double? netProfit,
-  }) async {
-    try {
-      logMessage('🔄 [API] Обновление состояния смены $shiftId', category: 'API');
-      await _apiClient.updateShiftState(
-        shiftId,
-        totalPaidDistance: totalPaidDistance,
-        totalIdleDistance: totalIdleDistance,
-        totalOrderTimeSeconds: totalOrderTimeSeconds,
-        ordersCount: ordersCount,
-        totalIncome: totalIncome,
-        totalExpenses: totalExpenses,
-        netProfit: netProfit,
-      );
-      logMessage('✅ [API] Состояние смены обновлено', category: 'API');
-    } catch (e) {
-      logMessage('⚠️ [API] Ошибка обновления состояния смены: $e', category: 'API');
-    }
+  int shiftId, {
+  int? durationSeconds,
+  double? totalPaidDistance,
+  double? totalIdleDistance,
+  int? totalOrderTimeSeconds,
+  int? ordersCount,
+  double? totalIncome,
+  double? totalExpenses,
+  double? netProfit,
+}) async {
+  try {
+    logMessage('🔄 [API] Обновление состояния смены $shiftId', category: 'API');
+    await _apiClient.updateShiftState(
+      shiftId,
+      durationSeconds: durationSeconds,
+      totalPaidDistance: totalPaidDistance,
+      totalIdleDistance: totalIdleDistance,
+      totalOrderTimeSeconds: totalOrderTimeSeconds,
+      ordersCount: ordersCount,
+      totalIncome: totalIncome,
+      totalExpenses: totalExpenses,
+      netProfit: netProfit,
+    );
+    logMessage('✅ [API] Состояние смены обновлено', category: 'API');
+  } catch (e) {
+    logMessage('⚠️ [API] Ошибка обновления состояния смены: $e', category: 'API');
   }
+}
 
   Future<void> completeShift(
-    int shiftId, {
-    double? totalPaidDistance,
-    double? totalIdleDistance,
-    int? totalOrderTimeSeconds,
-    int? ordersCount,
-    double? totalIncome,
-    double? totalExpenses,
-    double? netProfit,
-  }) async {
-    try {
-      await _apiClient.completeShift(
-        shiftId,
-        totalPaidDistance: totalPaidDistance,
-        totalIdleDistance: totalIdleDistance,
-        totalOrderTimeSeconds: totalOrderTimeSeconds,
-        ordersCount: ordersCount,
-        totalIncome: totalIncome,
-        totalExpenses: totalExpenses,
-        netProfit: netProfit,
-      );
-      _cache.activeShift = null;
-      await loadAllData();
-      logMessage('✅ [API] Смена завершена', category: 'API');
-    } catch (e) {
-      logMessage('❌ [API] Ошибка завершения: $e', category: 'API', level: LogLevel.error);
-      rethrow;
-    }
+  int shiftId, {
+  int? durationSeconds,
+  double? totalPaidDistance,
+  double? totalIdleDistance,
+  int? totalOrderTimeSeconds,
+  int? ordersCount,
+  double? totalIncome,
+  double? totalExpenses,
+  double? netProfit,
+}) async {
+  try {
+    await _apiClient.completeShift(
+      shiftId,
+      durationSeconds: durationSeconds,
+      totalPaidDistance: totalPaidDistance,
+      totalIdleDistance: totalIdleDistance,
+      totalOrderTimeSeconds: totalOrderTimeSeconds,
+      ordersCount: ordersCount,
+      totalIncome: totalIncome,
+      totalExpenses: totalExpenses,
+      netProfit: netProfit,
+    );
+    _cache.activeShift = null;
+    await loadAllData();
+    logMessage('✅ [API] Смена завершена', category: 'API');
+  } catch (e) {
+    logMessage('❌ [API] Ошибка завершения: $e', category: 'API', level: LogLevel.error);
+    rethrow;
   }
+}
 
   // ===== ЗАКАЗ =====
 

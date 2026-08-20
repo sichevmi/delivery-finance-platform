@@ -212,9 +212,13 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   if (_isLoading) return;
   
   try {
-    logMessage('🔄 [API] Обновление состояния смены ${state.shiftId}', category: 'API');
+    final currentWorkSeconds = state.currentWorkTime.inSeconds;
+    
+    logMessage('🔄 [API] Обновление состояния смены ${state.shiftId}, workTime=$currentWorkSeconds сек', category: 'API');
+    
     await _apiService.updateShiftState(
       state.shiftId!,
+      durationSeconds: currentWorkSeconds,  // <-- ДОБАВЛЯЕМ
       totalPaidDistance: _roundToTwo(state.totalPaidDistance),
       totalIdleDistance: _roundToTwo(state.totalIdleDistance),
       totalOrderTimeSeconds: state.totalOrderTime.inSeconds,
@@ -478,6 +482,7 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
       
       await _apiService.pauseShift(
         state.shiftId!,
+        durationSeconds: state.currentWorkTime.inSeconds,  // <-- ДОБАВЛЯЕМ
         addedWorkSeconds: addedWork.inSeconds,
         addedIdleSeconds: addedIdle.inSeconds,
         totalPaidDistance: _roundToTwo(state.totalPaidDistance),
@@ -531,6 +536,7 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
       
       await _apiService.completeShift(
         state.shiftId!,
+        durationSeconds: state.totalWorkTime.inSeconds,  // <-- ДОБАВЛЯЕМ
         totalPaidDistance: _roundToTwo(state.totalPaidDistance),
         totalIdleDistance: _roundToTwo(state.totalIdleDistance),
         totalOrderTimeSeconds: state.totalOrderTime.inSeconds,

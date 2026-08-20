@@ -97,42 +97,44 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> pauseShift(
-    int shiftId, {
-    required int addedWorkSeconds,
-    required int addedIdleSeconds,
-    required double totalPaidDistance,
-    required double totalIdleDistance,
-    required int totalOrderTimeSeconds,
-    required int ordersCount,
-    required double totalIncome,
-    required double totalExpenses,
-    required double netProfit,
-  }) async {
-    try {
-      final data = {
-        'addedWorkSeconds': addedWorkSeconds,
-        'addedIdleSeconds': addedIdleSeconds,
-        'totalPaidDistance': totalPaidDistance,
-        'totalIdleDistance': totalIdleDistance,
-        'totalOrderTimeSeconds': totalOrderTimeSeconds,
-        'ordersCount': ordersCount,
-        'totalIncome': totalIncome,
-        'totalExpenses': totalExpenses,
-        'netProfit': netProfit,
-      };
-      
-      logMessage('⏸️ [API] Приостановка смены $shiftId', category: 'API');
-      
-      final response = await _dio.post(
-        '/shifts/$shiftId/pause',
-        data: data,
-      );
-      return response.data;
-    } catch (e) {
-      logMessage('⚠️ Ошибка приостановки смены: $e', category: 'API', level: LogLevel.error);
-      rethrow;
-    }
+  int shiftId, {
+  int? durationSeconds,  // <-- ДОБАВЛЯЕМ
+  required int addedWorkSeconds,
+  required int addedIdleSeconds,
+  required double totalPaidDistance,
+  required double totalIdleDistance,
+  required int totalOrderTimeSeconds,
+  required int ordersCount,
+  required double totalIncome,
+  required double totalExpenses,
+  required double netProfit,
+}) async {
+  try {
+    final data = {
+      'durationSeconds': durationSeconds,  // <-- ДОБАВЛЯЕМ
+      'addedWorkSeconds': addedWorkSeconds,
+      'addedIdleSeconds': addedIdleSeconds,
+      'totalPaidDistance': totalPaidDistance,
+      'totalIdleDistance': totalIdleDistance,
+      'totalOrderTimeSeconds': totalOrderTimeSeconds,
+      'ordersCount': ordersCount,
+      'totalIncome': totalIncome,
+      'totalExpenses': totalExpenses,
+      'netProfit': netProfit,
+    };
+    
+    logMessage('⏸️ [API] Приостановка смены $shiftId', category: 'API');
+    
+    final response = await _dio.post(
+      '/shifts/$shiftId/pause',
+      data: data,
+    );
+    return response.data;
+  } catch (e) {
+    logMessage('⚠️ Ошибка приостановки смены: $e', category: 'API', level: LogLevel.error);
+    rethrow;
   }
+}
 
   Future<Map<String, dynamic>> resumeShift(int shiftId) async {
     try {
@@ -149,71 +151,75 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> completeShift(
-    int shiftId, {
-    double? totalPaidDistance,
-    double? totalIdleDistance,
-    int? totalOrderTimeSeconds,
-    int? ordersCount,
-    double? totalIncome,
-    double? totalExpenses,
-    double? netProfit,
-  }) async {
-    try {
-      final data = <String, dynamic>{};
-      if (totalPaidDistance != null) data['totalPaidDistance'] = totalPaidDistance;
-      if (totalIdleDistance != null) data['totalIdleDistance'] = totalIdleDistance;
-      if (totalOrderTimeSeconds != null) data['totalOrderTimeSeconds'] = totalOrderTimeSeconds;
-      if (ordersCount != null) data['ordersCount'] = ordersCount;
-      if (totalIncome != null) data['totalIncome'] = totalIncome;
-      if (totalExpenses != null) data['totalExpenses'] = totalExpenses;
-      if (netProfit != null) data['netProfit'] = netProfit;
-      
-      logMessage('📤 [API] Завершение смены $shiftId', category: 'API');
-      
-      final response = await _dio.post(
-        '/shifts/$shiftId/complete',
-        data: data,
-      );
-      return response.data;
-    } catch (e) {
-      logMessage('⚠️ Ошибка завершения смены: $e', category: 'API', level: LogLevel.error);
-      rethrow;
-    }
+  int shiftId, {
+  int? durationSeconds,  // <-- ДОБАВЛЯЕМ
+  double? totalPaidDistance,
+  double? totalIdleDistance,
+  int? totalOrderTimeSeconds,
+  int? ordersCount,
+  double? totalIncome,
+  double? totalExpenses,
+  double? netProfit,
+}) async {
+  try {
+    final data = <String, dynamic>{};
+    if (durationSeconds != null) data['durationSeconds'] = durationSeconds;
+    if (totalPaidDistance != null) data['totalPaidDistance'] = totalPaidDistance;
+    if (totalIdleDistance != null) data['totalIdleDistance'] = totalIdleDistance;
+    if (totalOrderTimeSeconds != null) data['totalOrderTimeSeconds'] = totalOrderTimeSeconds;
+    if (ordersCount != null) data['ordersCount'] = ordersCount;
+    if (totalIncome != null) data['totalIncome'] = totalIncome;
+    if (totalExpenses != null) data['totalExpenses'] = totalExpenses;
+    if (netProfit != null) data['netProfit'] = netProfit;
+    
+    logMessage('📤 [API] Завершение смены $shiftId', category: 'API');
+    
+    final response = await _dio.post(
+      '/shifts/$shiftId/complete',
+      data: data,
+    );
+    return response.data;
+  } catch (e) {
+    logMessage('⚠️ Ошибка завершения смены: $e', category: 'API', level: LogLevel.error);
+    rethrow;
   }
+}
 
   // ===== ОБНОВЛЕНИЕ СОСТОЯНИЯ СМЕНЫ =====
   Future<Map<String, dynamic>> updateShiftState(
-    int shiftId, {
-    double? totalPaidDistance,
-    double? totalIdleDistance,
-    int? totalOrderTimeSeconds,
-    int? ordersCount,
-    double? totalIncome,
-    double? totalExpenses,
-    double? netProfit,
-  }) async {
-    try {
-      final data = <String, dynamic>{};
-      if (totalPaidDistance != null) data['totalPaidDistance'] = totalPaidDistance;
-      if (totalIdleDistance != null) data['totalIdleDistance'] = totalIdleDistance;
-      if (totalOrderTimeSeconds != null) data['totalOrderTimeSeconds'] = totalOrderTimeSeconds;
-      if (ordersCount != null) data['ordersCount'] = ordersCount;
-      if (totalIncome != null) data['totalIncome'] = totalIncome;
-      if (totalExpenses != null) data['totalExpenses'] = totalExpenses;
-      if (netProfit != null) data['netProfit'] = netProfit;
-      
-      logMessage('🔄 [API] Обновление состояния смены $shiftId', category: 'API');
-      
-      final response = await _dio.patch(
-        '/shifts/$shiftId/state',
-        data: data,
-      );
-      return response.data;
-    } catch (e) {
-      logMessage('⚠️ Ошибка обновления состояния смены: $e', category: 'API', level: LogLevel.error);
-      rethrow;
-    }
+  int shiftId, {
+  int? durationSeconds,  // <-- ДОБАВЛЯЕМ
+  double? totalPaidDistance,
+  double? totalIdleDistance,
+  int? totalOrderTimeSeconds,
+  int? ordersCount,
+  double? totalIncome,
+  double? totalExpenses,
+  double? netProfit,
+}) async {
+  try {
+    final data = <String, dynamic>{};
+    if (durationSeconds != null) data['durationSeconds'] = durationSeconds;
+    if (totalPaidDistance != null) data['totalPaidDistance'] = totalPaidDistance;
+    if (totalIdleDistance != null) data['totalIdleDistance'] = totalIdleDistance;
+    if (totalOrderTimeSeconds != null) data['totalOrderTimeSeconds'] = totalOrderTimeSeconds;
+    if (ordersCount != null) data['ordersCount'] = ordersCount;
+    if (totalIncome != null) data['totalIncome'] = totalIncome;
+    if (totalExpenses != null) data['totalExpenses'] = totalExpenses;
+    if (netProfit != null) data['netProfit'] = netProfit;
+    
+    logMessage('🔄 [API] Обновление состояния смены $shiftId', category: 'API');
+    
+    final response = await _dio.patch(
+      '/shifts/$shiftId/state',
+      data: data,
+    );
+    return response.data;
+  } catch (e) {
+    logMessage('⚠️ Ошибка обновления состояния смены: $e', category: 'API', level: LogLevel.error);
+    rethrow;
   }
+}
 
   // ===== ЗАКАЗЫ =====
 
