@@ -569,83 +569,95 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   // ============================================================
   
   void startOrder() {
-    if (!state.isActive || state.isPaused || state.isCompleted) {
-      logMessage('⚠️ [SHIFT] Нельзя начать заказ', category: 'SHIFT');
-      return;
-    }
-    if (state.isOnOrder) {
-      logMessage('⚠️ [SHIFT] Заказ уже активен', category: 'SHIFT');
-      return;
-    }
-    
-    final now = DateTime.now();
-    state = state.copyWith(
-      isOnOrder: true,
-      orderStartTime: now,
-      idleStartTime: null,
-    );
-    _saveShiftState();
-    logMessage('🟢 [SHIFT] Заказ начат', category: 'SHIFT');
+  if (!state.isActive || state.isPaused || state.isCompleted) {
+    logMessage('⚠️ [SHIFT] Нельзя начать заказ', category: 'SHIFT');
+    return;
+  }
+  if (state.isOnOrder) {
+    logMessage('⚠️ [SHIFT] Заказ уже активен', category: 'SHIFT');
+    return;
   }
   
-  void cancelOrder() {
-    if (!state.isOnOrder) return;
-    final now = DateTime.now();
-    state = state.copyWith(
-      isOnOrder: false,
-      orderStartTime: null,
-      idleStartTime: now,
-    );
-    _saveShiftState();
-    logMessage('❌ [SHIFT] Заказ отменён', category: 'SHIFT');
+  final now = DateTime.now();
+  
+  // ===== ВАЖНО: ФИКСИРУЕМ ВРЕМЯ ПРОСТОЯ =====
+  // Добавляем текущий период простоя к общему времени простоя
+  Duration addedIdle = Duration.zero;
+  if (state.idleStartTime != null) {
+    addedIdle = now.difference(state.idleStartTime!);
+    logMessage('📊 [SHIFT] Добавлено время простоя перед заказом: ${addedIdle.inSeconds} сек', category: 'SHIFT');
   }
   
-  void finishOrder({
-    required double paidDistance,
-    required double income,
-    required double expenses,
-    required Duration orderDuration,
-  }) {
-    if (!state.isOnOrder) {
-      logMessage('⚠️ [SHIFT] Заказ не активен', category: 'SHIFT');
-      return;
-    }
-    
-    final now = DateTime.now();
-    final orderTime = now.difference(state.orderStartTime!);
-    
-    final unprocessedIdle = _roundToTwo(state.totalIdleDistance - state.processedIdleDistance);
-    final settings = _ref.read(settingsProvider);
-    final idleCost = _roundToTwo(_calculateIdleCost(unprocessedIdle, settings));
-    
-    if (unprocessedIdle > 0) {
-      logMessage('📊 [SHIFT] Списание холостого пробега: ${unprocessedIdle.toStringAsFixed(2)} км на сумму ${idleCost.toStringAsFixed(2)} руб', category: 'SHIFT');
-    }
-    
-    final newTotalExpenses = _roundToTwo(state.totalExpenses + expenses + idleCost);
-    final newNetProfit = _roundToTwo((state.totalIncome + income) - newTotalExpenses);
-    final newTotalPaidDistance = _roundToTwo(state.totalPaidDistance + paidDistance);
-    final newTotalOrderTime = state.totalOrderTime + orderTime;
-    
-    state = state.copyWith(
-      isOnOrder: false,
-      orderStartTime: null,
-      totalOrderTime: newTotalOrderTime,
-      totalPaidDistance: newTotalPaidDistance,
-      ordersCount: state.ordersCount + 1,
-      totalIncome: _roundToTwo(state.totalIncome + income),
-      totalExpenses: newTotalExpenses,
-      netProfit: newNetProfit,
-      idleStartTime: now,
-      processedIdleDistance: state.totalIdleDistance,
-    );
-    
-    // ===== СОХРАНЯЕМ И СИНХРОНИЗИРУЕМ СРАЗУ =====
-    _saveShiftState();
-    _syncShiftToServer();
-    
-    logMessage('✅ [SHIFT] Заказ завершён', category: 'SHIFT');
+  state = state.copyWith(
+    isOnOrder: true,
+    orderStartTime: now,
+    idleStartTime: null,  // Останавливаем подсчёт простоя
+    totalIdleTime: state.totalIdleTime + addedIdle,  // Сохраняем накопленное время простоя
+  );
+  
+  _saveShiftState();
+  logMessage('🟢 [SHIFT] Заказ начат, isOnOrder=${state.isOnOrder}', category: 'SHIFT');
+}
+
+void cancelOrder() {
+  if (!state.isOnOrder) return;
+  final now = DateTime.now();
+  state = state.copyWith(
+    isOnOrder: false,
+    orderStartTime: null,
+    idleStartTime: now,  // Возобновляем подсчёт простоя
+  );
+  _saveShiftState();
+  logMessage('❌ [SHIFT] Заказ отменён', category: 'SHIFT');
+}
+
+void finishOrder({
+  required double paidDistance,
+  required double income,
+  required double expenses,
+  required Duration orderDuration,
+}) {
+  if (!state.isOnOrder) {
+    logMessage('⚠️ [SHIFT] Заказ не активен', category: 'SHIFT');
+    return;
   }
+  
+  final now = DateTime.now();
+  final orderTime = now.difference(state.orderStartTime!);
+  
+  // ===== ВАЖНО: ВОЗОБНОВЛЯЕМ ПОДСЧЁТ ПРОСТОЯ ПОСЛЕ ЗАКАЗА =====
+  // Расходы на холостой пробег списываем при завершении заказа
+  final unprocessedIdle = _roundToTwo(state.totalIdleDistance - state.processedIdleDistance);
+  final settings = _ref.read(settingsProvider);
+  final idleCost = _roundToTwo(_calculateIdleCost(unprocessedIdle, settings));
+  
+  if (unprocessedIdle > 0) {
+    logMessage('📊 [SHIFT] Списание холостого пробега: ${unprocessedIdle.toStringAsFixed(2)} км на сумму ${idleCost.toStringAsFixed(2)} руб', category: 'SHIFT');
+  }
+  
+  final newTotalExpenses = _roundToTwo(state.totalExpenses + expenses + idleCost);
+  final newNetProfit = _roundToTwo((state.totalIncome + income) - newTotalExpenses);
+  final newTotalPaidDistance = _roundToTwo(state.totalPaidDistance + paidDistance);
+  final newTotalOrderTime = state.totalOrderTime + orderTime;
+  
+  state = state.copyWith(
+    isOnOrder: false,
+    orderStartTime: null,
+    totalOrderTime: newTotalOrderTime,
+    totalPaidDistance: newTotalPaidDistance,
+    ordersCount: state.ordersCount + 1,
+    totalIncome: _roundToTwo(state.totalIncome + income),
+    totalExpenses: newTotalExpenses,
+    netProfit: newNetProfit,
+    idleStartTime: now,  // Возобновляем подсчёт простоя
+    processedIdleDistance: state.totalIdleDistance,  // Весь холостой пробег списан
+  );
+  
+  _saveShiftState();
+  _syncShiftToServer();
+  
+  logMessage('✅ [SHIFT] Заказ завершён, idleStartTime обновлён', category: 'SHIFT');
+}
   
   // ============================================================
   // GPS

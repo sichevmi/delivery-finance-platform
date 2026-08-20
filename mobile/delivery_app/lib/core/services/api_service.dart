@@ -79,52 +79,49 @@ class ApiService {
   // ===== СМЕНА =====
 
   Future<Shift> startShift() async {
-  try {
-    logMessage('🔄 [API] startShift()', category: 'API');
-    
-    if (_cache.activeShift != null) {
-      logMessage('⚠️ [API] Уже есть смена id=${_cache.activeShift!.id}, status=${_cache.activeShift!.status}', category: 'API');
-      return _cache.activeShift!;
-    }
-    
-    final response = await _apiClient.startShift();
-    final shift = Shift.fromJson(response);
-    
-    // ===== ВАЖНО: ПРОВЕРЯЕМ СТАТУС =====
-    if (shift.status == 'active') {
-      // Если сервер вернул active, а должен был paused — обновляем статус
-      logMessage('⚠️ [API] Сервер вернул статус active, меняем на paused', category: 'API');
-      // Отправляем запрос на приостановку
-      await _apiClient.pauseShift(
-        shift.id,
-        addedWorkSeconds: 0,
-        addedIdleSeconds: 0,
-        totalPaidDistance: 0,
-        totalIdleDistance: 0,
-        totalOrderTimeSeconds: 0,
-        ordersCount: 0,
-        totalIncome: 0,
-        totalExpenses: 0,
-        netProfit: 0,
-      );
-      // Перезагружаем данные чтобы получить актуальный статус
-      await loadAllData();
-      final updatedShift = _cache.activeShift;
-      if (updatedShift != null) {
-        logMessage('✅ [API] Статус обновлён: ${updatedShift.status}', category: 'API');
-        return updatedShift;
+    try {
+      logMessage('🔄 [API] startShift()', category: 'API');
+      
+      if (_cache.activeShift != null) {
+        logMessage('⚠️ [API] Уже есть смена id=${_cache.activeShift!.id}, status=${_cache.activeShift!.status}', category: 'API');
+        return _cache.activeShift!;
       }
+      
+      final response = await _apiClient.startShift();
+      final shift = Shift.fromJson(response);
+      
+      // ===== ВАЖНО: ПРОВЕРЯЕМ СТАТУС =====
+      if (shift.status == 'active') {
+        logMessage('⚠️ [API] Сервер вернул статус active, меняем на paused', category: 'API');
+        await _apiClient.pauseShift(
+          shift.id,
+          addedWorkSeconds: 0,
+          addedIdleSeconds: 0,
+          totalPaidDistance: 0,
+          totalIdleDistance: 0,
+          totalOrderTimeSeconds: 0,
+          ordersCount: 0,
+          totalIncome: 0,
+          totalExpenses: 0,
+          netProfit: 0,
+        );
+        await loadAllData();
+        final updatedShift = _cache.activeShift;
+        if (updatedShift != null) {
+          logMessage('✅ [API] Статус обновлён: ${updatedShift.status}', category: 'API');
+          return updatedShift;
+        }
+        return shift;
+      }
+      
+      _cache.activeShift = shift;
+      logMessage('✅ [API] Создана смена id=${shift.id}, status=${shift.status}', category: 'API');
       return shift;
+    } catch (e) {
+      logMessage('❌ [API] Ошибка создания смены: $e', category: 'API', level: LogLevel.error);
+      rethrow;
     }
-    
-    _cache.activeShift = shift;
-    logMessage('✅ [API] Создана смена id=${shift.id}, status=${shift.status}', category: 'API');
-    return shift;
-  } catch (e) {
-    logMessage('❌ [API] Ошибка создания смены: $e', category: 'API', level: LogLevel.error);
-    rethrow;
   }
-}
 
   Future<void> pauseShift(
     int shiftId, {
@@ -170,35 +167,33 @@ class ApiService {
     }
   }
 
-  // В api_service.dart добавляем метод:
-
-Future<void> updateShiftState(
-  int shiftId, {
-  double? totalPaidDistance,
-  double? totalIdleDistance,
-  int? totalOrderTimeSeconds,
-  int? ordersCount,
-  double? totalIncome,
-  double? totalExpenses,
-  double? netProfit,
-}) async {
-  try {
-    logMessage('🔄 [API] Обновление состояния смены $shiftId', category: 'API');
-    await _apiClient.updateShiftState(
-      shiftId,
-      totalPaidDistance: totalPaidDistance,
-      totalIdleDistance: totalIdleDistance,
-      totalOrderTimeSeconds: totalOrderTimeSeconds,
-      ordersCount: ordersCount,
-      totalIncome: totalIncome,
-      totalExpenses: totalExpenses,
-      netProfit: netProfit,
-    );
-  } catch (e) {
-    logMessage('⚠️ [API] Ошибка обновления состояния смены: $e', category: 'API');
-    // Не выбрасываем исключение, чтобы не прерывать работу
+  Future<void> updateShiftState(
+    int shiftId, {
+    double? totalPaidDistance,
+    double? totalIdleDistance,
+    int? totalOrderTimeSeconds,
+    int? ordersCount,
+    double? totalIncome,
+    double? totalExpenses,
+    double? netProfit,
+  }) async {
+    try {
+      logMessage('🔄 [API] Обновление состояния смены $shiftId', category: 'API');
+      await _apiClient.updateShiftState(
+        shiftId,
+        totalPaidDistance: totalPaidDistance,
+        totalIdleDistance: totalIdleDistance,
+        totalOrderTimeSeconds: totalOrderTimeSeconds,
+        ordersCount: ordersCount,
+        totalIncome: totalIncome,
+        totalExpenses: totalExpenses,
+        netProfit: netProfit,
+      );
+      logMessage('✅ [API] Состояние смены обновлено', category: 'API');
+    } catch (e) {
+      logMessage('⚠️ [API] Ошибка обновления состояния смены: $e', category: 'API');
+    }
   }
-}
 
   Future<void> completeShift(
     int shiftId, {

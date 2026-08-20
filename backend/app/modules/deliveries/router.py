@@ -53,6 +53,7 @@ async def get_today_data(
                 "totalExpenses": order.total_expenses,
                 "netProfit": order.net_profit,
                 "totalTimeSeconds": order.total_time_seconds,
+                "shopAddress": order.shop_address,
                 "status": order.status,
                 "isSynced": order.is_synced,
                 "createdAt": order.created_at.isoformat() if order.created_at else None,
@@ -70,6 +71,7 @@ async def get_today_data(
                         "timeToClient": d.time_to_client,
                         "distanceToClient": d.distance_to_client,
                         "timeDelivery": d.time_delivery,
+                        "tip": d.tip or 0.0,
                         "status": d.status,
                         "isSynced": d.is_synced,
                     }
@@ -82,6 +84,18 @@ async def get_today_data(
         for s in shifts:
             duration = s.duration_seconds or 0
             order_time = s.total_order_time_seconds or 0
+            
+            # Если total_order_time не сохранён, вычисляем из доставок
+            if order_time == 0 and s.id:
+                shift_orders = db.query(Order).filter(Order.shift_id == s.id).all()
+                for o in shift_orders:
+                    deliveries = db.query(Delivery).filter(Delivery.order_id == o.id).all()
+                    if deliveries:
+                        first = deliveries[0]
+                        order_time += first.time_to_shop + first.time_receiving
+                        for d in deliveries:
+                            order_time += d.time_to_client + d.time_delivery
+            
             # Время простоя = длительность - время на заказах
             idle_time = max(0, duration - order_time)
             
@@ -93,7 +107,7 @@ async def get_today_data(
                 "durationSeconds": duration,
                 "totalPaidDistance": s.total_paid_distance or 0.0,
                 "totalIdleDistance": s.total_idle_distance or 0.0,
-                "totalOrderTimeSeconds": order_time,  # <-- ДОБАВЛЯЕМ
+                "totalOrderTimeSeconds": order_time,
                 "ordersCount": s.orders_count or 0,
                 "totalIncome": s.total_income or 0.0,
                 "totalExpenses": s.total_expenses or 0.0,
@@ -101,7 +115,9 @@ async def get_today_data(
                 "status": s.status,
                 "isSynced": s.is_synced,
                 "createdAt": s.created_at.isoformat() if s.created_at else None,
-                "totalIdleTimeSeconds": idle_time,  # <-- ДОБАВЛЯЕМ
+                "totalIdleTimeSeconds": idle_time,
+                "pausedAt": s.paused_at,
+                "resumedAt": s.resumed_at,
             })
         
         return {
@@ -235,6 +251,168 @@ async def start_shift(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.patch("/shifts/{shift_id}/state")
+async def update_shift_state(
+    shift_id: int,
+    request_data: Dict[str, Any],
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Обновить состояние смены (промежуточное сохранение)"""
+    try:
+        shift = db.query(Shift).filter(
+            Shift.id == shift_id,
+            Shift.user_id == current_user.id
+        ).first()
+        
+        if not shift:
+            raise HTTPException(status_code=404, detail="Смена не найдена")
+        
+        now = datetime.now(timezone.utc)
+        
+        # Обновляем только переданные поля
+        if 'totalPaidDistance' in request_data:
+            shift.total_paid_distance = request_data['totalPaidDistance']
+        if 'totalIdleDistance' in request_data:
+            shift.total_idle_distance = request_data['totalIdleDistance']
+        if 'totalOrderTimeSeconds' in request_data:
+            shift.total_order_time_seconds = request_data['totalOrderTimeSeconds']
+        if 'ordersCount' in request_data:
+            shift.orders_count = request_data['ordersCount']
+        if 'totalIncome' in request_data:
+            shift.total_income = request_data['totalIncome']
+        if 'totalExpenses' in request_data:
+            shift.total_expenses = request_data['totalExpenses']
+        if 'netProfit' in request_data:
+            shift.net_profit = request_data['netProfit']
+        
+        # Пересчитываем длительность, если есть start_time
+        if shift.start_time:
+            try:
+                start_str = shift.start_time
+                if start_str.endswith('Z'):
+                    start_str = start_str[:-1] + '+00:00'
+                start = datetime.fromisoformat(start_str)
+                if start.tzinfo is None:
+                    start = start.replace(tzinfo=timezone.utc)
+                shift.duration_seconds = int((now - start).total_seconds())
+                logger.info(f"📊 Обновлена длительность смены: {shift.duration_seconds} сек")
+            except Exception as e:
+                logger.warning(f"⚠️ Ошибка расчёта длительности: {e}")
+        
+        shift.updated_at = now
+        db.commit()
+        
+        logger.info(f"🔄 Обновлено состояние смены {shift_id}: duration={shift.duration_seconds} сек")
+        
+        return {"status": "ok", "shift": {"id": shift.id, "durationSeconds": shift.duration_seconds}}
+    except Exception as e:
+        logger.error(f"❌ Ошибка обновления состояния смены: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/shifts/{shift_id}/pause")
+async def pause_shift(
+    shift_id: int,
+    request_data: Dict[str, Any],
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Приостановить работу"""
+    shift = db.query(Shift).filter(
+        Shift.id == shift_id,
+        Shift.user_id == current_user.id
+    ).first()
+    
+    if not shift:
+        raise HTTPException(status_code=404, detail="Смена не найдена")
+    
+    if shift.status != 'active':
+        raise HTTPException(status_code=400, detail="Смена не активна")
+    
+    now = datetime.now(timezone.utc)
+    
+    # Сохраняем накопленные данные
+    shift.total_paid_distance = request_data.get('totalPaidDistance', 0.0)
+    shift.total_idle_distance = request_data.get('totalIdleDistance', 0.0)
+    shift.total_order_time_seconds = request_data.get('totalOrderTimeSeconds', 0)
+    shift.orders_count = request_data.get('ordersCount', 0)
+    shift.total_income = request_data.get('totalIncome', 0.0)
+    shift.total_expenses = request_data.get('totalExpenses', 0.0)
+    shift.net_profit = request_data.get('netProfit', 0.0)
+    
+    # ===== ВАЖНО: ЗАПОЛНЯЕМ paused_at =====
+    shift.status = 'paused'
+    shift.paused_at = now.isoformat()
+    shift.resumed_at = None  # Сбрасываем время возобновления
+    shift.updated_at = now
+    
+    # Пересчитываем длительность
+    if shift.start_time:
+        try:
+            start_str = shift.start_time
+            if start_str.endswith('Z'):
+                start_str = start_str[:-1] + '+00:00'
+            start = datetime.fromisoformat(start_str)
+            if start.tzinfo is None:
+                start = start.replace(tzinfo=timezone.utc)
+            shift.duration_seconds = int((now - start).total_seconds())
+        except Exception as e:
+            logger.warning(f"⚠️ Ошибка расчёта длительности: {e}")
+    
+    db.commit()
+    
+    logger.info(f"⏸️ Смена {shift_id} приостановлена, duration={shift.duration_seconds} сек, paused_at={shift.paused_at}")
+    
+    return {"status": "ok", "shift": {"id": shift.id, "status": "paused"}}
+
+
+@router.post("/shifts/{shift_id}/resume")
+async def resume_shift(
+    shift_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Возобновить работу"""
+    shift = db.query(Shift).filter(
+        Shift.id == shift_id,
+        Shift.user_id == current_user.id
+    ).first()
+    
+    if not shift:
+        raise HTTPException(status_code=404, detail="Смена не найдена")
+    
+    if shift.status != 'paused':
+        raise HTTPException(status_code=400, detail="Смена не приостановлена")
+    
+    now = datetime.now(timezone.utc)
+    
+    # ===== ВАЖНО: ЗАПОЛНЯЕМ resumed_at =====
+    shift.status = 'active'
+    shift.resumed_at = now.isoformat()
+    shift.paused_at = None  # Сбрасываем время паузы
+    shift.updated_at = now
+    
+    # Пересчитываем длительность
+    if shift.start_time:
+        try:
+            start_str = shift.start_time
+            if start_str.endswith('Z'):
+                start_str = start_str[:-1] + '+00:00'
+            start = datetime.fromisoformat(start_str)
+            if start.tzinfo is None:
+                start = start.replace(tzinfo=timezone.utc)
+            shift.duration_seconds = int((now - start).total_seconds())
+        except Exception as e:
+            logger.warning(f"⚠️ Ошибка расчёта длительности: {e}")
+    
+    db.commit()
+    
+    logger.info(f"▶️ Смена {shift_id} возобновлена, duration={shift.duration_seconds} сек, resumed_at={shift.resumed_at}")
+    
+    return {"status": "ok", "shift": {"id": shift.id, "status": "active"}}
+
+
 @router.post("/shifts/{shift_id}/complete")
 async def complete_shift(
     shift_id: int,
@@ -258,13 +436,13 @@ async def complete_shift(
         # ===== ОБНОВЛЯЕМ ВРЕМЯ =====
         shift.status = 'completed'
         shift.end_time = now.isoformat()
+        shift.paused_at = None
+        shift.resumed_at = None
         
         # ===== РАСЧЁТ ДЛИТЕЛЬНОСТИ =====
         if shift.start_time:
             try:
-                # Пробуем распарсить разными способами
                 start_str = shift.start_time
-                # Убираем Z в конце если есть
                 if start_str.endswith('Z'):
                     start_str = start_str[:-1] + '+00:00'
                 start = datetime.fromisoformat(start_str)
@@ -276,11 +454,31 @@ async def complete_shift(
                 logger.warning(f"⚠️ Ошибка расчёта длительности: {e}")
                 shift.duration_seconds = 0
         
+        # ===== ВЫЧИСЛЯЕМ ВРЕМЯ НА ЗАКАЗАХ ИЗ ДОСТАВОК =====
+        orders = db.query(Order).filter(
+            Order.shift_id == shift_id,
+            Order.user_id == current_user.id
+        ).all()
+        
+        total_order_time = 0
+        for order in orders:
+            deliveries = db.query(Delivery).filter(
+                Delivery.order_id == order.id
+            ).all()
+            
+            if deliveries:
+                first_delivery = deliveries[0]
+                order_time = first_delivery.time_to_shop + first_delivery.time_receiving
+                for d in deliveries:
+                    order_time += d.time_to_client + d.time_delivery
+                total_order_time += order_time
+        
+        logger.info(f"📊 Время на заказах: {total_order_time} сек")
+        
         # ===== СОХРАНЯЕМ СТАТИСТИКУ =====
-        # Используем данные из запроса или оставляем существующие
         shift.total_paid_distance = request_data.get('totalPaidDistance', shift.total_paid_distance or 0.0)
         shift.total_idle_distance = request_data.get('totalIdleDistance', shift.total_idle_distance or 0.0)
-        shift.total_order_time_seconds = request_data.get('totalOrderTimeSeconds', shift.total_order_time_seconds or 0)
+        shift.total_order_time_seconds = total_order_time
         shift.orders_count = request_data.get('ordersCount', shift.orders_count or 0)
         shift.total_income = request_data.get('totalIncome', shift.total_income or 0.0)
         shift.total_expenses = request_data.get('totalExpenses', shift.total_expenses or 0.0)
@@ -301,15 +499,20 @@ async def complete_shift(
                 "durationSeconds": shift.duration_seconds,
                 "totalPaidDistance": shift.total_paid_distance,
                 "totalIdleDistance": shift.total_idle_distance,
+                "totalOrderTimeSeconds": shift.total_order_time_seconds,
                 "ordersCount": shift.orders_count,
                 "totalIncome": shift.total_income,
                 "totalExpenses": shift.total_expenses,
                 "netProfit": shift.net_profit,
+                "pausedAt": shift.paused_at,
+                "resumedAt": shift.resumed_at,
             }
         }
     except Exception as e:
         logger.error(f"❌ Ошибка завершения смены: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============================================================
 # ЭНДПОИНТЫ ДЛЯ ЗАКАЗОВ С ДОСТАВКАМИ
 # ============================================================
@@ -369,7 +572,7 @@ async def create_order(
                 time_to_client=d_data.get("timeToClient", 0),
                 distance_to_client=d_data.get("distanceToClient", 0.0),
                 time_delivery=d_data.get("timeDelivery", 0),
-                tip=d_data.get("tip", 0.0),  # <-- ДОБАВЛЯЕМ
+                tip=d_data.get("tip", 0.0),
                 status='completed',
                 is_synced=True,
                 synced_at=now,
@@ -642,173 +845,4 @@ async def update_x5_settings(
             }
     except Exception as e:
         logger.error(f"❌ Ошибка обновления X5 настроек: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-# ===== ПРИОСТАНОВИТЬ СМЕНУ =====
-@router.post("/shifts/{shift_id}/pause")
-async def pause_shift(
-    shift_id: int,
-    request_data: Dict[str, Any],
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
-):
-    """Приостановить работу"""
-    shift = db.query(Shift).filter(
-        Shift.id == shift_id,
-        Shift.user_id == current_user.id
-    ).first()
-    
-    if not shift:
-        raise HTTPException(status_code=404, detail="Смена не найдена")
-    
-    if shift.status != 'active':
-        raise HTTPException(status_code=400, detail="Смена не активна")
-    
-    now = datetime.now(timezone.utc)
-    
-    # Сохраняем накопленные данные
-    shift.total_paid_distance = request_data.get('totalPaidDistance', 0.0)
-    shift.total_idle_distance = request_data.get('totalIdleDistance', 0.0)
-    shift.total_order_time_seconds = request_data.get('totalOrderTimeSeconds', 0)
-    shift.orders_count = request_data.get('ordersCount', 0)
-    shift.total_income = request_data.get('totalIncome', 0.0)
-    shift.total_expenses = request_data.get('totalExpenses', 0.0)
-    shift.net_profit = request_data.get('netProfit', 0.0)
-    
-    shift.status = 'paused'
-    shift.paused_at = now.isoformat()
-    shift.updated_at = now
-    db.commit()
-    
-    logger.info(f"⏸️ Смена {shift_id} приостановлена")
-    
-    return {"status": "ok", "shift": {"id": shift.id, "status": "paused"}}
-
-
-# ===== ВОЗОБНОВИТЬ СМЕНУ =====
-@router.post("/shifts/{shift_id}/resume")
-async def resume_shift(
-    shift_id: int,
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
-):
-    """Возобновить работу"""
-    shift = db.query(Shift).filter(
-        Shift.id == shift_id,
-        Shift.user_id == current_user.id
-    ).first()
-    
-    if not shift:
-        raise HTTPException(status_code=404, detail="Смена не найдена")
-    
-    if shift.status != 'paused':
-        raise HTTPException(status_code=400, detail="Смена не приостановлена")
-    
-    now = datetime.now(timezone.utc)
-    shift.status = 'active'
-    shift.resumed_at = now.isoformat()
-    shift.updated_at = now
-    db.commit()
-    
-    logger.info(f"▶️ Смена {shift_id} возобновлена")
-    
-    return {"status": "ok", "shift": {"id": shift.id, "status": "active"}}
-
-
-# ===== НАЧАТЬ НОВУЮ СМЕНУ (ВСЕГДА PAUSED) =====
-@router.post("/shifts/start")
-async def start_shift(
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
-):
-    """Создать новую приостановленную смену"""
-    # Проверяем существующую смену
-    existing = db.query(Shift).filter(
-        Shift.user_id == current_user.id,
-        Shift.status.in_(['active', 'paused'])
-    ).first()
-    
-    if existing:
-        return {
-            "id": existing.id,
-            "startTime": existing.start_time,
-            "status": existing.status,
-            "totalPaidDistance": existing.total_paid_distance,
-            "totalIdleDistance": existing.total_idle_distance,
-            "ordersCount": existing.orders_count,
-        }
-    
-    now = datetime.now(timezone.utc)
-    
-    shift = Shift(
-        user_id=current_user.id,
-        start_time=now.isoformat(),
-        status='paused',
-        total_paid_distance=0.0,
-        total_idle_distance=0.0,
-        orders_count=0,
-        total_income=0.0,
-        total_expenses=0.0,
-        net_profit=0.0,
-        is_synced=True,
-        synced_at=now,
-        created_at=now,
-        updated_at=now
-    )
-    db.add(shift)
-    db.commit()
-    db.refresh(shift)
-    
-    logger.info(f"📅 Создана новая смена id={shift.id}")
-    
-    return {
-        "id": shift.id,
-        "startTime": shift.start_time,
-        "status": shift.status,
-        "totalPaidDistance": shift.total_paid_distance,
-        "totalIdleDistance": shift.total_idle_distance,
-        "ordersCount": shift.orders_count,
-    }
-
-@router.patch("/shifts/{shift_id}/state")
-async def update_shift_state(
-    shift_id: int,
-    request_data: Dict[str, Any],
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
-):
-    """Обновить состояние смены (промежуточное сохранение)"""
-    try:
-        shift = db.query(Shift).filter(
-            Shift.id == shift_id,
-            Shift.user_id == current_user.id
-        ).first()
-        
-        if not shift:
-            raise HTTPException(status_code=404, detail="Смена не найдена")
-        
-        # Обновляем только переданные поля
-        if 'totalPaidDistance' in request_data:
-            shift.total_paid_distance = request_data['totalPaidDistance']
-        if 'totalIdleDistance' in request_data:
-            shift.total_idle_distance = request_data['totalIdleDistance']
-        if 'totalOrderTimeSeconds' in request_data:
-            shift.total_order_time_seconds = request_data['totalOrderTimeSeconds']
-        if 'ordersCount' in request_data:
-            shift.orders_count = request_data['ordersCount']
-        if 'totalIncome' in request_data:
-            shift.total_income = request_data['totalIncome']
-        if 'totalExpenses' in request_data:
-            shift.total_expenses = request_data['totalExpenses']
-        if 'netProfit' in request_data:
-            shift.net_profit = request_data['netProfit']
-        
-        shift.updated_at = datetime.now(timezone.utc)
-        db.commit()
-        
-        logger.info(f"🔄 Обновлено состояние смены {shift_id}")
-        
-        return {"status": "ok", "shift": {"id": shift.id}}
-    except Exception as e:
-        logger.error(f"❌ Ошибка обновления состояния смены: {e}")
         raise HTTPException(status_code=500, detail=str(e))

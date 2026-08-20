@@ -84,7 +84,7 @@ class ApiClient {
     }
   }
 
-  // ===== СМЕНЫ (НОВАЯ ЛОГИКА) =====
+  // ===== СМЕНЫ =====
 
   Future<Map<String, dynamic>> startShift() async {
     try {
@@ -181,6 +181,40 @@ class ApiClient {
     }
   }
 
+  // ===== ОБНОВЛЕНИЕ СОСТОЯНИЯ СМЕНЫ =====
+  Future<Map<String, dynamic>> updateShiftState(
+    int shiftId, {
+    double? totalPaidDistance,
+    double? totalIdleDistance,
+    int? totalOrderTimeSeconds,
+    int? ordersCount,
+    double? totalIncome,
+    double? totalExpenses,
+    double? netProfit,
+  }) async {
+    try {
+      final data = <String, dynamic>{};
+      if (totalPaidDistance != null) data['totalPaidDistance'] = totalPaidDistance;
+      if (totalIdleDistance != null) data['totalIdleDistance'] = totalIdleDistance;
+      if (totalOrderTimeSeconds != null) data['totalOrderTimeSeconds'] = totalOrderTimeSeconds;
+      if (ordersCount != null) data['ordersCount'] = ordersCount;
+      if (totalIncome != null) data['totalIncome'] = totalIncome;
+      if (totalExpenses != null) data['totalExpenses'] = totalExpenses;
+      if (netProfit != null) data['netProfit'] = netProfit;
+      
+      logMessage('🔄 [API] Обновление состояния смены $shiftId', category: 'API');
+      
+      final response = await _dio.patch(
+        '/shifts/$shiftId/state',
+        data: data,
+      );
+      return response.data;
+    } catch (e) {
+      logMessage('⚠️ Ошибка обновления состояния смены: $e', category: 'API', level: LogLevel.error);
+      rethrow;
+    }
+  }
+
   // ===== ЗАКАЗЫ =====
 
   Future<Map<String, dynamic>> createOrder(Map<String, dynamic> data) async {
@@ -264,39 +298,6 @@ class ApiClient {
       rethrow;
     }
   }
-
-  // В api_client.dart добавляем метод:
-
-Future<Map<String, dynamic>> updateShiftState(
-  int shiftId, {
-  double? totalPaidDistance,
-  double? totalIdleDistance,
-  int? totalOrderTimeSeconds,
-  int? ordersCount,
-  double? totalIncome,
-  double? totalExpenses,
-  double? netProfit,
-}) async {
-  try {
-    final data = <String, dynamic>{};
-    if (totalPaidDistance != null) data['totalPaidDistance'] = totalPaidDistance;
-    if (totalIdleDistance != null) data['totalIdleDistance'] = totalIdleDistance;
-    if (totalOrderTimeSeconds != null) data['totalOrderTimeSeconds'] = totalOrderTimeSeconds;
-    if (ordersCount != null) data['ordersCount'] = ordersCount;
-    if (totalIncome != null) data['totalIncome'] = totalIncome;
-    if (totalExpenses != null) data['totalExpenses'] = totalExpenses;
-    if (netProfit != null) data['netProfit'] = netProfit;
-    
-    final response = await _dio.patch(
-      '/shifts/$shiftId/state',
-      data: data,
-    );
-    return response.data;
-  } catch (e) {
-    logMessage('⚠️ Ошибка обновления состояния смены: $e', category: 'API', level: LogLevel.error);
-    rethrow;
-  }
-}
 
   Future<Map<String, dynamic>> updateX5Settings(Map<String, dynamic> x5Settings) async {
     try {
