@@ -13,6 +13,25 @@ import 'package:delivery_app/features/delivery/ui/tabs/directories_tab.dart';
 import 'package:delivery_app/features/delivery/ui/tabs/more_tab.dart';
 import 'package:delivery_app/core/services/api_service.dart';
 
+// ============================================================
+// ГЛОБАЛЬНЫЙ МЕНЕДЖЕР ДЛЯ КОЛИЧЕСТВА ЗАКАЗОВ
+// ============================================================
+class OrdersCountManager extends ChangeNotifier {
+  static final OrdersCountManager _instance = OrdersCountManager._internal();
+  factory OrdersCountManager() => _instance;
+  OrdersCountManager._internal();
+
+  int _count = 0;
+  int get count => _count;
+
+  void updateCount(int newCount) {
+    if (_count != newCount) {
+      _count = newCount;
+      notifyListeners();
+    }
+  }
+}
+
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -73,6 +92,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       }
       
       if (mounted) {
+        // Инициализируем менеджер заказов
+        final stats = ref.read(dailyStatsProvider);
+        OrdersCountManager().updateCount(stats.ordersCount);
+        
         setState(() => _isLoading = false);
       }
       logMessage('🔄 [HOME] _loadData() завершён', category: 'SYSTEM');
@@ -226,11 +249,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           ),
           const SizedBox(height: 12),
 
-          // ===== ПЕРВАЯ СТРОКА: Количество заказов =====
+          // ===== КОЛИЧЕСТВО ЗАКАЗОВ (обновляется только при завершении заказа) =====
           const _OrdersCountMetric(),
           const SizedBox(height: 10),
 
-          // ===== ВТОРАЯ И ТРЕТЬЯ СТРОКИ =====
+          // ===== МЕТРИКИ (обновляются каждую секунду) =====
           IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -436,18 +459,48 @@ class _MetricCard extends StatelessWidget {
 }
 
 // ============================================================
-// КОЛИЧЕСТВО ЗАКАЗОВ (ОБНОВЛЯЕТСЯ ТОЛЬКО ПРИ ИЗМЕНЕНИИ)
+// КОЛИЧЕСТВО ЗАКАЗОВ (ОБНОВЛЯЕТСЯ ТОЛЬКО ПРИ ЗАВЕРШЕНИИ ЗАКАЗА)
 // ============================================================
-class _OrdersCountMetric extends ConsumerWidget {
+class _OrdersCountMetric extends StatefulWidget {
   const _OrdersCountMetric({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Подписываемся только на ordersCount через select
-    final count = ref.watch(
-      dailyStatsProvider.select((stats) => stats.ordersCount),
-    );
+  State<_OrdersCountMetric> createState() => _OrdersCountMetricState();
+}
 
+class _OrdersCountMetricState extends State<_OrdersCountMetric> {
+  int _count = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _count = OrdersCountManager().count;
+    OrdersCountManager().addListener(_onCountChanged);
+  }
+
+  void _onCountChanged() {
+    if (mounted) {
+      final newCount = OrdersCountManager().count;
+      if (_count != newCount) {
+        setState(() => _count = newCount);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    OrdersCountManager().removeListener(_onCountChanged);
+    super.dispose();
+  }
+
+  String _getOrdersText(int count) {
+    if (count % 10 == 1 && count % 100 != 11) return 'заказ';
+    if (count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 10 || count % 100 >= 20)) return 'заказа';
+    return 'заказов';
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
       decoration: BoxDecoration(
@@ -461,7 +514,7 @@ class _OrdersCountMetric extends ConsumerWidget {
           const Icon(Icons.shopping_bag, size: 24, color: Color(0xFF6C63FF)),
           const SizedBox(width: 10),
           Text(
-            '$count',
+            '$_count',
             style: const TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.bold,
@@ -470,7 +523,7 @@ class _OrdersCountMetric extends ConsumerWidget {
           ),
           const SizedBox(width: 10),
           Text(
-            _getOrdersText(count),
+            _getOrdersText(_count),
             style: const TextStyle(
               fontSize: 16,
               color: Color(0xFF888888),
@@ -480,17 +533,12 @@ class _OrdersCountMetric extends ConsumerWidget {
       ),
     );
   }
-
-  String _getOrdersText(int count) {
-    if (count % 10 == 1 && count % 100 != 11) return 'заказ';
-    if (count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 10 || count % 100 >= 20)) return 'заказа';
-    return 'заказов';
-  }
 }
 
 // ============================================================
-// ПРОБЕГ (НЕЗАВИСИМЫЙ ВИДЖЕТ)
+// МЕТРИКИ (ОБНОВЛЯЮТСЯ КАЖДУЮ СЕКУНДУ)
 // ============================================================
+
 class _TotalDistanceMetric extends ConsumerStatefulWidget {
   const _TotalDistanceMetric({super.key});
 
@@ -537,9 +585,6 @@ class _TotalDistanceMetricState extends ConsumerState<_TotalDistanceMetric> {
   }
 }
 
-// ============================================================
-// ХОЛОСТОЙ ПРОБЕГ (НЕЗАВИСИМЫЙ ВИДЖЕТ)
-// ============================================================
 class _IdleDistanceMetric extends ConsumerStatefulWidget {
   const _IdleDistanceMetric({super.key});
 
@@ -586,9 +631,6 @@ class _IdleDistanceMetricState extends ConsumerState<_IdleDistanceMetric> {
   }
 }
 
-// ============================================================
-// ДОХОД (НЕЗАВИСИМЫЙ ВИДЖЕТ)
-// ============================================================
 class _ProfitMetric extends ConsumerStatefulWidget {
   const _ProfitMetric({super.key});
 
@@ -674,9 +716,6 @@ class _ProfitMetricState extends ConsumerState<_ProfitMetric> {
   }
 }
 
-// ============================================================
-// ПРИБЫЛЬ НА КМ (НЕЗАВИСИМЫЙ ВИДЖЕТ)
-// ============================================================
 class _ProfitPerKmMetric extends ConsumerStatefulWidget {
   const _ProfitPerKmMetric({super.key});
 
@@ -728,9 +767,6 @@ class _ProfitPerKmMetricState extends ConsumerState<_ProfitPerKmMetric> {
   }
 }
 
-// ============================================================
-// ПРИБЫЛЬ ЗА ЧАС (НЕЗАВИСИМЫЙ ВИДЖЕТ)
-// ============================================================
 class _ProfitPerHourMetric extends ConsumerStatefulWidget {
   const _ProfitPerHourMetric({super.key});
 
@@ -787,9 +823,6 @@ class _ProfitPerHourMetricState extends ConsumerState<_ProfitPerHourMetric> {
   }
 }
 
-// ============================================================
-// РАСХОД (НЕЗАВИСИМЫЙ ВИДЖЕТ)
-// ============================================================
 class _ExpensesMetric extends ConsumerStatefulWidget {
   const _ExpensesMetric({super.key});
 
@@ -859,7 +892,7 @@ class _ExpensesMetricState extends ConsumerState<_ExpensesMetric> {
 }
 
 // ============================================================
-// ВРЕМЯ РАБОТЫ (НЕЗАВИСИМЫЙ ВИДЖЕТ)
+// ТАЙМЕРЫ (ОБНОВЛЯЮТСЯ КАЖДУЮ СЕКУНДУ)
 // ============================================================
 class _TimeDisplay extends ConsumerStatefulWidget {
   const _TimeDisplay({super.key});
@@ -913,9 +946,6 @@ class _TimeDisplayState extends ConsumerState<_TimeDisplay> {
   }
 }
 
-// ============================================================
-// ВРЕМЯ ПРОСТОЯ (НЕЗАВИСИМЫЙ ВИДЖЕТ)
-// ============================================================
 class _IdleTimeDisplay extends ConsumerStatefulWidget {
   const _IdleTimeDisplay({super.key});
 
