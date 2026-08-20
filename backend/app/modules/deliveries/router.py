@@ -286,15 +286,31 @@ async def update_shift_state(
         if 'netProfit' in request_data:
             shift.net_profit = request_data['netProfit']
         
-        # ===== ВАЖНО: НЕ ПЕРЕСЧИТЫВАЕМ duration_seconds =====
-        # duration_seconds обновляется только при паузе или возобновлении
+        # ===== ПЕРЕСЧИТЫВАЕМ duration_seconds ЕСЛИ СМЕНА АКТИВНА =====
+        if shift.status == 'active' and shift.start_time and shift.resumed_at:
+            try:
+                start_str = shift.resumed_at
+                if start_str.endswith('Z'):
+                    start_str = start_str[:-1] + '+00:00'
+                start = datetime.fromisoformat(start_str)
+                if start.tzinfo is None:
+                    start = start.replace(tzinfo=timezone.utc)
+                
+                # Текущее время работы = накопленное + время с момента возобновления
+                added_work = int((now - start).total_seconds())
+                total_duration = (shift.duration_seconds or 0) + added_work
+                
+                # Обновляем duration_seconds на актуальное значение
+                shift.duration_seconds = total_duration
+                
+                logger.info(f"📊 Обновлена длительность: {shift.duration_seconds} сек (добавлено с resumed_at: {added_work})")
+            except Exception as e:
+                logger.warning(f"⚠️ Ошибка расчёта длительности: {e}")
         
         shift.updated_at = now
         db.commit()
         
-        logger.info(f"🔄 Обновлено состояние смены {shift_id}")
-        
-        return {"status": "ok", "shift": {"id": shift.id}}
+        return {"status": "ok", "shift": {"id": shift.id, "durationSeconds": shift.duration_seconds}}
     except Exception as e:
         logger.error(f"❌ Ошибка обновления состояния смены: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -321,13 +337,8 @@ async def pause_shift(
     
     now = datetime.now(timezone.utc)
     
-    # ===== ДОБАВЛЯЕМ ВРЕМЯ РАБОТЫ =====
     added_work_seconds = request_data.get('addedWorkSeconds', 0)
-    old_duration = shift.duration_seconds or 0
-    shift.duration_seconds = old_duration + added_work_seconds
-    logger.info(f"📊 Добавлено времени работы: {added_work_seconds} сек, всего: {shift.duration_seconds} сек")
     
-    # Сохраняем накопленные данные
     shift.total_paid_distance = request_data.get('totalPaidDistance', 0.0)
     shift.total_idle_distance = request_data.get('totalIdleDistance', 0.0)
     shift.total_order_time_seconds = request_data.get('totalOrderTimeSeconds', 0)
@@ -335,6 +346,11 @@ async def pause_shift(
     shift.total_income = request_data.get('totalIncome', 0.0)
     shift.total_expenses = request_data.get('totalExpenses', 0.0)
     shift.net_profit = request_data.get('netProfit', 0.0)
+    
+    current_duration = shift.duration_seconds or 0
+    shift.duration_seconds = current_duration + added_work_seconds
+    
+    logger.info(f"📊 При паузе: было {current_duration} сек, добавлено {added_work_seconds} сек, стало {shift.duration_seconds} сек")
     
     shift.status = 'paused'
     shift.paused_at = now.isoformat()
@@ -400,22 +416,20 @@ async def complete_shift(
 
         now = datetime.now(timezone.utc)
         
-        # Если смена активна — сначала приостанавливаем
-        if shift.status == 'active':
-            # Считаем время с последнего возобновления
-            if shift.resumed_at:
-                try:
-                    resumed_str = shift.resumed_at
-                    if resumed_str.endswith('Z'):
-                        resumed_str = resumed_str[:-1] + '+00:00'
-                    resumed = datetime.fromisoformat(resumed_str)
-                    if resumed.tzinfo is None:
-                        resumed = resumed.replace(tzinfo=timezone.utc)
-                    added_work = int((now - resumed).total_seconds())
-                    shift.duration_seconds = (shift.duration_seconds or 0) + added_work
-                    logger.info(f"📊 Добавлено времени работы при завершении: {added_work} сек")
-                except Exception as e:
-                    logger.warning(f"⚠️ Ошибка расчёта времени: {e}")
+        # Если смена активна — добавляем время с последнего возобновления
+        if shift.status == 'active' and shift.resumed_at:
+            try:
+                resumed_str = shift.resumed_at
+                if resumed_str.endswith('Z'):
+                    resumed_str = resumed_str[:-1] + '+00:00'
+                resumed = datetime.fromisoformat(resumed_str)
+                if resumed.tzinfo is None:
+                    resumed = resumed.replace(tzinfo=timezone.utc)
+                added_work = int((now - resumed).total_seconds())
+                shift.duration_seconds = (shift.duration_seconds or 0) + added_work
+                logger.info(f"📊 При завершении добавлено {added_work} сек, всего {shift.duration_seconds} сек")
+            except Exception as e:
+                logger.warning(f"⚠️ Ошибка расчёта времени: {e}")
         
         shift.status = 'completed'
         shift.end_time = now.isoformat()
@@ -455,8 +469,7 @@ async def complete_shift(
         db.commit()
         db.refresh(shift)
         
-        logger.info(f"✅ Смена завершена: id={shift_id}")
-        logger.info(f"📊 duration={shift.duration_seconds} сек, заказов={shift.orders_count}, доход={shift.total_income}")
+        logger.info(f"✅ Смена завершена: id={shift_id}, duration={shift.duration_seconds} сек")
         
         return {
             "status": "ok",
