@@ -173,12 +173,29 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
   }
 
   // ===== 2. ПРИОРИТЕТНО ИСПОЛЬЗУЕМ ДАННЫЕ ИЗ shiftState =====
-  if (shiftState.totalIncome > 0) totalIncome = shiftState.totalIncome;
-  if (shiftState.totalExpenses > 0) totalExpenses = shiftState.totalExpenses;
-  if (shiftState.netProfit != 0) netProfit = shiftState.netProfit;
-  if (shiftState.ordersCount > 0) ordersCount = shiftState.ordersCount;
-  if (shiftState.totalPaidDistance > 0) totalPaid = shiftState.totalPaidDistance;
-  if (shiftState.totalIdleDistance > 0) totalIdleDistance = shiftState.totalIdleDistance;
+  if (shiftState.ordersCount > ordersCount) {
+    ordersCount = shiftState.ordersCount;
+  }
+  
+  if (shiftState.totalIncome > totalIncome) {
+    totalIncome = shiftState.totalIncome;
+  }
+  
+  if (shiftState.totalExpenses > totalExpenses) {
+    totalExpenses = shiftState.totalExpenses;
+  }
+  
+  if (shiftState.netProfit != 0 && shiftState.netProfit != netProfit) {
+    netProfit = shiftState.netProfit;
+  }
+  
+  if (shiftState.totalPaidDistance > totalPaid) {
+    totalPaid = shiftState.totalPaidDistance;
+  }
+  
+  if (shiftState.totalIdleDistance > totalIdleDistance) {
+    totalIdleDistance = shiftState.totalIdleDistance;
+  }
 
   // ===== 3. ВРЕМЯ РАБОТЫ И ПРОСТОЯ =====
   Duration totalWorkTime = Duration.zero;
@@ -195,7 +212,7 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
     totalIdleTime = shiftState.totalIdleTime;
   }
 
-  // ===== ОКРУГЛЯЕМ ВСЁ ДО 2 ЗНАКОВ =====
+  // ===== ОКРУГЛЯЕМ =====
   final roundToTwo = DailyStats._roundToTwo;
 
   return DailyStats(

@@ -199,7 +199,6 @@ async def start_shift(
 ):
     """Создать новую приостановленную смену"""
     try:
-        # Проверяем существующую смену
         existing = db.query(Shift).filter(
             Shift.user_id == current_user.id,
             Shift.status.in_(['active', 'paused'])
@@ -220,7 +219,7 @@ async def start_shift(
         shift = Shift(
             user_id=current_user.id,
             start_time=now.isoformat(),
-            status='paused',  # <-- ВАЖНО: ВСЕГДА PAUSED
+            status='paused',
             total_paid_distance=0.0,
             total_idle_distance=0.0,
             orders_count=0,
@@ -286,7 +285,7 @@ async def update_shift_state(
         if 'netProfit' in request_data:
             shift.net_profit = request_data['netProfit']
         
-        # Пересчитываем длительность, если есть start_time
+        # Пересчитываем длительность
         if shift.start_time:
             try:
                 start_str = shift.start_time
@@ -296,7 +295,7 @@ async def update_shift_state(
                 if start.tzinfo is None:
                     start = start.replace(tzinfo=timezone.utc)
                 shift.duration_seconds = int((now - start).total_seconds())
-                logger.info(f"📊 Обновлена длительность смены: {shift.duration_seconds} сек")
+                logger.info(f"📊 Обновлена длительность: {shift.duration_seconds} сек")
             except Exception as e:
                 logger.warning(f"⚠️ Ошибка расчёта длительности: {e}")
         
@@ -332,7 +331,6 @@ async def pause_shift(
     
     now = datetime.now(timezone.utc)
     
-    # Сохраняем накопленные данные
     shift.total_paid_distance = request_data.get('totalPaidDistance', 0.0)
     shift.total_idle_distance = request_data.get('totalIdleDistance', 0.0)
     shift.total_order_time_seconds = request_data.get('totalOrderTimeSeconds', 0)
@@ -341,13 +339,11 @@ async def pause_shift(
     shift.total_expenses = request_data.get('totalExpenses', 0.0)
     shift.net_profit = request_data.get('netProfit', 0.0)
     
-    # ===== ВАЖНО: ЗАПОЛНЯЕМ paused_at =====
     shift.status = 'paused'
     shift.paused_at = now.isoformat()
-    shift.resumed_at = None  # Сбрасываем время возобновления
+    shift.resumed_at = None
     shift.updated_at = now
     
-    # Пересчитываем длительность
     if shift.start_time:
         try:
             start_str = shift.start_time
@@ -362,7 +358,7 @@ async def pause_shift(
     
     db.commit()
     
-    logger.info(f"⏸️ Смена {shift_id} приостановлена, duration={shift.duration_seconds} сек, paused_at={shift.paused_at}")
+    logger.info(f"⏸️ Смена {shift_id} приостановлена, duration={shift.duration_seconds} сек")
     
     return {"status": "ok", "shift": {"id": shift.id, "status": "paused"}}
 
@@ -387,13 +383,11 @@ async def resume_shift(
     
     now = datetime.now(timezone.utc)
     
-    # ===== ВАЖНО: ЗАПОЛНЯЕМ resumed_at =====
     shift.status = 'active'
     shift.resumed_at = now.isoformat()
-    shift.paused_at = None  # Сбрасываем время паузы
+    shift.paused_at = None
     shift.updated_at = now
     
-    # Пересчитываем длительность
     if shift.start_time:
         try:
             start_str = shift.start_time
@@ -408,7 +402,7 @@ async def resume_shift(
     
     db.commit()
     
-    logger.info(f"▶️ Смена {shift_id} возобновлена, duration={shift.duration_seconds} сек, resumed_at={shift.resumed_at}")
+    logger.info(f"▶️ Смена {shift_id} возобновлена, duration={shift.duration_seconds} сек")
     
     return {"status": "ok", "shift": {"id": shift.id, "status": "active"}}
 
@@ -433,13 +427,11 @@ async def complete_shift(
 
         now = datetime.now(timezone.utc)
         
-        # ===== ОБНОВЛЯЕМ ВРЕМЯ =====
         shift.status = 'completed'
         shift.end_time = now.isoformat()
         shift.paused_at = None
         shift.resumed_at = None
         
-        # ===== РАСЧЁТ ДЛИТЕЛЬНОСТИ =====
         if shift.start_time:
             try:
                 start_str = shift.start_time
@@ -475,7 +467,6 @@ async def complete_shift(
         
         logger.info(f"📊 Время на заказах: {total_order_time} сек")
         
-        # ===== СОХРАНЯЕМ СТАТИСТИКУ =====
         shift.total_paid_distance = request_data.get('totalPaidDistance', shift.total_paid_distance or 0.0)
         shift.total_idle_distance = request_data.get('totalIdleDistance', shift.total_idle_distance or 0.0)
         shift.total_order_time_seconds = total_order_time
@@ -534,7 +525,6 @@ async def create_order(
 
         now = datetime.now(timezone.utc)
         
-        # Создаём заказ
         order = Order(
             user_id=current_user.id,
             shift_id=shift.id,
@@ -557,7 +547,6 @@ async def create_order(
         db.commit()
         db.refresh(order)
 
-        # Создаём доставки
         deliveries_data = data.get("deliveries", [])
         for d_data in deliveries_data:
             delivery = Delivery(
@@ -581,7 +570,6 @@ async def create_order(
             )
             db.add(delivery)
         
-        # Обновляем счётчики в смене
         shift.orders_count += 1
         shift.total_income += order.total_income
         shift.total_expenses += order.total_expenses

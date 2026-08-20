@@ -13,8 +13,8 @@ class Shift(Base):
     
     start_time = Column(String, nullable=True)
     end_time = Column(String, nullable=True)
-    paused_at = Column(String, nullable=True)      # <-- ДОБАВЛЯЕМ
-    resumed_at = Column(String, nullable=True)     # <-- ДОБАВЛЯЕМ
+    paused_at = Column(String, nullable=True)
+    resumed_at = Column(String, nullable=True)
     duration_seconds = Column(Integer, default=0)
     total_paid_distance = Column(Float, default=0)
     total_idle_distance = Column(Float, default=0)

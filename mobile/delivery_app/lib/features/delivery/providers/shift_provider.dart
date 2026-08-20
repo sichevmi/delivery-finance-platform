@@ -208,26 +208,26 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
 
   // ===== СИНХРОНИЗАЦИЯ С СЕРВЕРОМ =====
   Future<void> _syncShiftToServer() async {
-    if (!state.isActive || state.isCompleted || state.shiftId == null) return;
-    if (_isLoading) return;
-    
-    try {
-      // Отправляем текущее состояние смены на сервер
-      await _apiService.updateShiftState(
-        state.shiftId!,
-        totalPaidDistance: _roundToTwo(state.totalPaidDistance),
-        totalIdleDistance: _roundToTwo(state.totalIdleDistance),
-        totalOrderTimeSeconds: state.totalOrderTime.inSeconds,
-        ordersCount: state.ordersCount,
-        totalIncome: _roundToTwo(state.totalIncome),
-        totalExpenses: _roundToTwo(state.totalExpenses),
-        netProfit: _roundToTwo(state.netProfit),
-      );
-      logMessage('🔄 [SHIFT] Синхронизация с сервером выполнена', category: 'SHIFT');
-    } catch (e) {
-      logMessage('⚠️ [SHIFT] Ошибка синхронизации: $e', category: 'SHIFT');
-    }
+  if (!state.isActive || state.isCompleted || state.shiftId == null) return;
+  if (_isLoading) return;
+  
+  try {
+    logMessage('🔄 [API] Обновление состояния смены ${state.shiftId}', category: 'API');
+    await _apiService.updateShiftState(
+      state.shiftId!,
+      totalPaidDistance: _roundToTwo(state.totalPaidDistance),
+      totalIdleDistance: _roundToTwo(state.totalIdleDistance),
+      totalOrderTimeSeconds: state.totalOrderTime.inSeconds,
+      ordersCount: state.ordersCount,
+      totalIncome: _roundToTwo(state.totalIncome),
+      totalExpenses: _roundToTwo(state.totalExpenses),
+      netProfit: _roundToTwo(state.netProfit),
+    );
+    logMessage('✅ [API] Состояние смены обновлено', category: 'API');
+  } catch (e) {
+    logMessage('⚠️ [SHIFT] Ошибка синхронизации: $e', category: 'SHIFT');
   }
+}
 
   // ===== ВСПОМОГАТЕЛЬНЫЙ МЕТОД ОКРУГЛЕНИЯ =====
   static double _roundToTwo(double value) {
@@ -625,8 +625,7 @@ void finishOrder({
   final now = DateTime.now();
   final orderTime = now.difference(state.orderStartTime!);
   
-  // ===== ВАЖНО: ВОЗОБНОВЛЯЕМ ПОДСЧЁТ ПРОСТОЯ ПОСЛЕ ЗАКАЗА =====
-  // Расходы на холостой пробег списываем при завершении заказа
+  // ===== РАСЧЁТ ХОЛОСТОГО ПРОБЕГА =====
   final unprocessedIdle = _roundToTwo(state.totalIdleDistance - state.processedIdleDistance);
   final settings = _ref.read(settingsProvider);
   final idleCost = _roundToTwo(_calculateIdleCost(unprocessedIdle, settings));
@@ -635,6 +634,7 @@ void finishOrder({
     logMessage('📊 [SHIFT] Списание холостого пробега: ${unprocessedIdle.toStringAsFixed(2)} км на сумму ${idleCost.toStringAsFixed(2)} руб', category: 'SHIFT');
   }
   
+  // ===== ОБНОВЛЯЕМ СОСТОЯНИЕ =====
   final newTotalExpenses = _roundToTwo(state.totalExpenses + expenses + idleCost);
   final newNetProfit = _roundToTwo((state.totalIncome + income) - newTotalExpenses);
   final newTotalPaidDistance = _roundToTwo(state.totalPaidDistance + paidDistance);
@@ -649,14 +649,26 @@ void finishOrder({
     totalIncome: _roundToTwo(state.totalIncome + income),
     totalExpenses: newTotalExpenses,
     netProfit: newNetProfit,
-    idleStartTime: now,  // Возобновляем подсчёт простоя
-    processedIdleDistance: state.totalIdleDistance,  // Весь холостой пробег списан
+    idleStartTime: now,
+    processedIdleDistance: state.totalIdleDistance,
   );
   
+  // ===== СОХРАНЯЕМ ЛОКАЛЬНО =====
   _saveShiftState();
+  
+  // ===== ОБНОВЛЯЕМ НА СЕРВЕРЕ =====
   _syncShiftToServer();
   
-  logMessage('✅ [SHIFT] Заказ завершён, idleStartTime обновлён', category: 'SHIFT');
+  // ===== ВАЖНО: ПЕРЕЗАГРУЖАЕМ ДАННЫЕ С СЕРВЕРА =====
+  // Это нужно, чтобы получить актуальные данные из базы
+  // и избежать дублирования
+  _apiService.loadAllData().then((_) {
+    logMessage('📊 [SHIFT] Данные перезагружены после завершения заказа', category: 'SHIFT');
+  }).catchError((e) {
+    logMessage('⚠️ [SHIFT] Ошибка перезагрузки данных: $e', category: 'SHIFT');
+  });
+  
+  logMessage('✅ [SHIFT] Заказ завершён', category: 'SHIFT');
 }
   
   // ============================================================
