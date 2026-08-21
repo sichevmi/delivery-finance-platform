@@ -46,16 +46,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   ];
 
   bool _isLoading = true;
+  Timer? _midnightCheckTimer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadData();
+    
+    // Проверяем смену дня каждую минуту
+    _midnightCheckTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+      _checkDayChange();
+    });
   }
 
   @override
   void dispose() {
+    _midnightCheckTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -73,6 +80,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       }
       
       if (mounted) {
+        // Проверяем смену дня после загрузки
+        _checkDayChange();
         setState(() => _isLoading = false);
       }
       logMessage('🔄 [HOME] _loadData() завершён', category: 'SYSTEM');
@@ -81,6 +90,53 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  void _checkDayChange() {
+    final shiftState = ref.read(shiftProvider);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    // Если смена активна и есть время начала
+    if (shiftState.isActive && shiftState.shiftStartTime != null) {
+      final shiftDate = DateTime(
+        shiftState.shiftStartTime!.year,
+        shiftState.shiftStartTime!.month,
+        shiftState.shiftStartTime!.day,
+      );
+      
+      // Если смена началась не сегодня
+      if (shiftDate.isBefore(today)) {
+        logMessage('🔄 [HOME] Обнаружена смена за предыдущий день, завершаем...', category: 'SYSTEM');
+        _completePreviousShift();
+      }
+    }
+  }
+
+  Future<void> _completePreviousShift() async {
+    try {
+      logMessage('🔄 [HOME] Начинаем автоматическое завершение смены за предыдущий день', category: 'SYSTEM');
+      
+      final shiftNotifier = ref.read(shiftProvider.notifier);
+      
+      // Завершаем смену (это вызовет completeShift в shiftProvider)
+      await shiftNotifier.completeShift();
+      
+      // После завершения смены, принудительно перезагружаем данные
+      // чтобы получить новую смену на сегодня
+      final apiService = ApiService();
+      await apiService.loadAllData();
+      
+      // Обновляем статистику
+      await ref.refreshStats();
+      
+      // Принудительно перезагружаем состояние смены из кеша
+      await shiftNotifier.loadFromCache();
+      
+      logMessage('✅ [HOME] Смена успешно обновлена на сегодня', category: 'SYSTEM');
+    } catch (e) {
+      logMessage('⚠️ [HOME] Ошибка при смене дня: $e', category: 'SYSTEM', level: LogLevel.error);
     }
   }
 
