@@ -98,7 +98,7 @@ class ApiClient {
 
   Future<Map<String, dynamic>> pauseShift(
   int shiftId, {
-  int? durationSeconds,  // <-- ДОБАВЛЯЕМ
+  int? durationSeconds,
   required int addedWorkSeconds,
   required int addedIdleSeconds,
   required double totalPaidDistance,
@@ -111,7 +111,7 @@ class ApiClient {
 }) async {
   try {
     final data = {
-      'durationSeconds': durationSeconds,  // <-- ДОБАВЛЯЕМ
+      'durationSeconds': durationSeconds ?? 0,  // <-- ВСЕГДА передаём
       'addedWorkSeconds': addedWorkSeconds,
       'addedIdleSeconds': addedIdleSeconds,
       'totalPaidDistance': totalPaidDistance,
@@ -152,7 +152,7 @@ class ApiClient {
 
   Future<Map<String, dynamic>> completeShift(
   int shiftId, {
-  int? durationSeconds,  // <-- ДОБАВЛЯЕМ
+  int? durationSeconds,
   double? totalPaidDistance,
   double? totalIdleDistance,
   int? totalOrderTimeSeconds,
@@ -162,15 +162,16 @@ class ApiClient {
   double? netProfit,
 }) async {
   try {
-    final data = <String, dynamic>{};
-    if (durationSeconds != null) data['durationSeconds'] = durationSeconds;
-    if (totalPaidDistance != null) data['totalPaidDistance'] = totalPaidDistance;
-    if (totalIdleDistance != null) data['totalIdleDistance'] = totalIdleDistance;
-    if (totalOrderTimeSeconds != null) data['totalOrderTimeSeconds'] = totalOrderTimeSeconds;
-    if (ordersCount != null) data['ordersCount'] = ordersCount;
-    if (totalIncome != null) data['totalIncome'] = totalIncome;
-    if (totalExpenses != null) data['totalExpenses'] = totalExpenses;
-    if (netProfit != null) data['netProfit'] = netProfit;
+    final data = <String, dynamic>{
+      'durationSeconds': durationSeconds ?? 0,  // <-- ВСЕГДА передаём
+      'totalPaidDistance': totalPaidDistance ?? 0.0,
+      'totalIdleDistance': totalIdleDistance ?? 0.0,
+      'totalOrderTimeSeconds': totalOrderTimeSeconds ?? 0,
+      'ordersCount': ordersCount ?? 0,
+      'totalIncome': totalIncome ?? 0.0,
+      'totalExpenses': totalExpenses ?? 0.0,
+      'netProfit': netProfit ?? 0.0,
+    };
     
     logMessage('📤 [API] Завершение смены $shiftId', category: 'API');
     
@@ -188,7 +189,7 @@ class ApiClient {
   // ===== ОБНОВЛЕНИЕ СОСТОЯНИЯ СМЕНЫ =====
   Future<Map<String, dynamic>> updateShiftState(
   int shiftId, {
-  int? durationSeconds,  // <-- ДОБАВЛЯЕМ
+  int? durationSeconds,
   double? totalPaidDistance,
   double? totalIdleDistance,
   int? totalOrderTimeSeconds,

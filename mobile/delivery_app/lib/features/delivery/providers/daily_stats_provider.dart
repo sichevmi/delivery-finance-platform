@@ -1,7 +1,6 @@
 // lib/features/delivery/providers/daily_stats_provider.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:delivery_app/logger.dart';
-import 'package:delivery_app/core/services/api_service.dart';
 import 'package:delivery_app/features/delivery/providers/shift_provider.dart';
 import 'package:delivery_app/features/delivery/providers/settings_provider.dart';
 
@@ -100,6 +99,11 @@ class DailyStatsNotifier extends StateNotifier<DailyStats> {
 
   DailyStatsNotifier(this._ref) : super(DailyStats()) {
     _loadStats();
+    
+    // ===== ВАЖНО: Слушаем изменения shiftProvider =====
+    _ref.listen(shiftProvider, (previous, next) {
+      _loadStats();
+    });
   }
 
   Future<void> _loadStats() async {
@@ -150,68 +154,23 @@ extension DailyStatsExtensions on WidgetRef {
 
 // ===== ФУНКЦИЯ РАСЧЁТА =====
 Future<DailyStats> _calculateDailyStats(Ref ref) async {
-  final apiService = ApiService();
-  final cache = apiService.cache;
   final shiftState = ref.watch(shiftProvider);
   final settings = ref.watch(settingsProvider);
 
-  // ===== 1. СЧИТАЕМ ИЗ КЭША =====
-  int ordersCount = cache.todayOrders.length;
-  double totalPaid = 0.0;
-  double totalIncome = 0.0;
-  double totalExpenses = 0.0;
-  double netProfit = 0.0;
-  Duration totalOrderTime = Duration.zero;
-  double totalIdleDistance = 0.0;
-
-  for (final order in cache.todayOrders) {
-    totalPaid += order.totalPaidDistance;
-    totalIncome += order.totalIncome;
-    totalExpenses += order.totalExpenses;
-    netProfit += order.netProfit;
-    totalOrderTime += order.totalTime;
-  }
-
-  // ===== 2. ПРИОРИТЕТНО ИСПОЛЬЗУЕМ ДАННЫЕ ИЗ shiftState =====
-  if (shiftState.ordersCount > ordersCount) {
-    ordersCount = shiftState.ordersCount;
-  }
+  // ===== ВАЖНО: Используем ТОЛЬКО данные из shiftState =====
+  int ordersCount = shiftState.ordersCount;
+  double totalPaid = shiftState.totalPaidDistance;
+  double totalIncome = shiftState.totalIncome;
+  double totalExpenses = shiftState.totalExpenses;
+  double netProfit = shiftState.netProfit;
+  Duration totalOrderTime = shiftState.totalOrderTime;
+  double totalIdleDistance = shiftState.totalIdleDistance;
   
-  if (shiftState.totalIncome > totalIncome) {
-    totalIncome = shiftState.totalIncome;
-  }
+  // ===== ВРЕМЯ РАБОТЫ И ПРОСТОЯ =====
+  Duration totalWorkTime = shiftState.currentWorkTime;
+  Duration totalIdleTime = shiftState.currentIdleTime;
+  Duration totalOrderTimeFinal = shiftState.currentOrderTime;
   
-  if (shiftState.totalExpenses > totalExpenses) {
-    totalExpenses = shiftState.totalExpenses;
-  }
-  
-  if (shiftState.netProfit != 0 && shiftState.netProfit != netProfit) {
-    netProfit = shiftState.netProfit;
-  }
-  
-  if (shiftState.totalPaidDistance > totalPaid) {
-    totalPaid = shiftState.totalPaidDistance;
-  }
-  
-  if (shiftState.totalIdleDistance > totalIdleDistance) {
-    totalIdleDistance = shiftState.totalIdleDistance;
-  }
-
-  // ===== 3. ВРЕМЯ РАБОТЫ И ПРОСТОЯ =====
-  Duration totalWorkTime = Duration.zero;
-  Duration totalIdleTime = Duration.zero;
-
-  if (shiftState.isActive && !shiftState.isPaused && !shiftState.isCompleted) {
-    totalWorkTime = shiftState.currentWorkTime;
-    totalIdleTime = shiftState.currentIdleTime;
-  } else if (shiftState.isActive && shiftState.isPaused) {
-    totalWorkTime = shiftState.totalWorkTime;
-    totalIdleTime = shiftState.totalIdleTime;
-  } else {
-    totalWorkTime = shiftState.totalWorkTime;
-    totalIdleTime = shiftState.totalIdleTime;
-  }
-
   // ===== ОКРУГЛЯЕМ =====
   final roundToTwo = DailyStats._roundToTwo;
 
@@ -224,6 +183,6 @@ Future<DailyStats> _calculateDailyStats(Ref ref) async {
     netProfit: roundToTwo(netProfit),
     totalWorkTime: totalWorkTime,
     totalIdleTime: totalIdleTime,
-    totalOrderTime: totalOrderTime,
+    totalOrderTime: totalOrderTimeFinal,
   );
 }

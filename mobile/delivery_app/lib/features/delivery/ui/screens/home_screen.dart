@@ -7,6 +7,7 @@ import 'package:delivery_app/features/delivery/providers/shift_provider.dart';
 import 'package:delivery_app/features/delivery/providers/settings_provider.dart';
 import 'package:delivery_app/features/delivery/providers/tab_provider.dart';
 import 'package:delivery_app/features/delivery/providers/daily_stats_provider.dart';
+import 'package:delivery_app/features/delivery/providers/targets_provider.dart';
 import 'package:delivery_app/features/delivery/ui/tabs/orders_tab.dart';
 import 'package:delivery_app/features/delivery/ui/tabs/analytics_tab.dart';
 import 'package:delivery_app/features/delivery/ui/tabs/directories_tab.dart';
@@ -54,7 +55,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     WidgetsBinding.instance.addObserver(this);
     _loadData();
     
-    // Проверяем смену дня каждую минуту
     _midnightCheckTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
       _checkDayChange();
     });
@@ -68,37 +68,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   }
 
   Future<void> _loadData() async {
-    try {
-      logMessage('🔄 [HOME] _loadData() начат', category: 'SYSTEM');
-      final apiService = ApiService();
-      await apiService.loadAllData();
-      logMessage('🔄 [HOME] Данные загружены с сервера', category: 'SYSTEM');
-      
-      if (mounted) {
-        await ref.refreshStats();
-        logMessage('🔄 [HOME] Статистика обновлена', category: 'SYSTEM');
-      }
-      
-      if (mounted) {
-        // Проверяем смену дня после загрузки
-        _checkDayChange();
-        setState(() => _isLoading = false);
-      }
-      logMessage('🔄 [HOME] _loadData() завершён', category: 'SYSTEM');
-    } catch (e) {
-      logMessage('⚠️ [HOME] Ошибка загрузки данных: $e', category: 'SYSTEM', level: LogLevel.error);
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+  try {
+    logMessage('🔄 [HOME] _loadData() начат', category: 'SYSTEM');
+    
+    final apiService = ApiService();
+    await apiService.loadAllData();
+    logMessage('🔄 [HOME] Данные загружены с сервера', category: 'SYSTEM');
+    
+    final shiftNotifier = ref.read(shiftProvider.notifier);
+    await shiftNotifier.loadFromCache();
+    
+    if (mounted) {
+      await ref.read(dailyStatsProvider.notifier).refresh();
+      logMessage('🔄 [HOME] Статистика обновлена', category: 'SYSTEM');
+    }
+    
+    if (mounted) {
+      _checkDayChange();
+      setState(() => _isLoading = false);
+    }
+    logMessage('🔄 [HOME] _loadData() завершён', category: 'SYSTEM');
+  } catch (e) {
+    logMessage('⚠️ [HOME] Ошибка загрузки данных: $e', category: 'SYSTEM', level: LogLevel.error);
+    if (mounted) {
+      setState(() => _isLoading = false);
     }
   }
+}
 
   void _checkDayChange() {
     final shiftState = ref.read(shiftProvider);
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     
-    // Если смена активна и есть время начала
     if (shiftState.isActive && shiftState.shiftStartTime != null) {
       final shiftDate = DateTime(
         shiftState.shiftStartTime!.year,
@@ -106,7 +108,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         shiftState.shiftStartTime!.day,
       );
       
-      // Если смена началась не сегодня
       if (shiftDate.isBefore(today)) {
         logMessage('🔄 [HOME] Обнаружена смена за предыдущий день, завершаем...', category: 'SYSTEM');
         _completePreviousShift();
@@ -119,25 +120,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       logMessage('🔄 [HOME] Начинаем автоматическое завершение смены за предыдущий день', category: 'SYSTEM');
       
       final shiftNotifier = ref.read(shiftProvider.notifier);
-      
-      // Завершаем смену (это вызовет completeShift в shiftProvider)
       await shiftNotifier.completeShift();
       
-      // После завершения смены, принудительно перезагружаем данные
-      // чтобы получить новую смену на сегодня
-      final apiService = ApiService();
-      await apiService.loadAllData();
-      
-      // Обновляем статистику
-      await ref.refreshStats();
-      
-      // Принудительно перезагружаем состояние смены из кеша
-      await shiftNotifier.loadFromCache();
+      // ===== ВАЖНО: Обновляем статистику =====
+      if (mounted) {
+        await ref.read(dailyStatsProvider.notifier).refresh();
+      }
       
       logMessage('✅ [HOME] Смена успешно обновлена на сегодня', category: 'SYSTEM');
     } catch (e) {
       logMessage('⚠️ [HOME] Ошибка при смене дня: $e', category: 'SYSTEM', level: LogLevel.error);
     }
+  }
+
+  Color _getLoadFactorColor(double value) {
+    final targets = ref.watch(targetsProvider);
+    if (value >= targets.loadFactorGreen) return Colors.green;
+    if (value >= targets.loadFactorYellow) return Colors.amber;
+    return Colors.red;
+  }
+
+  Color _getOrdersPerHourColor(double value) {
+    final targets = ref.watch(targetsProvider);
+    if (value >= targets.ordersPerHourGreen) return Colors.green;
+    if (value >= targets.ordersPerHourYellow) return Colors.amber;
+    return Colors.red;
+  }
+
+  Color _getProfitPerHourColor(double value) {
+    final targets = ref.watch(targetsProvider);
+    if (value >= targets.profitPerHourGreen) return Colors.green;
+    if (value >= targets.profitPerHourYellow) return Colors.amber;
+    return Colors.red;
   }
 
   @override
@@ -323,6 +337,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           const SizedBox(height: 6),
 
           const _ExpensesMetric(),
+          const SizedBox(height: 6),
+
+          // ===== ДОПОЛНИТЕЛЬНЫЕ МЕТРИКИ ЭФФЕКТИВНОСТИ =====
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildEfficiencyMetric(
+                  shiftState.formattedOrderTime,
+                  'Время заказов',
+                  Icons.timer,
+                  Colors.teal,
+                ),
+                const SizedBox(width: 4),
+                _buildEfficiencyMetric(
+                  shiftState.formattedLoadFactor,
+                  'Загрузка',
+                  Icons.speed,
+                  _getLoadFactorColor(shiftState.loadFactor),
+                ),
+                const SizedBox(width: 4),
+                _buildEfficiencyMetric(
+                  shiftState.formattedOrdersPerHour,
+                  'Заказов/час',
+                  Icons.trending_up,
+                  _getOrdersPerHourColor(shiftState.ordersPerHour),
+                ),
+                const SizedBox(width: 4),
+                _buildEfficiencyMetric(
+                  shiftState.currentWorkTime.inSeconds >= 3600 
+                      ? '${shiftState.formattedEfficiency} ₽/ч'
+                      : '—',
+                  'Прибыль/час',
+                  Icons.attach_money,
+                  shiftState.currentWorkTime.inSeconds >= 3600 
+                      ? _getProfitPerHourColor(shiftState.efficiency)
+                      : Colors.grey,
+                ),
+              ],
+            ),
+          ),
           
           const Expanded(child: SizedBox()),
 
@@ -332,6 +387,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             child: _buildShiftButton(shiftState),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildEfficiencyMetric(String value, String label, IconData icon, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E1E),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFF2C2C2C), width: 0.5),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 12, color: color),
+                const SizedBox(width: 4),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 8,
+                color: Color(0xFF888888),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -361,7 +460,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           final notifier = ref.read(shiftProvider.notifier);
           await notifier.resumeShift();
           if (mounted) {
-            await ref.refreshStats();
+            await ref.read(dailyStatsProvider.notifier).refresh();
           }
         },
         style: ElevatedButton.styleFrom(
@@ -387,7 +486,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           final notifier = ref.read(shiftProvider.notifier);
           await notifier.pauseShift();
           if (mounted) {
-            await ref.refreshStats();
+            await ref.read(dailyStatsProvider.notifier).refresh();
           }
         },
         style: ElevatedButton.styleFrom(
@@ -784,7 +883,7 @@ class _ProfitPerKmMetricState extends ConsumerState<_ProfitPerKmMetric> {
 }
 
 // ============================================================
-// ПРИБЫЛЬ ЗА ЧАС
+// ПРИБЫЛЬ ЗА ЧАС (СТАРАЯ ВЕРСИЯ, НО ОСТАВЛЯЕМ ДЛЯ СОВМЕСТИМОСТИ)
 // ============================================================
 class _ProfitPerHourMetric extends ConsumerStatefulWidget {
   const _ProfitPerHourMetric({super.key});
