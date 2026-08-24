@@ -18,7 +18,10 @@ router = APIRouter()
 # ============================================================
 
 @router.get("/sync/today")
-async def get_today_data(...):
+async def get_today_data(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
     """Получение данных за сегодня"""
     try:
         today = date.today()
