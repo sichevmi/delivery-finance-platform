@@ -17,7 +17,12 @@ class SegmentContent extends StatelessWidget {
   final bool showManualClientInput;
   final bool isClientAddressManual;
   final String? manualClientAddress;
-  final double tip; // <-- ДОБАВЛЯЕМ
+  final double tip;
+  
+  // ===== ДОБАВЛЯЕМ КОНТРОЛЛЕРЫ =====
+  final TextEditingController? shopAddressController;
+  final TextEditingController? clientAddressController;
+  
   final ValueChanged<double> onWeightChanged;
   final ValueChanged<String> onApartmentChanged;
   final ValueChanged<bool> onPrivateHouseChanged;
@@ -27,7 +32,7 @@ class SegmentContent extends StatelessWidget {
   final VoidCallback onRetryClientGeocode;
   final ValueChanged<String> onManualClientAddressChanged;
   final VoidCallback onManualClientAddressConfirm;
-  final ValueChanged<double> onTipChanged; // <-- ДОБАВЛЯЕМ
+  final ValueChanged<double> onTipChanged;
 
   const SegmentContent({
     super.key,
@@ -46,6 +51,11 @@ class SegmentContent extends StatelessWidget {
     required this.isClientAddressManual,
     this.manualClientAddress,
     required this.tip,
+    
+    // ===== ДОБАВЛЯЕМ КОНТРОЛЛЕРЫ =====
+    this.shopAddressController,
+    this.clientAddressController,
+    
     required this.onWeightChanged,
     required this.onApartmentChanged,
     required this.onPrivateHouseChanged,
@@ -67,6 +77,7 @@ class SegmentContent extends StatelessWidget {
             title: 'Адрес магазина не определён. Введите адрес вручную:',
             hintText: 'Введите полный адрес магазина',
             manualAddress: manualShopAddress,
+            controller: shopAddressController, // <-- ПЕРЕДАЁМ КОНТРОЛЛЕР
             onChanged: onManualShopAddressChanged,
             onRetry: onRetryGeocode,
             onConfirm: onManualShopAddressConfirm,
@@ -124,6 +135,7 @@ class SegmentContent extends StatelessWidget {
             title: 'Адрес клиента не определён. Введите адрес вручную:',
             hintText: 'Введите полный адрес клиента',
             manualAddress: manualClientAddress,
+            controller: clientAddressController, // <-- ПЕРЕДАЁМ КОНТРОЛЛЕР
             onChanged: onManualClientAddressChanged,
             onRetry: onRetryClientGeocode,
             onConfirm: onManualClientAddressConfirm,
@@ -336,6 +348,7 @@ class _AddressInput extends StatelessWidget {
   final String title;
   final String hintText;
   final String? manualAddress;
+  final TextEditingController? controller; // <-- ДОБАВЛЯЕМ
   final ValueChanged<String> onChanged;
   final VoidCallback onRetry;
   final VoidCallback onConfirm;
@@ -344,6 +357,7 @@ class _AddressInput extends StatelessWidget {
     required this.title,
     required this.hintText,
     required this.manualAddress,
+    this.controller, // <-- ДОБАВЛЯЕМ
     required this.onChanged,
     required this.onRetry,
     required this.onConfirm,
@@ -351,11 +365,9 @@ class _AddressInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = TextEditingController(text: manualAddress);
-    controller.addListener(() {
-      onChanged(controller.text);
-    });
-
+    // ===== ВАЖНО: ИСПОЛЬЗУЕМ ПЕРЕДАННЫЙ КОНТРОЛЛЕР =====
+    final textController = controller ?? TextEditingController(text: manualAddress);
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -384,9 +396,11 @@ class _AddressInput extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         TextField(
-          controller: controller,
+          controller: textController, // <-- ИСПОЛЬЗУЕМ КОНТРОЛЛЕР
           style: const TextStyle(color: Colors.white),
           maxLines: 2,
+          keyboardType: TextInputType.streetAddress,
+          textInputAction: TextInputAction.done,
           decoration: InputDecoration(
             hintText: hintText,
             hintStyle: const TextStyle(color: Color(0xFF666666)),
@@ -402,6 +416,8 @@ class _AddressInput extends StatelessWidget {
             ),
             prefixIcon: const Icon(Icons.location_on, color: Color(0xFF6C63FF)),
           ),
+          onChanged: onChanged,
+          onSubmitted: (_) => onConfirm(),
         ),
         const SizedBox(height: 12),
         Row(
@@ -431,7 +447,7 @@ class _AddressInput extends StatelessWidget {
             Expanded(
               child: ElevatedButton(
                 onPressed: () {
-                  if (controller.text.trim().isEmpty) {
+                  if (textController.text.trim().isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Пожалуйста, введите адрес'),

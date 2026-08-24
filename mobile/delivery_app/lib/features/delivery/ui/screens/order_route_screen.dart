@@ -61,7 +61,7 @@ class _OrderRouteState {
   final String? manualClientAddress;
   final bool showManualShopInput;
   final bool showManualClientInput;
-  final double tip; // <-- ДОБАВЛЯЕМ ЧАЕВЫЕ
+  final double tip;
 
   _OrderRouteState({
     this.currentSegment = 0,
@@ -102,7 +102,7 @@ class _OrderRouteState {
     this.manualClientAddress,
     this.showManualShopInput = false,
     this.showManualClientInput = false,
-    this.tip = 0.0, // <-- ДОБАВЛЯЕМ
+    this.tip = 0.0,
   });
 
   _OrderRouteState copyWith({
@@ -144,7 +144,7 @@ class _OrderRouteState {
     String? manualClientAddress,
     bool? showManualShopInput,
     bool? showManualClientInput,
-    double? tip, // <-- ДОБАВЛЯЕМ
+    double? tip,
   }) {
     return _OrderRouteState(
       currentSegment: currentSegment ?? this.currentSegment,
@@ -185,7 +185,7 @@ class _OrderRouteState {
       manualClientAddress: manualClientAddress ?? this.manualClientAddress,
       showManualShopInput: showManualShopInput ?? this.showManualShopInput,
       showManualClientInput: showManualClientInput ?? this.showManualClientInput,
-      tip: tip ?? this.tip, // <-- ДОБАВЛЯЕМ
+      tip: tip ?? this.tip,
     );
   }
 }
@@ -213,6 +213,10 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   bool _isProcessing = false;
   late GpsService _gpsService;
   StreamSubscription<double>? _gpsSubscription;
+  
+  // ===== ДОБАВЛЯЕМ КОНТРОЛЛЕРЫ =====
+  final TextEditingController _shopAddressController = TextEditingController();
+  final TextEditingController _clientAddressController = TextEditingController();
 
   @override
   void initState() {
@@ -241,6 +245,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   @override
   void dispose() {
     _gpsSubscription?.cancel();
+    _shopAddressController.dispose();
+    _clientAddressController.dispose();
     super.dispose();
   }
 
@@ -314,7 +320,6 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
     });
   }
 
-  // ===== МЕТОД ДЛЯ ОБНОВЛЕНИЯ ЧАЕВЫХ =====
   void _updateTip(double value) {
     setState(() {
       _state = _state.copyWith(tip: value);
@@ -322,7 +327,6 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
     logMessage('📌 Чаевые обновлены: $value ₽', category: 'ORDER');
   }
 
-  // ===== МЕТОДЫ ДЛЯ РУЧНОГО ВВОДА АДРЕСА МАГАЗИНА =====
   void _retryGeocode() async {
     logMessage('🔄 Повторная попытка геокодирования адреса магазина', category: 'ORDER');
     if (_isProcessing) return;
@@ -376,8 +380,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   }
 
   void _onManualShopAddressConfirm() {
-    final address = _state.manualShopAddress?.trim();
-    if (address == null || address.isEmpty) {
+    final address = _shopAddressController.text.trim();
+    if (address.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -398,11 +402,11 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
         currentSegment: 1,
       );
     });
+    _shopAddressController.clear();
     _startSegment();
     logMessage('📌 Введён адрес магазина вручную: $address', category: 'ORDER');
   }
 
-  // ===== МЕТОДЫ ДЛЯ РУЧНОГО ВВОДА АДРЕСА КЛИЕНТА =====
   void _retryClientGeocode() async {
     logMessage('🔄 Повторная попытка геокодирования адреса клиента', category: 'ORDER');
     if (_isProcessing) return;
@@ -455,8 +459,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   }
 
   void _onManualClientAddressConfirm() {
-    final address = _state.manualClientAddress?.trim();
-    if (address == null || address.isEmpty) {
+    final address = _clientAddressController.text.trim();
+    if (address.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -476,6 +480,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
         currentSegment: 3,
       );
     });
+    _clientAddressController.clear();
     _startSegment();
     logMessage('📌 Введён адрес клиента вручную: $address', category: 'ORDER');
   }
@@ -726,7 +731,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
       timeToClient: _state.timeToClient,
       distanceToClient: _state.distanceToClient,
       timeDelivery: _state.timeDelivery,
-      tip: _state.tip, // <-- ДОБАВЛЯЕМ ЧАЕВЫЕ В ДОСТАВКУ
+      tip: _state.tip,
     );
 
     final updatedList = List<Delivery>.from(_state.completedDeliveries)..add(delivery);
@@ -832,7 +837,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
         timeToClient: _state.timeToClient,
         distanceToClient: _state.distanceToClient,
         timeDelivery: _state.timeDelivery,
-        tip: _state.tip, // <-- ДОБАВЛЯЕМ ЧАЕВЫЕ
+        tip: _state.tip,
       );
       newCompletedDeliveries.add(currentDelivery);
       logMessage('📦 Сохранена доставка #${_state.deliveryNumber} перед добавлением новой', category: 'ORDER');
@@ -875,7 +880,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
         manualClientAddress: _state.manualClientAddress,
         showManualShopInput: false,
         showManualClientInput: false,
-        tip: 0.0, // <-- СБРАСЫВАЕМ ЧАЕВЫЕ ДЛЯ НОВОЙ ДОСТАВКИ
+        tip: 0.0,
         coefficient: _state.coefficient,
       );
     });
@@ -996,7 +1001,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
               'timeToClient': d.timeToClient,
               'distanceToClient': d.distanceToClient,
               'timeDelivery': d.timeDelivery,
-              'tip': d.tip, // <-- ДОБАВЛЯЕМ ЧАЕВЫЕ В ОТПРАВКУ
+              'tip': d.tip,
               'status': d.status,
             }).toList(),
           };
@@ -1150,7 +1155,12 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
               showManualClientInput: _state.showManualClientInput,
               isClientAddressManual: _state.isClientAddressManual,
               manualClientAddress: _state.manualClientAddress,
-              tip: _state.tip, // <-- ДОБАВЛЯЕМ
+              tip: _state.tip,
+              
+              // ===== ПЕРЕДАЁМ КОНТРОЛЛЕРЫ =====
+              shopAddressController: _shopAddressController,
+              clientAddressController: _clientAddressController,
+              
               onWeightChanged: _updateWeight,
               onApartmentChanged: _updateApartment,
               onPrivateHouseChanged: _togglePrivateHouse,
@@ -1160,7 +1170,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
               onRetryClientGeocode: _retryClientGeocode,
               onManualClientAddressChanged: _onManualClientAddressChanged,
               onManualClientAddressConfirm: _onManualClientAddressConfirm,
-              onTipChanged: _updateTip, // <-- ДОБАВЛЯЕМ
+              onTipChanged: _updateTip,
             ),
             const SizedBox(height: 20),
             ActionButtons(
