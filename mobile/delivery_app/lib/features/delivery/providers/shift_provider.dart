@@ -652,15 +652,11 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     final now = DateTime.now();
     final orderTime = now.difference(state.orderStartTime!);
     
-    final unprocessedIdle = _roundToTwo(state.totalIdleDistance - state.processedIdleDistance);
-    final settings = _ref.read(settingsProvider);
-    final idleCost = _roundToTwo(_calculateIdleCost(unprocessedIdle, settings));
+    // ===== ВАЖНО: НЕ пересчитываем холостой пробег здесь! =====
+    // Расходы на холостой пробег уже добавлены в addIdleDistance()
     
-    if (unprocessedIdle > 0) {
-      logMessage('📊 [SHIFT] Списание холостого пробега: ${unprocessedIdle.toStringAsFixed(2)} км на сумму ${idleCost.toStringAsFixed(2)} руб', category: 'SHIFT');
-    }
-    
-    final newTotalExpenses = _roundToTwo(state.totalExpenses + expenses + idleCost);
+    // ===== ВАЖНО: Добавляем только расходы заказа + доход =====
+    final newTotalExpenses = _roundToTwo(state.totalExpenses + expenses);
     final newNetProfit = _roundToTwo((state.totalIncome + income) - newTotalExpenses);
     final newTotalPaidDistance = _roundToTwo(state.totalPaidDistance + paidDistance);
     final newTotalOrderTime = state.totalOrderTime + orderTime;
@@ -675,7 +671,7 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
       totalExpenses: newTotalExpenses,
       netProfit: newNetProfit,
       idleStartTime: now,
-      processedIdleDistance: state.totalIdleDistance,
+      processedIdleDistance: state.totalIdleDistance, // Просто фиксируем
     );
     
     _syncShiftToServer();
@@ -727,10 +723,12 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     
     logMessage('🔄 [SHIFT] Добавление холостого пробега: $distance км', category: 'SHIFT');
     
+    // ===== ВАЖНО: Добавляем расходы СРАЗУ =====
     final settings = _ref.read(settingsProvider);
     final fuelCostPerKm = (settings.fuelConsumption / 100) * settings.fuelPrice;
     final costPerKm = fuelCostPerKm + settings.repairCost;
     final idleCost = _roundToTwo(distance * costPerKm);
+    
     final newTotalIdleDistance = _roundToTwo(state.totalIdleDistance + distance);
     final newTotalExpenses = _roundToTwo(state.totalExpenses + idleCost);
     final newNetProfit = _roundToTwo(state.totalIncome - newTotalExpenses);
