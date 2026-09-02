@@ -20,7 +20,7 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
   final TextEditingController _customCoefficientController = TextEditingController();
   final TextEditingController _commentController = TextEditingController();
 
-  final List<double> _coefficients = [1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5];
+  final List<double> _coefficients = [1.0, 1.1, 1.2, 1.25, 1.5, 2.0, 2.5];
 
   @override
   void dispose() {
