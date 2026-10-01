@@ -33,6 +33,9 @@ class SegmentContent extends StatelessWidget {
   final ValueChanged<String> onManualClientAddressChanged;
   final VoidCallback onManualClientAddressConfirm;
   final ValueChanged<double> onTipChanged;
+  
+  // ===== ДОБАВЛЯЕМ КОЛБЭК ВОЗВРАТА =====
+  final VoidCallback? onReturnToShop;
 
   const SegmentContent({
     super.key,
@@ -66,6 +69,9 @@ class SegmentContent extends StatelessWidget {
     required this.onManualClientAddressChanged,
     required this.onManualClientAddressConfirm,
     required this.onTipChanged,
+    
+    // ===== ДОБАВЛЯЕМ КОЛБЭК ВОЗВРАТА =====
+    this.onReturnToShop,
   });
 
   @override
@@ -77,7 +83,7 @@ class SegmentContent extends StatelessWidget {
             title: 'Адрес магазина не определён. Введите адрес вручную:',
             hintText: 'Введите полный адрес магазина',
             manualAddress: manualShopAddress,
-            controller: shopAddressController, // <-- ПЕРЕДАЁМ КОНТРОЛЛЕР
+            controller: shopAddressController,
             onChanged: onManualShopAddressChanged,
             onRetry: onRetryGeocode,
             onConfirm: onManualShopAddressConfirm,
@@ -135,7 +141,7 @@ class SegmentContent extends StatelessWidget {
             title: 'Адрес клиента не определён. Введите адрес вручную:',
             hintText: 'Введите полный адрес клиента',
             manualAddress: manualClientAddress,
-            controller: clientAddressController, // <-- ПЕРЕДАЁМ КОНТРОЛЛЕР
+            controller: clientAddressController,
             onChanged: onManualClientAddressChanged,
             onRetry: onRetryClientGeocode,
             onConfirm: onManualClientAddressConfirm,
@@ -195,6 +201,23 @@ class SegmentContent extends StatelessWidget {
               tip: tip,
               onTipChanged: onTipChanged,
             ),
+            // ===== КНОПКА ВОЗВРАТА =====
+            if (onReturnToShop != null) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: onReturnToShop,
+                icon: const Icon(Icons.assignment_return),
+                label: const Text('Возврат в магазин'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.orange,
+                  side: const BorderSide(color: Colors.orange),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ],
           ],
         );
 
@@ -348,7 +371,7 @@ class _AddressInput extends StatelessWidget {
   final String title;
   final String hintText;
   final String? manualAddress;
-  final TextEditingController? controller; // <-- ДОБАВЛЯЕМ
+  final TextEditingController? controller;
   final ValueChanged<String> onChanged;
   final VoidCallback onRetry;
   final VoidCallback onConfirm;
@@ -357,7 +380,7 @@ class _AddressInput extends StatelessWidget {
     required this.title,
     required this.hintText,
     required this.manualAddress,
-    this.controller, // <-- ДОБАВЛЯЕМ
+    this.controller,
     required this.onChanged,
     required this.onRetry,
     required this.onConfirm,
@@ -365,7 +388,6 @@ class _AddressInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ===== ВАЖНО: ИСПОЛЬЗУЕМ ПЕРЕДАННЫЙ КОНТРОЛЛЕР =====
     final textController = controller ?? TextEditingController(text: manualAddress);
     
     return Column(
@@ -396,7 +418,7 @@ class _AddressInput extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         TextField(
-          controller: textController, // <-- ИСПОЛЬЗУЕМ КОНТРОЛЛЕР
+          controller: textController,
           style: const TextStyle(color: Colors.white),
           maxLines: 2,
           keyboardType: TextInputType.streetAddress,

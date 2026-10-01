@@ -13,8 +13,8 @@ class Shift {
   final String status;
   final Duration? totalIdleTime;
   final Duration? totalOrderTime;
-  final int? durationSeconds;      // <-- ДОБАВЛЯЕМ
-  final int? totalOrderTimeSeconds; // <-- ДОБАВЛЯЕМ
+  final int? durationSeconds;
+  final int? totalOrderTimeSeconds;
 
   Shift({
     required this.id,
@@ -34,12 +34,36 @@ class Shift {
     this.totalOrderTimeSeconds,
   });
 
+  /// Парсит дату из строки и приводит к ЛОКАЛЬНОМУ времени.
+  /// Если пришло без таймзоны — считаем UTC.
+  static DateTime _parseLocal(dynamic value) {
+    if (value is DateTime) return value.toLocal();
+    final s = value.toString();
+    final parsed = DateTime.parse(s);
+    // Если строка без таймзоны (нет 'Z' и нет '+/-' в конце) — считаем UTC
+    if (!s.contains('Z') && !s.contains('+') && !RegExp(r'-\d{2}:\d{2}$').hasMatch(s)) {
+      return DateTime.utc(
+        parsed.year,
+        parsed.month,
+        parsed.day,
+        parsed.hour,
+        parsed.minute,
+        parsed.second,
+        parsed.millisecond,
+        parsed.microsecond,
+      ).toLocal();
+    }
+    return parsed.toLocal();
+  }
+
   factory Shift.fromJson(Map<String, dynamic> json) {
     return Shift(
       id: json['id'],
-      startTime: DateTime.parse(json['startTime']),
-      endTime: json['endTime'] != null ? DateTime.parse(json['endTime']) : null,
-      duration: json['durationSeconds'] != null ? Duration(seconds: json['durationSeconds']) : null,
+      startTime: _parseLocal(json['startTime']),
+      endTime: json['endTime'] != null ? _parseLocal(json['endTime']) : null,
+      duration: json['durationSeconds'] != null
+          ? Duration(seconds: json['durationSeconds'])
+          : null,
       totalPaidDistance: _roundToTwo((json['totalPaidDistance'] ?? 0).toDouble()),
       totalIdleDistance: _roundToTwo((json['totalIdleDistance'] ?? 0).toDouble()),
       ordersCount: json['ordersCount'] ?? 0,
@@ -47,11 +71,11 @@ class Shift {
       totalExpenses: _roundToTwo((json['totalExpenses'] ?? 0).toDouble()),
       netProfit: _roundToTwo((json['netProfit'] ?? 0).toDouble()),
       status: json['status'] ?? 'active',
-      totalIdleTime: json['totalIdleTimeSeconds'] != null 
-          ? Duration(seconds: json['totalIdleTimeSeconds']) 
+      totalIdleTime: json['totalIdleTimeSeconds'] != null
+          ? Duration(seconds: json['totalIdleTimeSeconds'])
           : null,
-      totalOrderTime: json['totalOrderTimeSeconds'] != null 
-          ? Duration(seconds: json['totalOrderTimeSeconds']) 
+      totalOrderTime: json['totalOrderTimeSeconds'] != null
+          ? Duration(seconds: json['totalOrderTimeSeconds'])
           : null,
       durationSeconds: json['durationSeconds'],
       totalOrderTimeSeconds: json['totalOrderTimeSeconds'],

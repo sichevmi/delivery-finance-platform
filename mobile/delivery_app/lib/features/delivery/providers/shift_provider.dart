@@ -205,26 +205,35 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
   }
 
   Future<void> _checkDayChange() async {
-    if (_isCompleting) return;
-    
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    
-    if ((state.isActive || state.isPaused) && !state.isCompleted && state.shiftStartTime != null) {
-      final shiftDate = DateTime(
-        state.shiftStartTime!.year,
-        state.shiftStartTime!.month,
-        state.shiftStartTime!.day,
-      );
-      
-      if (shiftDate.isBefore(today)) {
-        logMessage('🔄 [SHIFT] Обнаружена смена за предыдущий день (${shiftDate.toLocal()}), автоматически завершаем...', category: 'SHIFT');
-        _isCompleting = true;
-        await _completePreviousShift();
-        _isCompleting = false;
-      }
+  if (_isCompleting) return;
+  if (!state.isActive && !state.isPaused) return;
+  if (state.isCompleted) return;
+  if (state.shiftStartTime == null) return;
+
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+
+  // ===== ВАЖНО: приводим к ЛОКАЛЬНОМУ времени! =====
+  final shiftStartLocal = state.shiftStartTime!.toLocal();
+  final shiftDate = DateTime(
+    shiftStartLocal.year,
+    shiftStartLocal.month,
+    shiftStartLocal.day,
+  );
+
+  if (shiftDate.isBefore(today)) {
+    logMessage(
+      '🔄 [SHIFT] Обнаружена смена за предыдущий день (${shiftDate.toLocal()}), автоматически завершаем...',
+      category: 'SHIFT',
+    );
+    _isCompleting = true;
+    try {
+      await _completePreviousShift();
+    } finally {
+      _isCompleting = false;
     }
   }
+}
 
   Future<void> _completePreviousShift() async {
     if (_isLoading) return;

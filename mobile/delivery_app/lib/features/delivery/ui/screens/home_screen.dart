@@ -47,89 +47,57 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   ];
 
   bool _isLoading = true;
-  Timer? _midnightCheckTimer;
+  bool _isLoadingData = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadData();
-    
-    _midnightCheckTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
-      _checkDayChange();
-    });
+    // ===== ВАЖНО: НЕ создаём _midnightCheckTimer здесь =====
+    // Проверка смены дня выполняется в ShiftNotifier каждую минуту
   }
 
   @override
   void dispose() {
-    _midnightCheckTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   Future<void> _loadData() async {
-  try {
-    logMessage('🔄 [HOME] _loadData() начат', category: 'SYSTEM');
-    
-    final apiService = ApiService();
-    await apiService.loadAllData();
-    logMessage('🔄 [HOME] Данные загружены с сервера', category: 'SYSTEM');
-    
-    final shiftNotifier = ref.read(shiftProvider.notifier);
-    await shiftNotifier.loadFromCache();
-    
-    if (mounted) {
-      await ref.read(dailyStatsProvider.notifier).refresh();
-      logMessage('🔄 [HOME] Статистика обновлена', category: 'SYSTEM');
+    if (_isLoadingData) {
+      logMessage('⚠️ [HOME] _loadData() уже выполняется, пропускаем', category: 'SYSTEM');
+      return;
     }
-    
-    if (mounted) {
-      _checkDayChange();
-      setState(() => _isLoading = false);
-    }
-    logMessage('🔄 [HOME] _loadData() завершён', category: 'SYSTEM');
-  } catch (e) {
-    logMessage('⚠️ [HOME] Ошибка загрузки данных: $e', category: 'SYSTEM', level: LogLevel.error);
-    if (mounted) {
-      setState(() => _isLoading = false);
-    }
-  }
-}
+    _isLoadingData = true;
 
-  void _checkDayChange() {
-    final shiftState = ref.read(shiftProvider);
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    
-    if (shiftState.isActive && shiftState.shiftStartTime != null) {
-      final shiftDate = DateTime(
-        shiftState.shiftStartTime!.year,
-        shiftState.shiftStartTime!.month,
-        shiftState.shiftStartTime!.day,
-      );
-      
-      if (shiftDate.isBefore(today)) {
-        logMessage('🔄 [HOME] Обнаружена смена за предыдущий день, завершаем...', category: 'SYSTEM');
-        _completePreviousShift();
-      }
-    }
-  }
-
-  Future<void> _completePreviousShift() async {
     try {
-      logMessage('🔄 [HOME] Начинаем автоматическое завершение смены за предыдущий день', category: 'SYSTEM');
-      
+      logMessage('🔄 [HOME] _loadData() начат', category: 'SYSTEM');
+
+      final apiService = ApiService();
+      await apiService.loadAllData();
+      logMessage('🔄 [HOME] Данные загружены с сервера', category: 'SYSTEM');
+
       final shiftNotifier = ref.read(shiftProvider.notifier);
-      await shiftNotifier.completeShift();
-      
-      // ===== ВАЖНО: Обновляем статистику =====
+      await shiftNotifier.loadFromCache();
+      logMessage('🔄 [HOME] Смена загружена', category: 'SYSTEM');
+
       if (mounted) {
         await ref.read(dailyStatsProvider.notifier).refresh();
+        logMessage('🔄 [HOME] Статистика обновлена', category: 'SYSTEM');
       }
-      
-      logMessage('✅ [HOME] Смена успешно обновлена на сегодня', category: 'SYSTEM');
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+      logMessage('🔄 [HOME] _loadData() завершён', category: 'SYSTEM');
     } catch (e) {
-      logMessage('⚠️ [HOME] Ошибка при смене дня: $e', category: 'SYSTEM', level: LogLevel.error);
+      logMessage('⚠️ [HOME] Ошибка загрузки данных: $e', category: 'SYSTEM', level: LogLevel.error);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    } finally {
+      _isLoadingData = false;
     }
   }
 
@@ -182,12 +150,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         title: const Text('FinFlow Доставка'),
         toolbarHeight: 44,
         actions: [
-          IconButton(icon: const Icon(Icons.notifications_outlined, size: 20), onPressed: () {}, padding: EdgeInsets.zero),
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined, size: 20),
+            onPressed: () {},
+            padding: EdgeInsets.zero,
+          ),
           CircleAvatar(
             radius: 12,
             backgroundColor: const Color(0xFF6C63FF),
             child: Text(
-              authState.user?.name.isNotEmpty == true ? authState.user!.name[0].toUpperCase() : 'К',
+              authState.user?.name.isNotEmpty == true
+                  ? authState.user!.name[0].toUpperCase()
+                  : 'К',
               style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
             ),
           ),
@@ -198,10 +172,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         index: selectedTab,
         children: [
           _buildHomeTab(shiftState, settings),
-          Navigator(key: _navigatorKeys[1], onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => const OrdersTab())),
-          Navigator(key: _navigatorKeys[2], onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => const DirectoriesTab())),
-          Navigator(key: _navigatorKeys[3], onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => const AnalyticsTab())),
-          Navigator(key: _navigatorKeys[4], onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => const MoreTab())),
+          Navigator(
+            key: _navigatorKeys[1],
+            onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => const OrdersTab()),
+          ),
+          Navigator(
+            key: _navigatorKeys[2],
+            onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => const DirectoriesTab()),
+          ),
+          Navigator(
+            key: _navigatorKeys[3],
+            onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => const AnalyticsTab()),
+          ),
+          Navigator(
+            key: _navigatorKeys[4],
+            onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => const MoreTab()),
+          ),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -214,10 +200,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             ref.read(selectedTabProvider.notifier).state = index;
           }
         },
-        items: List.generate(_tabLabels.length, (index) => BottomNavigationBarItem(
-          icon: Icon(_tabIcons[index]),
-          label: _tabLabels[index],
-        )),
+        items: List.generate(
+          _tabLabels.length,
+          (index) => BottomNavigationBarItem(
+            icon: Icon(_tabIcons[index]),
+            label: _tabLabels[index],
+          ),
+        ),
       ),
     );
   }
@@ -244,10 +233,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: shiftState.isActive && !shiftState.isPaused && !shiftState.isCompleted 
-                      ? Colors.green.withOpacity(0.15) 
-                      : shiftState.isPaused 
-                          ? Colors.orange.withOpacity(0.15) 
+                  color: shiftState.isActive && !shiftState.isPaused && !shiftState.isCompleted
+                      ? Colors.green.withOpacity(0.15)
+                      : shiftState.isPaused
+                          ? Colors.orange.withOpacity(0.15)
                           : Colors.grey.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(6),
                 ),
@@ -257,24 +246,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       width: 5,
                       height: 5,
                       decoration: BoxDecoration(
-                        color: shiftState.isActive && !shiftState.isPaused && !shiftState.isCompleted 
-                            ? Colors.green 
-                            : shiftState.isPaused 
-                                ? Colors.orange 
+                        color: shiftState.isActive && !shiftState.isPaused && !shiftState.isCompleted
+                            ? Colors.green
+                            : shiftState.isPaused
+                                ? Colors.orange
                                 : Colors.grey,
                         shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      shiftState.isCompleted ? 'Завершена' :
-                      shiftState.isPaused ? 'Приостановлена' : 
-                      shiftState.isActive ? 'Активна' : 'Не начата',
+                      shiftState.isCompleted
+                          ? 'Завершена'
+                          : shiftState.isPaused
+                              ? 'Приостановлена'
+                              : shiftState.isActive
+                                  ? 'Активна'
+                                  : 'Не начата',
                       style: TextStyle(
                         fontSize: 9,
-                        color: shiftState.isCompleted ? Colors.grey :
-                               shiftState.isPaused ? Colors.orange : 
-                               shiftState.isActive ? Colors.green : Colors.grey,
+                        color: shiftState.isCompleted
+                            ? Colors.grey
+                            : shiftState.isPaused
+                                ? Colors.orange
+                                : shiftState.isActive
+                                    ? Colors.green
+                                    : Colors.grey,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -366,19 +363,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                 ),
                 const SizedBox(width: 4),
                 _buildEfficiencyMetric(
-                  shiftState.currentWorkTime.inSeconds >= 3600 
+                  shiftState.currentWorkTime.inSeconds >= 3600
                       ? '${shiftState.formattedEfficiency} ₽/ч'
                       : '—',
                   'Прибыль/час',
                   Icons.attach_money,
-                  shiftState.currentWorkTime.inSeconds >= 3600 
+                  shiftState.currentWorkTime.inSeconds >= 3600
                       ? _getProfitPerHourColor(shiftState.efficiency)
                       : Colors.grey,
                 ),
               ],
             ),
           ),
-          
+
           const Expanded(child: SizedBox()),
 
           SizedBox(
@@ -410,7 +407,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                 const SizedBox(width: 4),
                 Text(
                   value,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -442,9 +439,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.grey,
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
         child: const Text(
           'Смена завершена',
@@ -452,7 +447,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         ),
       );
     }
-    
+
     if (shiftState.isPaused) {
       return ElevatedButton(
         onPressed: () async {
@@ -466,9 +461,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.green,
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -492,9 +485,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.orange,
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,

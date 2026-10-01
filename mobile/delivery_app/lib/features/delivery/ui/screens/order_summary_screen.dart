@@ -15,7 +15,13 @@ class OrderSummaryScreen extends ConsumerWidget {
   final double totalCost;
   final int totalTime;
   final double totalDistance;
-  final String? shopAddress; // <-- ДОБАВЛЯЕМ
+  final String? shopAddress;
+  
+  // ===== ДОБАВЛЯЕМ ПАРАМЕТРЫ ДЛЯ ПРАВИЛЬНОГО ОТОБРАЖЕНИЯ =====
+  final double? totalExpensesOverride;
+  final double? netProfitOverride;
+  final double? totalPaidDistanceOverride;
+  final bool isReturn; // <-- Флаг возврата
 
   const OrderSummaryScreen({
     super.key,
@@ -25,7 +31,11 @@ class OrderSummaryScreen extends ConsumerWidget {
     required this.totalCost,
     required this.totalTime,
     required this.totalDistance,
-    this.shopAddress, // <-- ДОБАВЛЯЕМ
+    this.shopAddress,
+    this.totalExpensesOverride,
+    this.netProfitOverride,
+    this.totalPaidDistanceOverride,
+    this.isReturn = false, // <-- По умолчанию false
   });
 
   String _formatTime(int seconds) {
@@ -47,32 +57,34 @@ class OrderSummaryScreen extends ConsumerWidget {
     final shopWeight = firstDelivery?.weight ?? 0.0;
     final shopCost = (pricing.receivingFee + (shopWeight * pricing.pricePerKg)) * coefficient;
 
-    // Платный пробег = сумма расстояний до клиентов по всем доставкам
-    final totalPaidDistance = deliveries.fold(0.0, (sum, d) => sum + d.distanceToClient);
+    // ===== ВАЖНО: ИСПОЛЬЗУЕМ ПЕРЕДАННЫЕ ЗНАЧЕНИЯ ЕСЛИ ОНИ ЕСТЬ =====
+    // Платный пробег
+    final double totalPaidDistance = totalPaidDistanceOverride ?? 
+        deliveries.fold<double>(0.0, (sum, d) => sum + (d.distanceToClient ?? 0.0));
 
-    // ОБЩИЙ пробег = пробег до магазина + все платные пробеги
-    final totalAllDistance = shopDistance + totalPaidDistance;
-
-    // ===== РАСЧЁТ РАСХОДОВ (из справочника) =====
+    // ОБЩИЙ пробег (если передан - используем его, иначе считаем)
+    final double totalAllDistance = totalDistance > 0 
+        ? totalDistance 
+        : (shopDistance + totalPaidDistance);
+    
+    // ===== РАСЧЁТ РАСХОДОВ =====
     final fuelCostPerKm = (settings.fuelConsumption / 100) * settings.fuelPrice;
     final totalFuelCost = totalAllDistance * fuelCostPerKm;
     final totalRepairCost = totalAllDistance * settings.repairCost;
-    final totalExpenses = totalFuelCost + totalRepairCost;
-
-    // Рассчитываем стоимость каждой доставки
-    double totalDeliveriesCost = 0.0;
-    for (final d in deliveries) {
-      final deliveryCost = (pricing.deliveryFee + (d.distanceToClient * pricing.pricePerKm)) * coefficient;
-      totalDeliveriesCost += deliveryCost;
-    }
-
-    final totalCostFinal = shopCost + totalDeliveriesCost;
-    final netProfit = totalCostFinal - totalExpenses;
+    final totalExpenses = totalExpensesOverride ?? (totalFuelCost + totalRepairCost);
+    
+    // ===== ВАЖНО: СТОИМОСТЬ ЗАКАЗА =====
+    // Если передан totalCost - используем его, иначе считаем по формуле
+    final totalCostFinal = totalCost;
+    
+    // ===== ВАЖНО: ЧИСТАЯ ПРИБЫЛЬ =====
+    final netProfit = netProfitOverride ?? (totalCostFinal - totalExpenses);
 
     // ===== ПОКАЗЫВАЕМ АДРЕС МАГАЗИНА =====
     final displayShopAddress = shopAddress ?? 'Адрес не определён';
 
     logMessage('🟢 OrderSummaryScreen: отображение сводки');
+    logMessage('   isReturn: $isReturn');
     logMessage('   shopAddress: $displayShopAddress');
     logMessage('   totalAllDistance: $totalAllDistance');
     logMessage('   totalExpenses: $totalExpenses');
@@ -197,7 +209,7 @@ class OrderSummaryScreen extends ConsumerWidget {
 
                   // Список доставок
                   ...deliveries.map((d) {
-                    final deliveryCost = (pricing.deliveryFee + (d.distanceToClient * pricing.pricePerKm)) * coefficient;
+                    final deliveryCost = (pricing.deliveryFee + ((d.distanceToClient ?? 0.0) * pricing.pricePerKm)) * coefficient;
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: _buildDeliveryCard(d, deliveryCost),
@@ -424,7 +436,7 @@ class OrderSummaryScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                _buildChip(Icons.route, '${d.distanceToClient.toStringAsFixed(2)} км', size: 12),
+                _buildChip(Icons.route, '${(d.distanceToClient ?? 0.0).toStringAsFixed(2)} км', size: 12),
               ],
             ),
           ),

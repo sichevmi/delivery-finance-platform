@@ -213,7 +213,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   bool _isProcessing = false;
   late GpsService _gpsService;
   StreamSubscription<double>? _gpsSubscription;
-  
+
   // ===== ДОБАВЛЯЕМ КОНТРОЛЛЕРЫ =====
   final TextEditingController _shopAddressController = TextEditingController();
   final TextEditingController _clientAddressController = TextEditingController();
@@ -222,13 +222,13 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   void initState() {
     super.initState();
     logMessage('🟢 OrderRouteScreen.initState()');
-    
+
     _gpsService = ref.read(gpsServiceProvider);
-    
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initOrderRoute();
       ref.read(shiftProvider.notifier).startOrder();
-      
+
       _gpsSubscription = _gpsService.distanceStream.listen((distance) {
         if (mounted) {
           setState(() {
@@ -487,7 +487,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
 
   Future<void> _handleMainAction() async {
     logMessage('🔵 [_handleMainAction] ВХОД, _isProcessing=$_isProcessing, сегмент=${_state.currentSegment}');
-    
+
     if (_isProcessing) {
       logMessage('⚠️ [_handleMainAction] ПРОПУСК: уже в обработке');
       return;
@@ -495,7 +495,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
     _isProcessing = true;
 
     logMessage('🟢 _handleMainAction() сегмент ${_state.currentSegment}');
-    
+
     final end = DateTime.now();
     if (_state.isPaused && _state.pauseStartTime != null) {
       final added = end.difference(_state.pauseStartTime!);
@@ -515,23 +515,23 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
     switch (_state.currentSegment) {
       case 0:
         logMessage('🔵 [_handleMainAction] КЕЙС 0: получение позиции для адреса магазина');
-        
+
         final pos = await _getCurrentPosition();
-        if (!mounted) { 
+        if (!mounted) {
           logMessage('⚠️ [_handleMainAction] КЕЙС 0: виджет не смонтирован');
-          _isProcessing = false; 
-          return; 
+          _isProcessing = false;
+          return;
         }
         String? addr;
         if (pos != null) {
           addr = await GeocoderService.reverseGeocode(
-            pos.latitude, 
+            pos.latitude,
             pos.longitude,
             onLog: (msg) => logMessage(msg, category: 'GEO'),
           );
         }
         final shopAddr = addr ?? 'Адрес не определён';
-        
+
         if (shopAddr == 'Адрес не определён') {
           setState(() {
             _state = _state.copyWith(
@@ -591,21 +591,21 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
       case 2:
         logMessage('🔵 [_handleMainAction] КЕЙС 2: получение позиции для адреса клиента');
         final posClient = await _getCurrentPosition();
-        if (!mounted) { 
+        if (!mounted) {
           logMessage('⚠️ [_handleMainAction] КЕЙС 2: виджет не смонтирован');
-          _isProcessing = false; 
-          return; 
+          _isProcessing = false;
+          return;
         }
         String? clientAddr;
         if (posClient != null) {
           clientAddr = await GeocoderService.reverseGeocode(
-            posClient.latitude, 
+            posClient.latitude,
             posClient.longitude,
             onLog: (msg) => logMessage(msg, category: 'GEO'),
           );
         }
         final clientAddress = clientAddr ?? 'Адрес не определён';
-        
+
         if (clientAddress == 'Адрес не определён') {
           setState(() {
             _state = _state.copyWith(
@@ -671,7 +671,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
           },
         );
       }
-      
+
       final lastPosition = await Geolocator.getLastKnownPosition();
       if (lastPosition != null) {
         return lastPosition;
@@ -694,7 +694,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   Future<void> _completeDelivery() async {
     logMessage('🔵 [_completeDelivery] ВХОД, deliveryNumber=${_state.deliveryNumber}');
     logMessage('🔵 [_completeDelivery] completedDeliveries до: ${_state.completedDeliveries.length}');
-    
+
     if (_state.completedDeliveries.any((d) => d.number == _state.deliveryNumber)) {
       logMessage('⚠️ [_completeDelivery] Доставка #${_state.deliveryNumber} уже завершена!');
       return;
@@ -817,12 +817,12 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   void _addDelivery() {
     logMessage('🔵 [_addDelivery] ВХОД, deliveryNumber=${_state.deliveryNumber}');
     logMessage('🔵 [_addDelivery] completedDeliveries до: ${_state.completedDeliveries.length}');
-    
+
     final alreadyExists = _state.completedDeliveries.any((d) => d.number == _state.deliveryNumber);
     logMessage('🔵 [_addDelivery] alreadyExists: $alreadyExists');
-    
+
     List<Delivery> newCompletedDeliveries = List.from(_state.completedDeliveries);
-    
+
     if (!alreadyExists && _state.clientAddress != null && _state.clientAddress != 'Адрес клиента будет определён позже') {
       logMessage('🔵 [_addDelivery] Сохраняем текущую доставку #${_state.deliveryNumber}');
       final currentDelivery = Delivery(
@@ -884,23 +884,387 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
         coefficient: _state.coefficient,
       );
     });
-    
+
     logMessage('🔵 [_addDelivery] После setState: deliveryNumber=${_state.deliveryNumber}, completedDeliveries=${_state.completedDeliveries.length}');
-    
+
     _gpsService.resetDistance();
     _startSegment();
     logMessage('🔵 [_addDelivery] ВЫХОД');
   }
 
-  void _cancelOrder() {
-    _gpsSubscription?.cancel();
-    ref.read(shiftProvider.notifier).cancelOrder();
-    Navigator.of(context).pop();
+  // ===== ОБРАБОТКА КНОПКИ "ОТМЕНИТЬ" =====
+  Future<void> _cancelOrder() async {
+    logMessage('🔵 [_cancelOrder] ВХОД, сегмент=${_state.currentSegment}', category: 'ORDER');
+
+    // На сегменте 0 (путь до магазина) — особый флоу
+    if (_state.currentSegment == 0) {
+      final shouldCancel = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          title: const Text(
+            'Отмена заказа',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: const Text(
+            'Заказ отменён. Мы учтём пройденный километраж до магазина как расходы.',
+            style: TextStyle(color: Color(0xFFB0B0B0)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text(
+                'Остаться',
+                style: TextStyle(color: Color(0xFF888888)),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+              ),
+              child: const Text(
+                'Отменить заказ',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldCancel == true && mounted) {
+        await _showCancelSummary();
+      }
+      return;
+    }
+
+    // На остальных сегментах — обычная отмена без учёта
+    final shouldCancel = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text(
+          'Отмена заказа',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'Вы уверены, что хотите отменить заказ?',
+          style: TextStyle(color: Color(0xFFB0B0B0)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(
+              'Нет',
+              style: TextStyle(color: Color(0xFF888888)),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text(
+              'Отменить',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldCancel == true && mounted) {
+      _gpsSubscription?.cancel();
+      ref.read(shiftProvider.notifier).cancelOrder();
+      if (mounted) Navigator.of(context).pop();
+    }
+  }
+
+  // ===== ЭКРАН ИТОГОВ ПРИ ОТМЕНЕ (сегмент 0) =====
+  Future<void> _showCancelSummary() async {
+    logMessage('🔵 [_showCancelSummary] ВХОД', category: 'ORDER');
+
+    if (_isProcessing) return;
+    _isProcessing = true;
+
+    // Сохраняем текущий пройденный путь до магазина
+    final end = DateTime.now();
+    setState(() {
+      _state = _state.copyWith(segmentEndTime: end);
+    });
+    _saveCurrentSegmentData();
+
+    final settings = ref.read(settingsProvider);
+    final fuelCostPerKm = (settings.fuelConsumption / 100) * settings.fuelPrice;
+    final totalCostPerKm = fuelCostPerKm + settings.repairCost;
+
+    // Пройденный путь до магазина
+    final distanceToShop = _getDistance();
+    final totalDistance = distanceToShop;
+
+    // Расходы на топливо + ремонт
+    final totalExpenses = _roundToTwo(totalDistance * totalCostPerKm);
+
+    // Доход = 0, т.к. ничего не заработали
+    const orderCost = 0.0;
+
+    // Чистая прибыль = −расходы (отрицательная)
+    final netProfit = _roundToTwo(orderCost - totalExpenses);
+
+    // Время на сегменте
+    final totalTime = _getSegmentTime();
+
+    logMessage('🔵 [_showCancelSummary] distance=$totalDistance, '
+        'expenses=$totalExpenses, income=$orderCost, profit=$netProfit', category: 'ORDER');
+
+    // Обновляем статистику смены: добавляем расходы и пробег
+    final shiftNotifier = ref.read(shiftProvider.notifier);
+    shiftNotifier.finishOrder(
+      paidDistance: totalDistance,
+      income: orderCost,
+      expenses: totalExpenses,
+      orderDuration: Duration(seconds: totalTime),
+    );
+
+    // Создаём фиктивную доставку для отображения в карточке магазина
+    final cancelDelivery = Delivery(
+      id: 0,
+      number: 1,
+      clientAddress: 'Заказ отменён',
+      apartment: '',
+      weight: 0,
+      timeToShop: totalTime,
+      distanceToShop: distanceToShop,
+      timeReceiving: 0,
+      timeToClient: 0,
+      distanceToClient: 0,
+      timeDelivery: 0,
+      tip: 0,
+    );
+
+    // Переход на экран итогов
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => OrderSummaryScreen(
+          serviceName: 'Отмена заказа',
+          coefficient: _state.coefficient,
+          deliveries: [cancelDelivery],
+          totalCost: orderCost, // 0
+          totalTime: totalTime,
+          totalDistance: totalDistance,
+          shopAddress: _state.shopAddressForOrder,
+          totalExpensesOverride: totalExpenses,
+          netProfitOverride: netProfit,
+          totalPaidDistanceOverride: 0.0, // платного пробега нет
+        ),
+      ),
+    ).then((result) async {
+      if (!mounted) {
+        _isProcessing = false;
+        return;
+      }
+
+      // После закрытия итогов — отправляем заказ на сервер
+      try {
+        final apiService = ApiService();
+        final orderData = {
+          'serviceName': 'Отмена заказа',
+          'coefficient': _state.coefficient,
+          'deliveryNumber': 1,
+          'totalPaidDistance': totalDistance,
+          'totalIncome': orderCost, // 0
+          'totalExpenses': totalExpenses,
+          'netProfit': netProfit, // отрицательная
+          'totalTimeSeconds': totalTime,
+          'shopAddress': _state.shopAddressForOrder ?? '',
+          'deliveries': [
+            {
+              'number': 1,
+              'clientAddress': 'Заказ отменён',
+              'apartment': '',
+              'weight': 0,
+              'timeToShop': totalTime,
+              'distanceToShop': distanceToShop,
+              'timeReceiving': 0,
+              'timeToClient': 0,
+              'distanceToClient': 0,
+              'timeDelivery': 0,
+              'tip': 0,
+              'status': 'cancelled',
+            }
+          ],
+        };
+        await apiService.createOrder(orderData);
+        logMessage('✅ Заказ-отмена создан на сервере', category: 'ORDER');
+      } catch (e) {
+        logMessage('❌ Ошибка создания заказа-отмены: $e', category: 'ORDER');
+      }
+
+      if (mounted) {
+        setState(() {
+          _state = _state.copyWith(shouldNavigateToHome: true);
+        });
+      }
+      _isProcessing = false;
+    });
+  }
+
+  // ===== МЕТОД ОБРАБОТКИ ВОЗВРАТА =====
+  Future<void> _handleReturnToShop() async {
+    logMessage('🔄 [_handleReturnToShop] ВХОД', category: 'ORDER');
+
+    // Показываем диалог подтверждения
+    final shouldReturn = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text('Возврат в магазин', style: TextStyle(color: Colors.white)),
+        content: const Text('Вы уверены, что хотите вернуть заказ в магазин?', style: TextStyle(color: Color(0xFFB0B0B0))),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отменить', style: TextStyle(color: Color(0xFF888888))),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF)),
+            child: const Text('Вернуть', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldReturn == true && mounted) {
+      _isProcessing = true;
+
+      final settings = ref.read(settingsProvider);
+      final fuelCostPerKm = (settings.fuelConsumption / 100) * settings.fuelPrice;
+      final totalCostPerKm = fuelCostPerKm + settings.repairCost;
+
+      // ===== ВАЖНО: Учитываем ОБА пробега =====
+      final distanceToShop = _state.distanceToShop;
+      final distanceToClient = _state.distanceToClient;
+      final totalDistance = distanceToShop + distanceToClient;
+
+      // Расходы по всей дистанции
+      final totalExpenses = _roundToTwo(totalDistance * totalCostPerKm);
+
+      // ===== ВАЖНО: Стоимость заказа = 175 ₽ (фиксированная) =====
+      final orderCost = 175.0;
+
+      // Чистая прибыль = стоимость заказа - расходы
+      final netProfit = _roundToTwo(orderCost - totalExpenses);
+
+      // Общее время
+      final totalTime = _calculateTotalTime();
+
+      logMessage('🔄 [_handleReturnToShop] distanceToShop=$distanceToShop, distanceToClient=$distanceToClient');
+      logMessage('🔄 [_handleReturnToShop] totalDistance=$totalDistance, totalExpenses=$totalExpenses');
+      logMessage('🔄 [_handleReturnToShop] orderCost=$orderCost, netProfit=$netProfit');
+
+      // Обновляем статистику смены
+      final shiftNotifier = ref.read(shiftProvider.notifier);
+      shiftNotifier.finishOrder(
+        paidDistance: totalDistance,
+        income: orderCost,
+        expenses: totalExpenses,
+        orderDuration: Duration(seconds: totalTime),
+      );
+
+      // ===== ВАЖНО: Создаём фиктивную доставку с данными =====
+      final returnDelivery = Delivery(
+        id: 0,
+        number: 1,
+        clientAddress: _state.clientAddress ?? 'Возврат в магазин',
+        apartment: '',
+        weight: _state.weight ?? 0,
+        timeToShop: _state.timeToShop,
+        distanceToShop: distanceToShop,
+        timeReceiving: _state.timeReceiving,
+        timeToClient: _state.timeToClient,
+        distanceToClient: distanceToClient,
+        timeDelivery: _state.timeDelivery,
+        tip: 0,
+      );
+
+      // Открываем экран итогов с этими данными
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => OrderSummaryScreen(
+            serviceName: 'Возврат в магазин',
+            coefficient: _state.coefficient,
+            deliveries: [returnDelivery],
+            totalCost: 175.0, // ===== ВАЖНО: Стоимость заказа = 175 ₽ =====
+            totalTime: totalTime,
+            totalDistance: totalDistance, // ===== ВАЖНО: Оба пробега =====
+            shopAddress: _state.shopAddressForOrder,
+            totalExpensesOverride: totalExpenses, // ===== ВАЖНО: Передаём расходы =====
+            netProfitOverride: 175.0 - totalExpenses, // ===== ВАЖНО: Передаём прибыль =====
+            totalPaidDistanceOverride: distanceToClient, // ===== ВАЖНО: Платный пробег =====
+            isReturn: true, // ===== ВАЖНО: Флаг возврата =====
+          ),
+        ),
+      ).then((result) async {
+        if (!mounted) { _isProcessing = false; return; }
+
+        if (result == true) {
+          _isProcessing = false;
+          if (mounted) {
+            setState(() {
+              _state = _state.copyWith(shouldNavigateToHome: true);
+            });
+          }
+        } else {
+          // Пользователь завершил заказ – отправляем на сервер
+          try {
+            final apiService = ApiService();
+            final orderData = {
+              'serviceName': 'Возврат в магазин',
+              'coefficient': _state.coefficient,
+              'deliveryNumber': _state.deliveryNumber,
+              'totalPaidDistance': totalDistance,
+              'totalIncome': orderCost,
+              'totalExpenses': totalExpenses,
+              'netProfit': netProfit,
+              'totalTimeSeconds': totalTime,
+              'shopAddress': _state.shopAddressForOrder ?? '',
+              'deliveries': [
+                {
+                  'number': 1,
+                  'clientAddress': _state.clientAddress ?? 'Возврат в магазин',
+                  'apartment': '',
+                  'weight': _state.weight ?? 0,
+                  'timeToShop': _state.timeToShop,
+                  'distanceToShop': distanceToShop,
+                  'timeReceiving': _state.timeReceiving,
+                  'timeToClient': _state.timeToClient,
+                  'distanceToClient': distanceToClient,
+                  'timeDelivery': _state.timeDelivery,
+                  'tip': 0,
+                  'status': 'completed',
+                }
+              ],
+            };
+            await apiService.createOrder(orderData);
+            logMessage('✅ Заказ возврата создан на сервере');
+          } catch (e) {
+            logMessage('❌ Ошибка создания заказа возврата: $e');
+          }
+
+          if (mounted) {
+            setState(() {
+              _state = _state.copyWith(shouldNavigateToHome: true);
+            });
+          }
+          _isProcessing = false;
+        }
+      });
+    }
   }
 
   void _showSummary(BuildContext context) {
     logMessage('🔵 [_showSummary] ВХОД, completedDeliveries=${_state.completedDeliveries.length}');
-    
+
     if (_isProcessing) {
       logMessage('⚠️ [_showSummary] ПРОПУСК: уже в обработке');
       return;
@@ -914,8 +1278,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
     final totalDistance = _calculateTotalDistance();
     final totalCost = _calculateTotalCost(pricing);
 
-    final firstDelivery = _state.completedDeliveries.isNotEmpty 
-        ? _state.completedDeliveries.first 
+    final firstDelivery = _state.completedDeliveries.isNotEmpty
+        ? _state.completedDeliveries.first
         : null;
     final shopDistance = firstDelivery?.distanceToShop ?? 0.0;
     final totalPaidDistance = _state.completedDeliveries.fold(0.0, (sum, d) => sum + d.distanceToClient);
@@ -947,12 +1311,12 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
       ),
     ).then((result) async {
       logMessage('🔵 [_showSummary] Возврат из OrderSummaryScreen, result=$result');
-      if (!mounted) { 
+      if (!mounted) {
         logMessage('⚠️ [_showSummary] виджет не смонтирован');
-        _isProcessing = false; 
-        return; 
+        _isProcessing = false;
+        return;
       }
-      
+
       if (result == true) {
         logMessage('🟢 Добавление ещё доставки');
         _isProcessing = false;
@@ -961,14 +1325,14 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
         logMessage('🟢 Завершение заказа через API');
         final shiftNotifier = ref.read(shiftProvider.notifier);
         final orderDuration = Duration(seconds: totalTime);
-        
+
         shiftNotifier.finishOrder(
           paidDistance: totalAllDistance,
           income: totalCost,
           expenses: totalExpenses,
           orderDuration: orderDuration,
         );
-        
+
         if (mounted) {
           try {
             await ref.refreshStats();
@@ -977,7 +1341,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
             logMessage('⚠️ Ошибка обновления статистики: $e', category: 'STATS');
           }
         }
-        
+
         try {
           final apiService = ApiService();
           final orderData = {
@@ -1005,7 +1369,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
               'status': d.status,
             }).toList(),
           };
-          
+
           logMessage('🔵 [_showSummary] Отправка заказа с ${_state.completedDeliveries.length} доставками');
           logMessage('🔵 [_showSummary] shopAddress: ${_state.shopAddressForOrder}');
           await apiService.createOrder(orderData);
@@ -1013,7 +1377,7 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
         } catch (e) {
           logMessage('❌ Ошибка создания заказа: $e');
         }
-        
+
         if (mounted) {
           setState(() {
             _state = _state.copyWith(shouldNavigateToHome: true);
@@ -1156,11 +1520,14 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
               isClientAddressManual: _state.isClientAddressManual,
               manualClientAddress: _state.manualClientAddress,
               tip: _state.tip,
-              
+
               // ===== ПЕРЕДАЁМ КОНТРОЛЛЕРЫ =====
               shopAddressController: _shopAddressController,
               clientAddressController: _clientAddressController,
-              
+
+              // ===== ПЕРЕДАЁМ КОЛБЭК ВОЗВРАТА =====
+              onReturnToShop: () => _handleReturnToShop(),
+
               onWeightChanged: _updateWeight,
               onApartmentChanged: _updateApartment,
               onPrivateHouseChanged: _togglePrivateHouse,
@@ -1185,5 +1552,9 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
         ),
       ),
     );
+  }
+
+  double _roundToTwo(double value) {
+    return double.parse(value.toStringAsFixed(2));
   }
 }
