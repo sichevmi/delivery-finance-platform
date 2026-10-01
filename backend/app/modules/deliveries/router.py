@@ -20,37 +20,39 @@ router = APIRouter()
 @router.get("/sync/today")
 async def get_today_data(
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user)
 ):
     """Получение данных за сегодня"""
     try:
         today = date.today()
-        
-        # ===== ВАЖНО: Ищем активные/паузные смены + смены за сегодня =====
+
         shifts = db.query(Shift).filter(
             Shift.user_id == current_user.id,
             or_(
                 Shift.status.in_(['active', 'paused']),
-                func.date(Shift.created_at) == today
-            )
+                func.date(Shift.created_at) == today,
+            ),
         ).order_by(Shift.created_at.desc()).all()
-        
-        # ===== ВАЖНО: Ищем заказы для активных смен =====
+
         active_shift_ids = [s.id for s in shifts if s.status in ['active', 'paused']]
-        
-        orders = db.query(Order).filter(
-            Order.user_id == current_user.id,
-            or_(
-                Order.shift_id.in_(active_shift_ids) if active_shift_ids else False,
-                func.date(Order.created_at) == today
-            )
-        ).order_by(Order.created_at.desc()).all()
-        
+
+        if active_shift_ids:
+            orders = db.query(Order).filter(
+                Order.user_id == current_user.id,
+                or_(
+                    Order.shift_id.in_(active_shift_ids),
+                    func.date(Order.created_at) == today,
+                ),
+            ).order_by(Order.created_at.desc()).all()
+        else:
+            orders = db.query(Order).filter(
+                Order.user_id == current_user.id,
+                func.date(Order.created_at) == today,
+            ).order_by(Order.created_at.desc()).all()
+
         orders_data = []
         for order in orders:
-            deliveries = db.query(Delivery).filter(
-                Delivery.order_id == order.id
-            ).all()
+            deliveries = db.query(Delivery).filter(Delivery.order_id == order.id).all()
             orders_data.append({
                 "id": order.id,
                 "localId": order.local_id,
@@ -86,16 +88,14 @@ async def get_today_data(
                         "isSynced": d.is_synced,
                     }
                     for d in deliveries
-                ]
+                ],
             })
-        
-        # ===== ВЫЧИСЛЯЕМ ВРЕМЯ ПРОСТОЯ ДЛЯ КАЖДОЙ СМЕНЫ =====
+
         shifts_data = []
         for s in shifts:
             duration = s.duration_seconds or 0
             order_time = s.total_order_time_seconds or 0
-            
-            # Если total_order_time не сохранён, вычисляем из доставок
+
             if order_time == 0 and s.id:
                 shift_orders = db.query(Order).filter(Order.shift_id == s.id).all()
                 for o in shift_orders:
@@ -105,10 +105,9 @@ async def get_today_data(
                         order_time += first.time_to_shop + first.time_receiving
                         for d in deliveries:
                             order_time += d.time_to_client + d.time_delivery
-            
-            # Время простоя = длительность - время на заказах
+
             idle_time = max(0, duration - order_time)
-            
+
             shifts_data.append({
                 "id": s.id,
                 "localId": s.local_id,
@@ -129,7 +128,7 @@ async def get_today_data(
                 "pausedAt": s.paused_at,
                 "resumedAt": s.resumed_at,
             })
-        
+
         return {
             "status": "success",
             "date": today.isoformat(),
@@ -144,24 +143,16 @@ async def get_today_data(
 @router.get("/directories")
 async def get_directories(
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user)
 ):
     """Получение всех справочников"""
     try:
         from app.modules.deliveries.models import Settings, Pricing, X5Settings
-        
-        settings = db.query(Settings).filter(
-            Settings.is_active == True
-        ).order_by(Settings.id.desc()).first()
-        
-        pricing = db.query(Pricing).filter(
-            Pricing.is_active == True
-        ).order_by(Pricing.id.desc()).first()
-        
-        x5_settings = db.query(X5Settings).filter(
-            X5Settings.is_active == True
-        ).order_by(X5Settings.id.desc()).first()
-        
+
+        settings = db.query(Settings).filter(Settings.is_active == True).order_by(Settings.id.desc()).first()
+        pricing = db.query(Pricing).filter(Pricing.is_active == True).order_by(Pricing.id.desc()).first()
+        x5_settings = db.query(X5Settings).filter(X5Settings.is_active == True).order_by(X5Settings.id.desc()).first()
+
         return {
             "status": "success",
             "settings": {
@@ -205,39 +196,47 @@ async def get_directories(
 @router.post("/shifts/start")
 async def start_shift(
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user)
 ):
-    """Создать новую приостановленную смену"""
+    """Создать новую приостановленную смену (с защитой от дубликатов)"""
     try:
-        # Ищем ТОЛЬКО активные или паузные смены (НЕ completed)
-        existing = db.query(Shift).filter(
+        # ===== ВАЖНО: Ищем ВСЕ активные/паузные смены =====
+        existing_shifts = db.query(Shift).filter(
             Shift.user_id == current_user.id,
             Shift.status.in_(['active', 'paused'])
-        ).first()
-        
-        if existing:
-            # Возвращаем существующую смену с её данными
+        ).order_by(Shift.created_at.desc()).all()
+
+        if existing_shifts:
+            # Оставляем самую свежую, остальные закрываем (защита от гонки)
+            keep = existing_shifts[0]
+            now = datetime.now(timezone.utc)
+            for dup in existing_shifts[1:]:
+                dup.status = 'completed'
+                dup.end_time = now.isoformat()
+                dup.updated_at = now
+                logger.warning(f"⚠️ Закрыта дублирующая смена id={dup.id} (user_id={current_user.id})")
+            db.commit()
+
             return {
-                "id": existing.id,
-                "startTime": existing.start_time,
-                "status": existing.status,
-                "totalPaidDistance": existing.total_paid_distance,
-                "totalIdleDistance": existing.total_idle_distance,
-                "ordersCount": existing.orders_count,
-                "durationSeconds": existing.duration_seconds,
-                "totalIncome": existing.total_income,
-                "totalExpenses": existing.total_expenses,
-                "netProfit": existing.net_profit,
-                "totalOrderTimeSeconds": existing.total_order_time_seconds,
+                "id": keep.id,
+                "startTime": keep.start_time,
+                "status": keep.status,
+                "totalPaidDistance": keep.total_paid_distance,
+                "totalIdleDistance": keep.total_idle_distance,
+                "ordersCount": keep.orders_count,
+                "durationSeconds": keep.duration_seconds,
+                "totalIncome": keep.total_income,
+                "totalExpenses": keep.total_expenses,
+                "netProfit": keep.net_profit,
+                "totalOrderTimeSeconds": keep.total_order_time_seconds,
             }
 
         now = datetime.now(timezone.utc)
-        
-        # Создаём НОВУЮ смену с нулевыми данными
+
         shift = Shift(
             user_id=current_user.id,
             start_time=now.isoformat(),
-            status='paused',  # Сразу на паузе
+            status='paused',
             total_paid_distance=0.0,
             total_idle_distance=0.0,
             orders_count=0,
@@ -249,14 +248,14 @@ async def start_shift(
             is_synced=True,
             synced_at=now,
             created_at=now,
-            updated_at=now
+            updated_at=now,
         )
         db.add(shift)
         db.commit()
         db.refresh(shift)
-        
+
         logger.info(f"📅 Создана новая смена id={shift.id}, status={shift.status}")
-        
+
         return {
             "id": shift.id,
             "startTime": shift.start_time,
@@ -280,21 +279,20 @@ async def update_shift_state(
     shift_id: int,
     request_data: Dict[str, Any],
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user)
 ):
     """Обновить состояние смены (промежуточное сохранение)"""
     try:
         shift = db.query(Shift).filter(
             Shift.id == shift_id,
-            Shift.user_id == current_user.id
+            Shift.user_id == current_user.id,
         ).first()
-        
+
         if not shift:
             raise HTTPException(status_code=404, detail="Смена не найдена")
-        
+
         now = datetime.now(timezone.utc)
-        
-        # Обновляем только переданные поля
+
         if 'totalPaidDistance' in request_data:
             shift.total_paid_distance = request_data['totalPaidDistance']
         if 'totalIdleDistance' in request_data:
@@ -309,15 +307,12 @@ async def update_shift_state(
             shift.total_expenses = request_data['totalExpenses']
         if 'netProfit' in request_data:
             shift.net_profit = request_data['netProfit']
-        
-        # ===== ПРОСТО СОХРАНЯЕМ ВРЕМЯ ИЗ ПРИЛОЖЕНИЯ =====
         if 'durationSeconds' in request_data:
             shift.duration_seconds = request_data['durationSeconds']
-            logger.info(f"📊 Обновлена длительность из приложения: {shift.duration_seconds} сек")
-        
+
         shift.updated_at = now
         db.commit()
-        
+
         return {"status": "ok", "shift": {"id": shift.id, "durationSeconds": shift.duration_seconds}}
     except Exception as e:
         logger.error(f"❌ Ошибка обновления состояния смены: {e}")
@@ -329,25 +324,23 @@ async def pause_shift(
     shift_id: int,
     request_data: Dict[str, Any],
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user)
 ):
     """Приостановить работу"""
     try:
         shift = db.query(Shift).filter(
             Shift.id == shift_id,
-            Shift.user_id == current_user.id
+            Shift.user_id == current_user.id,
         ).first()
-        
+
         if not shift:
             raise HTTPException(status_code=404, detail="Смена не найдена")
-        
-        # Разрешаем паузу если смена активна ИЛИ уже на паузе (для обновления данных)
+
         if shift.status not in ['active', 'paused']:
             raise HTTPException(status_code=400, detail="Смена не может быть приостановлена")
-        
+
         now = datetime.now(timezone.utc)
-        
-        # Сохраняем все данные из запроса (если переданы)
+
         if 'totalPaidDistance' in request_data:
             shift.total_paid_distance = request_data['totalPaidDistance']
         if 'totalIdleDistance' in request_data:
@@ -362,21 +355,17 @@ async def pause_shift(
             shift.total_expenses = request_data['totalExpenses']
         if 'netProfit' in request_data:
             shift.net_profit = request_data['netProfit']
-        
-        # ===== СОХРАНЯЕМ ВРЕМЯ ИЗ ПРИЛОЖЕНИЯ =====
         if 'durationSeconds' in request_data:
             shift.duration_seconds = request_data['durationSeconds']
-            logger.info(f"📊 При паузе сохранено время из приложения: {shift.duration_seconds} сек")
-        
+
         shift.status = 'paused'
         shift.paused_at = now.isoformat()
         shift.resumed_at = None
         shift.updated_at = now
-        
         db.commit()
-        
+
         logger.info(f"⏸️ Смена {shift_id} приостановлена")
-        
+
         return {"status": "ok", "shift": {"id": shift.id, "status": "paused", "durationSeconds": shift.duration_seconds}}
     except Exception as e:
         logger.error(f"❌ Ошибка приостановки смены: {e}")
@@ -387,32 +376,30 @@ async def pause_shift(
 async def resume_shift(
     shift_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user)
 ):
     """Возобновить работу"""
     try:
         shift = db.query(Shift).filter(
             Shift.id == shift_id,
-            Shift.user_id == current_user.id
+            Shift.user_id == current_user.id,
         ).first()
-        
+
         if not shift:
             raise HTTPException(status_code=404, detail="Смена не найдена")
-        
+
         if shift.status != 'paused':
             raise HTTPException(status_code=400, detail="Смена не приостановлена")
-        
+
         now = datetime.now(timezone.utc)
-        
         shift.status = 'active'
         shift.resumed_at = now.isoformat()
         shift.paused_at = None
         shift.updated_at = now
-        
         db.commit()
-        
+
         logger.info(f"▶️ Смена {shift_id} возобновлена, duration={shift.duration_seconds} сек")
-        
+
         return {"status": "ok", "shift": {"id": shift.id, "status": "active"}}
     except Exception as e:
         logger.error(f"❌ Ошибка возобновления смены: {e}")
@@ -424,13 +411,13 @@ async def complete_shift(
     shift_id: int,
     request_data: Dict[str, Any],
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user)
 ):
     """Завершить смену с сохранением статистики"""
     try:
         shift = db.query(Shift).filter(
             Shift.id == shift_id,
-            Shift.user_id == current_user.id
+            Shift.user_id == current_user.id,
         ).first()
         if not shift:
             raise HTTPException(status_code=404, detail="Смена не найдена")
@@ -438,14 +425,13 @@ async def complete_shift(
             raise HTTPException(status_code=400, detail="Смена уже завершена")
 
         now = datetime.now(timezone.utc)
-        
+
         shift.status = 'completed'
         shift.end_time = now.isoformat()
         shift.paused_at = None
         shift.resumed_at = None
-        
-        # ===== ВАЖНО: Используем текущие значения из БД, если поле не передано =====
-        # НЕ обнуляем данные, если они не переданы в запросе!
+
+        # НЕ обнуляем данные, если поле не передано
         shift.duration_seconds = request_data.get('durationSeconds', shift.duration_seconds)
         shift.total_paid_distance = request_data.get('totalPaidDistance', shift.total_paid_distance)
         shift.total_idle_distance = request_data.get('totalIdleDistance', shift.total_idle_distance)
@@ -454,13 +440,13 @@ async def complete_shift(
         shift.total_income = request_data.get('totalIncome', shift.total_income)
         shift.total_expenses = request_data.get('totalExpenses', shift.total_expenses)
         shift.net_profit = request_data.get('netProfit', shift.net_profit)
-        
+
         shift.updated_at = now
         db.commit()
         db.refresh(shift)
-        
-        logger.info(f"✅ Смена завершена: id={shift_id}, duration={shift.duration_seconds} сек, income={shift.total_income}, expenses={shift.total_expenses}")
-        
+
+        logger.info(f"✅ Смена завершена: id={shift_id}, duration={shift.duration_seconds} сек, income={shift.total_income}")
+
         return {
             "status": "ok",
             "shift": {
@@ -476,7 +462,7 @@ async def complete_shift(
                 "netProfit": shift.net_profit,
                 "pausedAt": shift.paused_at,
                 "resumedAt": shift.resumed_at,
-            }
+            },
         }
     except Exception as e:
         logger.error(f"❌ Ошибка завершения смены: {e}")
@@ -491,19 +477,19 @@ async def complete_shift(
 async def create_order(
     data: Dict[str, Any],
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user)
 ):
     """Создать новый заказ с доставками"""
     try:
         shift = db.query(Shift).filter(
             Shift.user_id == current_user.id,
-            Shift.status == 'active'
+            Shift.status == 'active',
         ).first()
         if not shift:
             raise HTTPException(status_code=400, detail="Нет активной смены")
 
         now = datetime.now(timezone.utc)
-        
+
         order = Order(
             user_id=current_user.id,
             shift_id=shift.id,
@@ -520,7 +506,7 @@ async def create_order(
             is_synced=True,
             synced_at=now,
             created_at=now,
-            updated_at=now
+            updated_at=now,
         )
         db.add(order)
         db.commit()
@@ -545,10 +531,10 @@ async def create_order(
                 is_synced=True,
                 synced_at=now,
                 created_at=now,
-                updated_at=now
+                updated_at=now,
             )
             db.add(delivery)
-        
+
         shift.orders_count += 1
         shift.total_income += order.total_income
         shift.total_expenses += order.total_expenses
@@ -582,13 +568,13 @@ async def create_order(
 async def complete_order(
     order_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user)
 ):
     """Завершить заказ"""
     try:
         order = db.query(Order).filter(
             Order.id == order_id,
-            Order.user_id == current_user.id
+            Order.user_id == current_user.id,
         ).first()
         if not order:
             raise HTTPException(status_code=404, detail="Заказ не найден")
@@ -620,17 +606,15 @@ async def complete_order(
 async def update_settings(
     data: Dict[str, Any],
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user)
 ):
     """Обновление настроек"""
     try:
         from app.modules.deliveries.models import Settings
-        
+
         now = datetime.now(timezone.utc)
-        existing = db.query(Settings).filter(
-            Settings.is_active == True
-        ).order_by(Settings.id.desc()).first()
-        
+        existing = db.query(Settings).filter(Settings.is_active == True).order_by(Settings.id.desc()).first()
+
         if existing:
             existing.fuel_consumption = data.get("fuelConsumption", 10.0)
             existing.fuel_price = data.get("fuelPrice", 50.0)
@@ -649,7 +633,7 @@ async def update_settings(
                     "repairCost": existing.repair_cost,
                     "additionalCosts": existing.additional_costs,
                     "version": existing.version,
-                }
+                },
             }
         else:
             new_settings = Settings(
@@ -674,7 +658,7 @@ async def update_settings(
                     "repairCost": new_settings.repair_cost,
                     "additionalCosts": new_settings.additional_costs,
                     "version": new_settings.version,
-                }
+                },
             }
     except Exception as e:
         logger.error(f"❌ Ошибка обновления настроек: {e}")
@@ -685,17 +669,15 @@ async def update_settings(
 async def update_pricing(
     data: Dict[str, Any],
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user)
 ):
     """Обновление тарифов"""
     try:
         from app.modules.deliveries.models import Pricing
-        
+
         now = datetime.now(timezone.utc)
-        existing = db.query(Pricing).filter(
-            Pricing.is_active == True
-        ).order_by(Pricing.id.desc()).first()
-        
+        existing = db.query(Pricing).filter(Pricing.is_active == True).order_by(Pricing.id.desc()).first()
+
         if existing:
             existing.receiving_fee = data.get("receivingFee", 50.0)
             existing.delivery_fee = data.get("deliveryFee", 100.0)
@@ -716,7 +698,7 @@ async def update_pricing(
                     "pricePerKm": existing.price_per_km,
                     "baseCoefficient": existing.base_coefficient,
                     "version": existing.version,
-                }
+                },
             }
         else:
             new_pricing = Pricing(
@@ -743,7 +725,7 @@ async def update_pricing(
                     "pricePerKm": new_pricing.price_per_km,
                     "baseCoefficient": new_pricing.base_coefficient,
                     "version": new_pricing.version,
-                }
+                },
             }
     except Exception as e:
         logger.error(f"❌ Ошибка обновления тарифов: {e}")
@@ -754,17 +736,15 @@ async def update_pricing(
 async def update_x5_settings(
     data: Dict[str, Any],
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user)
 ):
     """Обновление X5 настроек"""
     try:
         from app.modules.deliveries.models import X5Settings
-        
+
         now = datetime.now(timezone.utc)
-        existing = db.query(X5Settings).filter(
-            X5Settings.is_active == True
-        ).order_by(X5Settings.id.desc()).first()
-        
+        existing = db.query(X5Settings).filter(X5Settings.is_active == True).order_by(X5Settings.id.desc()).first()
+
         if existing:
             existing.pickup_price = data.get("pickupPrice", 250.0)
             existing.delivery_price = data.get("deliveryPrice", 150.0)
@@ -783,7 +763,7 @@ async def update_x5_settings(
                     "perKmPrice": existing.per_km_price,
                     "perKgPrice": existing.per_kg_price,
                     "version": existing.version,
-                }
+                },
             }
         else:
             new_x5 = X5Settings(
@@ -808,7 +788,7 @@ async def update_x5_settings(
                     "perKmPrice": new_x5.per_km_price,
                     "perKgPrice": new_x5.per_kg_price,
                     "version": new_x5.version,
-                }
+                },
             }
     except Exception as e:
         logger.error(f"❌ Ошибка обновления X5 настроек: {e}")
