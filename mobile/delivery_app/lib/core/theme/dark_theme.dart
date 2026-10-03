@@ -8,16 +8,13 @@ class DarkTheme {
       scaffoldBackgroundColor: const Color(0xFF121212),
       cardColor: const Color(0xFF1E1E1E),
       dividerColor: const Color(0xFF2C2C2C),
-      
-      // Используем CardThemeData
-      cardTheme: const CardThemeData(
+
+      // Используем CardTheme (не CardThemeData)
+      cardTheme: const CardTheme(
         color: Color(0xFF1E1E1E),
         elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(8)),
-        ),
       ),
-      
+
       appBarTheme: const AppBarTheme(
         backgroundColor: Color(0xFF1E1E1E),
         elevation: 0,
@@ -28,14 +25,14 @@ class DarkTheme {
           fontWeight: FontWeight.w600,
         ),
       ),
-      
+
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: Color(0xFF1E1E1E),
         selectedItemColor: Color(0xFF6C63FF),
         unselectedItemColor: Color(0xFF888888),
         type: BottomNavigationBarType.fixed,
       ),
-      
+
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF6C63FF),
@@ -46,13 +43,13 @@ class DarkTheme {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
       ),
-      
+
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: const Color(0xFF6C63FF),
         ),
       ),
-      
+
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: const Color(0xFF1E1E1E),
@@ -81,7 +78,7 @@ class DarkTheme {
         prefixIconColor: const Color(0xFF888888),
         suffixIconColor: const Color(0xFF888888),
       ),
-      
+
       textTheme: const TextTheme(
         headlineMedium: TextStyle(
           color: Colors.white,
@@ -116,7 +113,7 @@ class DarkTheme {
           fontWeight: FontWeight.w600,
         ),
       ),
-      
+
       colorScheme: const ColorScheme.dark(
         primary: Color(0xFF6C63FF),
         secondary: Color(0xFF6C63FF),
