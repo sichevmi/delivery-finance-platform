@@ -21,7 +21,8 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with WidgetsBindingObserver {
   final List<GlobalKey<NavigatorState>> _navigatorKeys = [
     GlobalKey<NavigatorState>(),
     GlobalKey<NavigatorState>(),
@@ -66,7 +67,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
   Future<void> _loadData() async {
     if (_isLoadingData) {
-      logMessage('⚠️ [HOME] _loadData() уже выполняется, пропускаем', category: 'SYSTEM');
+      logMessage('⚠️ [HOME] _loadData() уже выполняется, пропускаем',
+          category: 'SYSTEM');
       return;
     }
     _isLoadingData = true;
@@ -92,7 +94,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       }
       logMessage('🔄 [HOME] _loadData() завершён', category: 'SYSTEM');
     } catch (e) {
-      logMessage('⚠️ [HOME] Ошибка загрузки данных: $e', category: 'SYSTEM', level: LogLevel.error);
+      logMessage('⚠️ [HOME] Ошибка загрузки данных: $e',
+          category: 'SYSTEM', level: LogLevel.error);
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -133,7 +136,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             children: [
               CircularProgressIndicator(color: Color(0xFF6C63FF)),
               SizedBox(height: 16),
-              Text('Загрузка данных...', style: TextStyle(color: Color(0xFF888888))),
+              Text('Загрузка данных...',
+                  style: TextStyle(color: Color(0xFF888888))),
             ],
           ),
         ),
@@ -162,7 +166,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
               authState.user?.name.isNotEmpty == true
                   ? authState.user!.name[0].toUpperCase()
                   : 'К',
-              style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold),
             ),
           ),
           const SizedBox(width: 6),
@@ -174,19 +181,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           _buildHomeTab(shiftState, settings),
           Navigator(
             key: _navigatorKeys[1],
-            onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => const OrdersTab()),
+            onGenerateRoute: (_) =>
+                MaterialPageRoute(builder: (_) => const OrdersTab()),
           ),
           Navigator(
             key: _navigatorKeys[2],
-            onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => const DirectoriesTab()),
+            onGenerateRoute: (_) =>
+                MaterialPageRoute(builder: (_) => const DirectoriesTab()),
           ),
           Navigator(
             key: _navigatorKeys[3],
-            onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => const AnalyticsTab()),
+            onGenerateRoute: (_) =>
+                MaterialPageRoute(builder: (_) => const AnalyticsTab()),
           ),
           Navigator(
             key: _navigatorKeys[4],
-            onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => const MoreTab()),
+            onGenerateRoute: (_) =>
+                MaterialPageRoute(builder: (_) => const MoreTab()),
           ),
         ],
       ),
@@ -195,7 +206,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         type: BottomNavigationBarType.fixed,
         onTap: (index) {
           if (index == selectedTab) {
-            _navigatorKeys[index].currentState?.popUntil((route) => route.isFirst);
+            _navigatorKeys[index]
+                .currentState
+                ?.popUntil((route) => route.isFirst);
           } else {
             ref.read(selectedTabProvider.notifier).state = index;
           }
@@ -223,7 +236,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           // Дата и статус смены
           Row(
             children: [
-              const Icon(Icons.calendar_today, size: 11, color: Color(0xFF888888)),
+              const Icon(Icons.calendar_today,
+                  size: 11, color: Color(0xFF888888)),
               const SizedBox(width: 4),
               Text(
                 _getTodayDate(),
@@ -233,7 +247,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: shiftState.isActive && !shiftState.isPaused && !shiftState.isCompleted
+                  color: shiftState.isActive &&
+                          !shiftState.isPaused &&
+                          !shiftState.isCompleted
                       ? Colors.green.withOpacity(0.15)
                       : shiftState.isPaused
                           ? Colors.orange.withOpacity(0.15)
@@ -246,7 +262,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       width: 5,
                       height: 5,
                       decoration: BoxDecoration(
-                        color: shiftState.isActive && !shiftState.isPaused && !shiftState.isCompleted
+                        color: shiftState.isActive &&
+                                !shiftState.isPaused &&
+                                !shiftState.isCompleted
                             ? Colors.green
                             : shiftState.isPaused
                                 ? Colors.orange
@@ -388,7 +406,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     );
   }
 
-  Widget _buildEfficiencyMetric(String value, String label, IconData icon, Color color) {
+  Widget _buildEfficiencyMetric(
+      String value, String label, IconData icon, Color color) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
@@ -439,7 +458,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.grey,
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
         child: const Text(
           'Смена завершена',
@@ -461,14 +481,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.green,
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.play_arrow, size: 20),
             SizedBox(width: 6),
-            Text('Возобновить работу', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            Text('Возобновить работу',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
           ],
         ),
       );
@@ -485,14 +507,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.orange,
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.pause, size: 20),
             SizedBox(width: 6),
-            Text('Приостановить работу', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            Text('Приостановить работу',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
           ],
         ),
       );
@@ -501,8 +525,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
   String _getTodayDate() {
     final now = DateTime.now();
-    const weekdays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
-    const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+    const weekdays = [
+      'Понедельник',
+      'Вторник',
+      'Среда',
+      'Четверг',
+      'Пятница',
+      'Суббота',
+      'Воскресенье'
+    ];
+    const months = [
+      'января',
+      'февраля',
+      'марта',
+      'апреля',
+      'мая',
+      'июня',
+      'июля',
+      'августа',
+      'сентября',
+      'октября',
+      'ноября',
+      'декабря'
+    ];
     return '${weekdays[now.weekday - 1]}, ${now.day} ${months[now.month - 1]}';
   }
 
@@ -628,7 +673,9 @@ class _OrdersCountMetric extends ConsumerWidget {
 
   String _getOrdersText(int count) {
     if (count % 10 == 1 && count % 100 != 11) return 'заказ';
-    if (count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 10 || count % 100 >= 20)) return 'заказа';
+    if (count % 10 >= 2 &&
+        count % 10 <= 4 &&
+        (count % 100 < 10 || count % 100 >= 20)) return 'заказа';
     return 'заказов';
   }
 }
@@ -651,7 +698,8 @@ class _ProfitMetricState extends ConsumerState<_ProfitMetric> {
   void initState() {
     super.initState();
     _updateValue();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) => _updateValue());
+    _timer =
+        Timer.periodic(const Duration(seconds: 1), (timer) => _updateValue());
   }
 
   void _updateValue() {
@@ -682,7 +730,8 @@ class _ProfitMetricState extends ConsumerState<_ProfitMetric> {
           ],
         ),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF6C63FF).withOpacity(0.3), width: 1),
+        border: Border.all(
+            color: const Color(0xFF6C63FF).withOpacity(0.3), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -728,7 +777,8 @@ class _TotalDistanceMetric extends ConsumerStatefulWidget {
   const _TotalDistanceMetric({super.key});
 
   @override
-  ConsumerState<_TotalDistanceMetric> createState() => _TotalDistanceMetricState();
+  ConsumerState<_TotalDistanceMetric> createState() =>
+      _TotalDistanceMetricState();
 }
 
 class _TotalDistanceMetricState extends ConsumerState<_TotalDistanceMetric> {
@@ -739,7 +789,8 @@ class _TotalDistanceMetricState extends ConsumerState<_TotalDistanceMetric> {
   void initState() {
     super.initState();
     _updateValue();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) => _updateValue());
+    _timer =
+        Timer.periodic(const Duration(seconds: 1), (timer) => _updateValue());
   }
 
   void _updateValue() {
@@ -777,7 +828,8 @@ class _IdleDistanceMetric extends ConsumerStatefulWidget {
   const _IdleDistanceMetric({super.key});
 
   @override
-  ConsumerState<_IdleDistanceMetric> createState() => _IdleDistanceMetricState();
+  ConsumerState<_IdleDistanceMetric> createState() =>
+      _IdleDistanceMetricState();
 }
 
 class _IdleDistanceMetricState extends ConsumerState<_IdleDistanceMetric> {
@@ -788,7 +840,8 @@ class _IdleDistanceMetricState extends ConsumerState<_IdleDistanceMetric> {
   void initState() {
     super.initState();
     _updateValue();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) => _updateValue());
+    _timer =
+        Timer.periodic(const Duration(seconds: 1), (timer) => _updateValue());
   }
 
   void _updateValue() {
@@ -837,7 +890,8 @@ class _ProfitPerKmMetricState extends ConsumerState<_ProfitPerKmMetric> {
   void initState() {
     super.initState();
     _updateValue();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) => _updateValue());
+    _timer =
+        Timer.periodic(const Duration(seconds: 1), (timer) => _updateValue());
   }
 
   void _updateValue() {
@@ -846,7 +900,8 @@ class _ProfitPerKmMetricState extends ConsumerState<_ProfitPerKmMetric> {
     if (stats.totalDistance <= 0) {
       newValue = '0.00 ₽/км';
     } else {
-      newValue = '${(stats.netProfit / stats.totalDistance).toStringAsFixed(2)} ₽/км';
+      newValue =
+          '${(stats.netProfit / stats.totalDistance).toStringAsFixed(2)} ₽/км';
     }
     if (_value != newValue) {
       setState(() => _value = newValue);
@@ -880,7 +935,8 @@ class _ProfitPerHourMetric extends ConsumerStatefulWidget {
   const _ProfitPerHourMetric({super.key});
 
   @override
-  ConsumerState<_ProfitPerHourMetric> createState() => _ProfitPerHourMetricState();
+  ConsumerState<_ProfitPerHourMetric> createState() =>
+      _ProfitPerHourMetricState();
 }
 
 class _ProfitPerHourMetricState extends ConsumerState<_ProfitPerHourMetric> {
@@ -891,7 +947,8 @@ class _ProfitPerHourMetricState extends ConsumerState<_ProfitPerHourMetric> {
   void initState() {
     super.initState();
     _updateValue();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) => _updateValue());
+    _timer =
+        Timer.periodic(const Duration(seconds: 1), (timer) => _updateValue());
   }
 
   void _updateValue() {
@@ -950,7 +1007,8 @@ class _ExpensesMetricState extends ConsumerState<_ExpensesMetric> {
   void initState() {
     super.initState();
     _updateValue();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) => _updateValue());
+    _timer =
+        Timer.periodic(const Duration(seconds: 1), (timer) => _updateValue());
   }
 
   void _updateValue() {
@@ -1021,7 +1079,8 @@ class _TimeDisplayState extends ConsumerState<_TimeDisplay> {
   void initState() {
     super.initState();
     _updateTime();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) => _updateTime());
+    _timer =
+        Timer.periodic(const Duration(seconds: 1), (timer) => _updateTime());
   }
 
   void _updateTime() {
@@ -1076,7 +1135,8 @@ class _IdleTimeDisplayState extends ConsumerState<_IdleTimeDisplay> {
   void initState() {
     super.initState();
     _updateTime();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) => _updateTime());
+    _timer =
+        Timer.periodic(const Duration(seconds: 1), (timer) => _updateTime());
   }
 
   void _updateTime() {

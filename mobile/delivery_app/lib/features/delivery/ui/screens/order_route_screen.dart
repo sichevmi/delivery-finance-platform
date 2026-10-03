@@ -181,10 +181,12 @@ class _OrderRouteState {
       shopAddressForOrder: shopAddressForOrder ?? this.shopAddressForOrder,
       isShopAddressManual: isShopAddressManual ?? this.isShopAddressManual,
       manualShopAddress: manualShopAddress ?? this.manualShopAddress,
-      isClientAddressManual: isClientAddressManual ?? this.isClientAddressManual,
+      isClientAddressManual:
+          isClientAddressManual ?? this.isClientAddressManual,
       manualClientAddress: manualClientAddress ?? this.manualClientAddress,
       showManualShopInput: showManualShopInput ?? this.showManualShopInput,
-      showManualClientInput: showManualClientInput ?? this.showManualClientInput,
+      showManualClientInput:
+          showManualClientInput ?? this.showManualClientInput,
       tip: tip ?? this.tip,
     );
   }
@@ -216,7 +218,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
 
   // ===== ДОБАВЛЯЕМ КОНТРОЛЛЕРЫ =====
   final TextEditingController _shopAddressController = TextEditingController();
-  final TextEditingController _clientAddressController = TextEditingController();
+  final TextEditingController _clientAddressController =
+      TextEditingController();
 
   @override
   void initState() {
@@ -301,7 +304,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   void _saveCurrentSegmentData() {
     final time = _getSegmentTime();
     final distance = _getDistance();
-    logMessage('📊 Сохраняем сегмент ${_state.currentSegment}: time=$time сек, distance=$distance км');
+    logMessage(
+        '📊 Сохраняем сегмент ${_state.currentSegment}: time=$time сек, distance=$distance км');
     setState(() {
       switch (_state.currentSegment) {
         case 0:
@@ -311,7 +315,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
           _state = _state.copyWith(timeReceiving: time);
           break;
         case 2:
-          _state = _state.copyWith(timeToClient: time, distanceToClient: distance);
+          _state =
+              _state.copyWith(timeToClient: time, distanceToClient: distance);
           break;
         case 3:
           _state = _state.copyWith(timeDelivery: time);
@@ -328,11 +333,15 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   }
 
   void _retryGeocode() async {
-    logMessage('🔄 Повторная попытка геокодирования адреса магазина', category: 'ORDER');
+    logMessage('🔄 Повторная попытка геокодирования адреса магазина',
+        category: 'ORDER');
     if (_isProcessing) return;
     _isProcessing = true;
     final pos = await _getCurrentPosition();
-    if (!mounted) { _isProcessing = false; return; }
+    if (!mounted) {
+      _isProcessing = false;
+      return;
+    }
     String? addr;
     if (pos != null) {
       addr = await GeocoderService.reverseGeocode(
@@ -359,11 +368,13 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
     });
     _isProcessing = false;
     if (shopAddr == 'Адрес не определён') {
-      logMessage('⚠️ Адрес магазина не определён после повторной попытки', category: 'ORDER');
+      logMessage('⚠️ Адрес магазина не определён после повторной попытки',
+          category: 'ORDER');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Не удалось определить адрес магазина. Введите вручную.'),
+            content:
+                Text('Не удалось определить адрес магазина. Введите вручную.'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -408,11 +419,15 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   }
 
   void _retryClientGeocode() async {
-    logMessage('🔄 Повторная попытка геокодирования адреса клиента', category: 'ORDER');
+    logMessage('🔄 Повторная попытка геокодирования адреса клиента',
+        category: 'ORDER');
     if (_isProcessing) return;
     _isProcessing = true;
     final pos = await _getCurrentPosition();
-    if (!mounted) { _isProcessing = false; return; }
+    if (!mounted) {
+      _isProcessing = false;
+      return;
+    }
     String? addr;
     if (pos != null) {
       addr = await GeocoderService.reverseGeocode(
@@ -438,11 +453,13 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
     });
     _isProcessing = false;
     if (clientAddr == 'Адрес не определён') {
-      logMessage('⚠️ Адрес клиента не определён после повторной попытки', category: 'ORDER');
+      logMessage('⚠️ Адрес клиента не определён после повторной попытки',
+          category: 'ORDER');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Не удалось определить адрес клиента. Введите вручную.'),
+            content:
+                Text('Не удалось определить адрес клиента. Введите вручную.'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -486,7 +503,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   }
 
   Future<void> _handleMainAction() async {
-    logMessage('🔵 [_handleMainAction] ВХОД, _isProcessing=$_isProcessing, сегмент=${_state.currentSegment}');
+    logMessage(
+        '🔵 [_handleMainAction] ВХОД, _isProcessing=$_isProcessing, сегмент=${_state.currentSegment}');
 
     if (_isProcessing) {
       logMessage('⚠️ [_handleMainAction] ПРОПУСК: уже в обработке');
@@ -514,7 +532,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
 
     switch (_state.currentSegment) {
       case 0:
-        logMessage('🔵 [_handleMainAction] КЕЙС 0: получение позиции для адреса магазина');
+        logMessage(
+            '🔵 [_handleMainAction] КЕЙС 0: получение позиции для адреса магазина');
 
         final pos = await _getCurrentPosition();
         if (!mounted) {
@@ -552,7 +571,9 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
               ),
             );
           }
-          logMessage('⚠️ Адрес магазина не определён, показываем форму для ручного ввода', category: 'ORDER');
+          logMessage(
+              '⚠️ Адрес магазина не определён, показываем форму для ручного ввода',
+              category: 'ORDER');
         } else {
           setState(() {
             _state = _state.copyWith(
@@ -566,7 +587,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
           });
           _startSegment();
           _isProcessing = false;
-          logMessage('🔵 [_handleMainAction] КЕЙС 0: адрес магазина определён, переход на сегмент 1');
+          logMessage(
+              '🔵 [_handleMainAction] КЕЙС 0: адрес магазина определён, переход на сегмент 1');
         }
         break;
 
@@ -585,11 +607,13 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
         });
         _startSegment();
         _isProcessing = false;
-        logMessage('🔵 [_handleMainAction] КЕЙС 1: завершён, переход на сегмент 2');
+        logMessage(
+            '🔵 [_handleMainAction] КЕЙС 1: завершён, переход на сегмент 2');
         break;
 
       case 2:
-        logMessage('🔵 [_handleMainAction] КЕЙС 2: получение позиции для адреса клиента');
+        logMessage(
+            '🔵 [_handleMainAction] КЕЙС 2: получение позиции для адреса клиента');
         final posClient = await _getCurrentPosition();
         if (!mounted) {
           logMessage('⚠️ [_handleMainAction] КЕЙС 2: виджет не смонтирован');
@@ -625,7 +649,9 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
               ),
             );
           }
-          logMessage('⚠️ Адрес клиента не определён, показываем форму для ручного ввода', category: 'ORDER');
+          logMessage(
+              '⚠️ Адрес клиента не определён, показываем форму для ручного ввода',
+              category: 'ORDER');
         } else {
           setState(() {
             _state = _state.copyWith(
@@ -638,7 +664,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
           });
           _startSegment();
           _isProcessing = false;
-          logMessage('🔵 [_handleMainAction] КЕЙС 2: адрес клиента определён, переход на сегмент 3');
+          logMessage(
+              '🔵 [_handleMainAction] КЕЙС 2: адрес клиента определён, переход на сегмент 3');
         }
         break;
 
@@ -647,7 +674,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
         await _completeDelivery();
         _isProcessing = false;
         if (mounted) {
-          logMessage('🔵 [_handleMainAction] КЕЙС 3: установка showSummary=true');
+          logMessage(
+              '🔵 [_handleMainAction] КЕЙС 3: установка showSummary=true');
           setState(() {
             _state = _state.copyWith(showSummary: true);
           });
@@ -692,11 +720,15 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   }
 
   Future<void> _completeDelivery() async {
-    logMessage('🔵 [_completeDelivery] ВХОД, deliveryNumber=${_state.deliveryNumber}');
-    logMessage('🔵 [_completeDelivery] completedDeliveries до: ${_state.completedDeliveries.length}');
+    logMessage(
+        '🔵 [_completeDelivery] ВХОД, deliveryNumber=${_state.deliveryNumber}');
+    logMessage(
+        '🔵 [_completeDelivery] completedDeliveries до: ${_state.completedDeliveries.length}');
 
-    if (_state.completedDeliveries.any((d) => d.number == _state.deliveryNumber)) {
-      logMessage('⚠️ [_completeDelivery] Доставка #${_state.deliveryNumber} уже завершена!');
+    if (_state.completedDeliveries
+        .any((d) => d.number == _state.deliveryNumber)) {
+      logMessage(
+          '⚠️ [_completeDelivery] Доставка #${_state.deliveryNumber} уже завершена!');
       return;
     }
 
@@ -708,15 +740,20 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
     }
     if (_state.isPrivateHouse) apartment = 'частный дом (1)';
 
-    logMessage('🔵 [_completeDelivery] Создание Delivery #${_state.deliveryNumber}');
-    logMessage('🔵 [_completeDelivery]   clientAddress: ${_state.clientAddress}');
+    logMessage(
+        '🔵 [_completeDelivery] Создание Delivery #${_state.deliveryNumber}');
+    logMessage(
+        '🔵 [_completeDelivery]   clientAddress: ${_state.clientAddress}');
     logMessage('🔵 [_completeDelivery]   apartment: $apartment');
     logMessage('🔵 [_completeDelivery]   weight: ${_state.weight}');
     logMessage('🔵 [_completeDelivery]   timeToShop: ${_state.timeToShop}');
-    logMessage('🔵 [_completeDelivery]   distanceToShop: ${_state.distanceToShop}');
-    logMessage('🔵 [_completeDelivery]   timeReceiving: ${_state.timeReceiving}');
+    logMessage(
+        '🔵 [_completeDelivery]   distanceToShop: ${_state.distanceToShop}');
+    logMessage(
+        '🔵 [_completeDelivery]   timeReceiving: ${_state.timeReceiving}');
     logMessage('🔵 [_completeDelivery]   timeToClient: ${_state.timeToClient}');
-    logMessage('🔵 [_completeDelivery]   distanceToClient: ${_state.distanceToClient}');
+    logMessage(
+        '🔵 [_completeDelivery]   distanceToClient: ${_state.distanceToClient}');
     logMessage('🔵 [_completeDelivery]   timeDelivery: ${_state.timeDelivery}');
 
     final delivery = Delivery(
@@ -734,10 +771,14 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
       tip: _state.tip,
     );
 
-    final updatedList = List<Delivery>.from(_state.completedDeliveries)..add(delivery);
+    final updatedList = List<Delivery>.from(_state.completedDeliveries)
+      ..add(delivery);
 
-    logMessage('✅ [_completeDelivery] Добавлена доставка #${_state.deliveryNumber}, всего: ${updatedList.length}', category: 'ORDER');
-    logMessage('🔵 [_completeDelivery] completedDeliveries после: ${updatedList.length}');
+    logMessage(
+        '✅ [_completeDelivery] Добавлена доставка #${_state.deliveryNumber}, всего: ${updatedList.length}',
+        category: 'ORDER');
+    logMessage(
+        '🔵 [_completeDelivery] completedDeliveries после: ${updatedList.length}');
 
     setState(() {
       _state = _state.copyWith(
@@ -815,16 +856,23 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   }
 
   void _addDelivery() {
-    logMessage('🔵 [_addDelivery] ВХОД, deliveryNumber=${_state.deliveryNumber}');
-    logMessage('🔵 [_addDelivery] completedDeliveries до: ${_state.completedDeliveries.length}');
+    logMessage(
+        '🔵 [_addDelivery] ВХОД, deliveryNumber=${_state.deliveryNumber}');
+    logMessage(
+        '🔵 [_addDelivery] completedDeliveries до: ${_state.completedDeliveries.length}');
 
-    final alreadyExists = _state.completedDeliveries.any((d) => d.number == _state.deliveryNumber);
+    final alreadyExists = _state.completedDeliveries
+        .any((d) => d.number == _state.deliveryNumber);
     logMessage('🔵 [_addDelivery] alreadyExists: $alreadyExists');
 
-    List<Delivery> newCompletedDeliveries = List.from(_state.completedDeliveries);
+    List<Delivery> newCompletedDeliveries =
+        List.from(_state.completedDeliveries);
 
-    if (!alreadyExists && _state.clientAddress != null && _state.clientAddress != 'Адрес клиента будет определён позже') {
-      logMessage('🔵 [_addDelivery] Сохраняем текущую доставку #${_state.deliveryNumber}');
+    if (!alreadyExists &&
+        _state.clientAddress != null &&
+        _state.clientAddress != 'Адрес клиента будет определён позже') {
+      logMessage(
+          '🔵 [_addDelivery] Сохраняем текущую доставку #${_state.deliveryNumber}');
       final currentDelivery = Delivery(
         id: 0,
         number: _state.deliveryNumber,
@@ -840,14 +888,19 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
         tip: _state.tip,
       );
       newCompletedDeliveries.add(currentDelivery);
-      logMessage('📦 Сохранена доставка #${_state.deliveryNumber} перед добавлением новой', category: 'ORDER');
+      logMessage(
+          '📦 Сохранена доставка #${_state.deliveryNumber} перед добавлением новой',
+          category: 'ORDER');
     } else if (alreadyExists) {
-      logMessage('🔵 [_addDelivery] Доставка #${_state.deliveryNumber} уже сохранена, пропускаем');
+      logMessage(
+          '🔵 [_addDelivery] Доставка #${_state.deliveryNumber} уже сохранена, пропускаем');
     } else {
-      logMessage('🔵 [_addDelivery] clientAddress не готов, пропускаем сохранение');
+      logMessage(
+          '🔵 [_addDelivery] clientAddress не готов, пропускаем сохранение');
     }
 
-    logMessage('🔵 [_addDelivery] newCompletedDeliveries: ${newCompletedDeliveries.length}');
+    logMessage(
+        '🔵 [_addDelivery] newCompletedDeliveries: ${newCompletedDeliveries.length}');
 
     _isSummaryShown = false;
 
@@ -885,7 +938,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
       );
     });
 
-    logMessage('🔵 [_addDelivery] После setState: deliveryNumber=${_state.deliveryNumber}, completedDeliveries=${_state.completedDeliveries.length}');
+    logMessage(
+        '🔵 [_addDelivery] После setState: deliveryNumber=${_state.deliveryNumber}, completedDeliveries=${_state.completedDeliveries.length}');
 
     _gpsService.resetDistance();
     _startSegment();
@@ -894,7 +948,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
 
   // ===== ОБРАБОТКА КНОПКИ "ОТМЕНИТЬ" =====
   Future<void> _cancelOrder() async {
-    logMessage('🔵 [_cancelOrder] ВХОД, сегмент=${_state.currentSegment}', category: 'ORDER');
+    logMessage('🔵 [_cancelOrder] ВХОД, сегмент=${_state.currentSegment}',
+        category: 'ORDER');
 
     // На сегменте 0 (путь до магазина) — особый флоу
     if (_state.currentSegment == 0) {
@@ -1012,8 +1067,10 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
     // Время на сегменте
     final totalTime = _getSegmentTime();
 
-    logMessage('🔵 [_showCancelSummary] distance=$totalDistance, '
-        'expenses=$totalExpenses, income=$orderCost, profit=$netProfit', category: 'ORDER');
+    logMessage(
+        '🔵 [_showCancelSummary] distance=$totalDistance, '
+        'expenses=$totalExpenses, income=$orderCost, profit=$netProfit',
+        category: 'ORDER');
 
     // Обновляем статистику смены: добавляем расходы и пробег
     final shiftNotifier = ref.read(shiftProvider.notifier);
@@ -1117,16 +1174,20 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text('Возврат в магазин', style: TextStyle(color: Colors.white)),
-        content: const Text('Вы уверены, что хотите вернуть заказ в магазин?', style: TextStyle(color: Color(0xFFB0B0B0))),
+        title: const Text('Возврат в магазин',
+            style: TextStyle(color: Colors.white)),
+        content: const Text('Вы уверены, что хотите вернуть заказ в магазин?',
+            style: TextStyle(color: Color(0xFFB0B0B0))),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отменить', style: TextStyle(color: Color(0xFF888888))),
+            child: const Text('Отменить',
+                style: TextStyle(color: Color(0xFF888888))),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF)),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6C63FF)),
             child: const Text('Вернуть', style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -1137,7 +1198,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
       _isProcessing = true;
 
       final settings = ref.read(settingsProvider);
-      final fuelCostPerKm = (settings.fuelConsumption / 100) * settings.fuelPrice;
+      final fuelCostPerKm =
+          (settings.fuelConsumption / 100) * settings.fuelPrice;
       final totalCostPerKm = fuelCostPerKm + settings.repairCost;
 
       // ===== ВАЖНО: Учитываем ОБА пробега =====
@@ -1157,9 +1219,12 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
       // Общее время
       final totalTime = _calculateTotalTime();
 
-      logMessage('🔄 [_handleReturnToShop] distanceToShop=$distanceToShop, distanceToClient=$distanceToClient');
-      logMessage('🔄 [_handleReturnToShop] totalDistance=$totalDistance, totalExpenses=$totalExpenses');
-      logMessage('🔄 [_handleReturnToShop] orderCost=$orderCost, netProfit=$netProfit');
+      logMessage(
+          '🔄 [_handleReturnToShop] distanceToShop=$distanceToShop, distanceToClient=$distanceToClient');
+      logMessage(
+          '🔄 [_handleReturnToShop] totalDistance=$totalDistance, totalExpenses=$totalExpenses');
+      logMessage(
+          '🔄 [_handleReturnToShop] orderCost=$orderCost, netProfit=$netProfit');
 
       // Обновляем статистику смены
       final shiftNotifier = ref.read(shiftProvider.notifier);
@@ -1198,14 +1263,20 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
             totalTime: totalTime,
             totalDistance: totalDistance, // ===== ВАЖНО: Оба пробега =====
             shopAddress: _state.shopAddressForOrder,
-            totalExpensesOverride: totalExpenses, // ===== ВАЖНО: Передаём расходы =====
-            netProfitOverride: 175.0 - totalExpenses, // ===== ВАЖНО: Передаём прибыль =====
-            totalPaidDistanceOverride: distanceToClient, // ===== ВАЖНО: Платный пробег =====
+            totalExpensesOverride:
+                totalExpenses, // ===== ВАЖНО: Передаём расходы =====
+            netProfitOverride:
+                175.0 - totalExpenses, // ===== ВАЖНО: Передаём прибыль =====
+            totalPaidDistanceOverride:
+                distanceToClient, // ===== ВАЖНО: Платный пробег =====
             isReturn: true, // ===== ВАЖНО: Флаг возврата =====
           ),
         ),
       ).then((result) async {
-        if (!mounted) { _isProcessing = false; return; }
+        if (!mounted) {
+          _isProcessing = false;
+          return;
+        }
 
         if (result == true) {
           _isProcessing = false;
@@ -1263,7 +1334,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   }
 
   void _showSummary(BuildContext context) {
-    logMessage('🔵 [_showSummary] ВХОД, completedDeliveries=${_state.completedDeliveries.length}');
+    logMessage(
+        '🔵 [_showSummary] ВХОД, completedDeliveries=${_state.completedDeliveries.length}');
 
     if (_isProcessing) {
       logMessage('⚠️ [_showSummary] ПРОПУСК: уже в обработке');
@@ -1282,7 +1354,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
         ? _state.completedDeliveries.first
         : null;
     final shopDistance = firstDelivery?.distanceToShop ?? 0.0;
-    final totalPaidDistance = _state.completedDeliveries.fold(0.0, (sum, d) => sum + d.distanceToClient);
+    final totalPaidDistance = _state.completedDeliveries
+        .fold(0.0, (sum, d) => sum + d.distanceToClient);
     final totalAllDistance = shopDistance + totalPaidDistance;
 
     final fuelCostPerKm = (settings.fuelConsumption / 100) * settings.fuelPrice;
@@ -1310,7 +1383,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
         ),
       ),
     ).then((result) async {
-      logMessage('🔵 [_showSummary] Возврат из OrderSummaryScreen, result=$result');
+      logMessage(
+          '🔵 [_showSummary] Возврат из OrderSummaryScreen, result=$result');
       if (!mounted) {
         logMessage('⚠️ [_showSummary] виджет не смонтирован');
         _isProcessing = false;
@@ -1336,9 +1410,11 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
         if (mounted) {
           try {
             await ref.refreshStats();
-            logMessage('📊 Статистика обновлена после завершения заказа', category: 'STATS');
+            logMessage('📊 Статистика обновлена после завершения заказа',
+                category: 'STATS');
           } catch (e) {
-            logMessage('⚠️ Ошибка обновления статистики: $e', category: 'STATS');
+            logMessage('⚠️ Ошибка обновления статистики: $e',
+                category: 'STATS');
           }
         }
 
@@ -1354,26 +1430,31 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
             'netProfit': totalCost - totalExpenses,
             'totalTimeSeconds': totalTime,
             'shopAddress': _state.shopAddressForOrder ?? '',
-            'deliveries': _state.completedDeliveries.map((d) => {
-              'number': d.number,
-              'clientAddress': d.clientAddress,
-              'apartment': d.apartment,
-              'weight': d.weight,
-              'timeToShop': d.timeToShop,
-              'distanceToShop': d.distanceToShop,
-              'timeReceiving': d.timeReceiving,
-              'timeToClient': d.timeToClient,
-              'distanceToClient': d.distanceToClient,
-              'timeDelivery': d.timeDelivery,
-              'tip': d.tip,
-              'status': d.status,
-            }).toList(),
+            'deliveries': _state.completedDeliveries
+                .map((d) => {
+                      'number': d.number,
+                      'clientAddress': d.clientAddress,
+                      'apartment': d.apartment,
+                      'weight': d.weight,
+                      'timeToShop': d.timeToShop,
+                      'distanceToShop': d.distanceToShop,
+                      'timeReceiving': d.timeReceiving,
+                      'timeToClient': d.timeToClient,
+                      'distanceToClient': d.distanceToClient,
+                      'timeDelivery': d.timeDelivery,
+                      'tip': d.tip,
+                      'status': d.status,
+                    })
+                .toList(),
           };
 
-          logMessage('🔵 [_showSummary] Отправка заказа с ${_state.completedDeliveries.length} доставками');
-          logMessage('🔵 [_showSummary] shopAddress: ${_state.shopAddressForOrder}');
+          logMessage(
+              '🔵 [_showSummary] Отправка заказа с ${_state.completedDeliveries.length} доставками');
+          logMessage(
+              '🔵 [_showSummary] shopAddress: ${_state.shopAddressForOrder}');
           await apiService.createOrder(orderData);
-          logMessage('✅ Заказ с ${_state.completedDeliveries.length} доставками создан на сервере');
+          logMessage(
+              '✅ Заказ с ${_state.completedDeliveries.length} доставками создан на сервере');
         } catch (e) {
           logMessage('❌ Ошибка создания заказа: $e');
         }
@@ -1411,9 +1492,13 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
   double _calculateTotalCost(PricingConfig pricing) {
     if (_state.completedDeliveries.isEmpty) return 0.0;
     final first = _state.completedDeliveries.first;
-    double total = (pricing.receivingFee + (first.weight * pricing.pricePerKg)) * _state.coefficient;
+    double total =
+        (pricing.receivingFee + (first.weight * pricing.pricePerKg)) *
+            _state.coefficient;
     for (final d in _state.completedDeliveries) {
-      total += (pricing.deliveryFee + (d.distanceToClient * pricing.pricePerKm)) * _state.coefficient;
+      total +=
+          (pricing.deliveryFee + (d.distanceToClient * pricing.pricePerKm)) *
+              _state.coefficient;
     }
     return total;
   }
@@ -1468,7 +1553,8 @@ class _OrderRouteScreenState extends ConsumerState<OrderRouteScreen> {
           TextButton(
             onPressed: _cancelOrder,
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Отменить', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            child: const Text('Отменить',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
           ),
         ],
       ),

@@ -16,7 +16,7 @@ class OrderSummaryScreen extends ConsumerWidget {
   final int totalTime;
   final double totalDistance;
   final String? shopAddress;
-  
+
   // ===== ДОБАВЛЯЕМ ПАРАМЕТРЫ ДЛЯ ПРАВИЛЬНОГО ОТОБРАЖЕНИЯ =====
   final double? totalExpensesOverride;
   final double? netProfitOverride;
@@ -55,28 +55,31 @@ class OrderSummaryScreen extends ConsumerWidget {
     // Данные по магазину
     final shopDistance = firstDelivery?.distanceToShop ?? 0.0;
     final shopWeight = firstDelivery?.weight ?? 0.0;
-    final shopCost = (pricing.receivingFee + (shopWeight * pricing.pricePerKg)) * coefficient;
+    final shopCost =
+        (pricing.receivingFee + (shopWeight * pricing.pricePerKg)) *
+            coefficient;
 
     // ===== ВАЖНО: ИСПОЛЬЗУЕМ ПЕРЕДАННЫЕ ЗНАЧЕНИЯ ЕСЛИ ОНИ ЕСТЬ =====
     // Платный пробег
-    final double totalPaidDistance = totalPaidDistanceOverride ?? 
-        deliveries.fold<double>(0.0, (sum, d) => sum + (d.distanceToClient ?? 0.0));
+    final double totalPaidDistance = totalPaidDistanceOverride ??
+        deliveries.fold<double>(
+            0.0, (sum, d) => sum + (d.distanceToClient ?? 0.0));
 
     // ОБЩИЙ пробег (если передан - используем его, иначе считаем)
-    final double totalAllDistance = totalDistance > 0 
-        ? totalDistance 
-        : (shopDistance + totalPaidDistance);
-    
+    final double totalAllDistance =
+        totalDistance > 0 ? totalDistance : (shopDistance + totalPaidDistance);
+
     // ===== РАСЧЁТ РАСХОДОВ =====
     final fuelCostPerKm = (settings.fuelConsumption / 100) * settings.fuelPrice;
     final totalFuelCost = totalAllDistance * fuelCostPerKm;
     final totalRepairCost = totalAllDistance * settings.repairCost;
-    final totalExpenses = totalExpensesOverride ?? (totalFuelCost + totalRepairCost);
-    
+    final totalExpenses =
+        totalExpensesOverride ?? (totalFuelCost + totalRepairCost);
+
     // ===== ВАЖНО: СТОИМОСТЬ ЗАКАЗА =====
     // Если передан totalCost - используем его, иначе считаем по формуле
     final totalCostFinal = totalCost;
-    
+
     // ===== ВАЖНО: ЧИСТАЯ ПРИБЫЛЬ =====
     final netProfit = netProfitOverride ?? (totalCostFinal - totalExpenses);
 
@@ -109,7 +112,8 @@ class OrderSummaryScreen extends ConsumerWidget {
                   // Заголовок
                   Row(
                     children: [
-                      const Icon(Icons.receipt_long, color: Color(0xFF6C63FF), size: 24),
+                      const Icon(Icons.receipt_long,
+                          color: Color(0xFF6C63FF), size: 24),
                       const SizedBox(width: 8),
                       Text(
                         'Доставок: ${deliveries.length}',
@@ -121,7 +125,8 @@ class OrderSummaryScreen extends ConsumerWidget {
                       ),
                       const Spacer(),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 4),
                         decoration: BoxDecoration(
                           color: const Color(0xFF6C63FF).withOpacity(0.15),
                           borderRadius: BorderRadius.circular(12),
@@ -149,7 +154,8 @@ class OrderSummaryScreen extends ConsumerWidget {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.storefront, size: 20, color: Color(0xFF6C63FF)),
+                        const Icon(Icons.storefront,
+                            size: 20, color: Color(0xFF6C63FF)),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(
@@ -180,15 +186,20 @@ class OrderSummaryScreen extends ConsumerWidget {
                                 spacing: 6,
                                 runSpacing: 2,
                                 children: [
-                                  _buildChip(Icons.route, '${shopDistance.toStringAsFixed(2)} км', size: 12),
-                                  _buildChip(Icons.fitness_center, '${shopWeight.toStringAsFixed(1)} кг', size: 12),
+                                  _buildChip(Icons.route,
+                                      '${shopDistance.toStringAsFixed(2)} км',
+                                      size: 12),
+                                  _buildChip(Icons.fitness_center,
+                                      '${shopWeight.toStringAsFixed(1)} кг',
+                                      size: 12),
                                 ],
                               ),
                             ],
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
                             color: const Color(0xFF6C63FF).withOpacity(0.15),
                             borderRadius: BorderRadius.circular(8),
@@ -209,7 +220,10 @@ class OrderSummaryScreen extends ConsumerWidget {
 
                   // Список доставок
                   ...deliveries.map((d) {
-                    final deliveryCost = (pricing.deliveryFee + ((d.distanceToClient ?? 0.0) * pricing.pricePerKm)) * coefficient;
+                    final deliveryCost = (pricing.deliveryFee +
+                            ((d.distanceToClient ?? 0.0) *
+                                pricing.pricePerKm)) *
+                        coefficient;
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: _buildDeliveryCard(d, deliveryCost),
@@ -237,14 +251,23 @@ class OrderSummaryScreen extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        _buildDetailRow('Общий пробег', '${totalAllDistance.toStringAsFixed(2)} км'),
-                        _buildDetailRow('Стоимость бензина на 1 км', '${fuelCostPerKm.toStringAsFixed(4)} руб.'),
-                        _buildDetailRow('Стоимость ремонта на 1 км', '${settings.repairCost.toStringAsFixed(2)} руб.'),
+                        _buildDetailRow('Общий пробег',
+                            '${totalAllDistance.toStringAsFixed(2)} км'),
+                        _buildDetailRow('Стоимость бензина на 1 км',
+                            '${fuelCostPerKm.toStringAsFixed(4)} руб.'),
+                        _buildDetailRow('Стоимость ремонта на 1 км',
+                            '${settings.repairCost.toStringAsFixed(2)} руб.'),
                         const Divider(color: Color(0xFF2C2C2C), height: 12),
-                        _buildDetailRow('Расход на бензин', '${totalFuelCost.toStringAsFixed(0)} руб.', bold: true),
-                        _buildDetailRow('Расход на ремонт', '${totalRepairCost.toStringAsFixed(0)} руб.', bold: true),
-                        _buildDetailRow('Итого расходы', '${totalExpenses.toStringAsFixed(0)} руб.', 
-                          bold: true, 
+                        _buildDetailRow('Расход на бензин',
+                            '${totalFuelCost.toStringAsFixed(0)} руб.',
+                            bold: true),
+                        _buildDetailRow('Расход на ремонт',
+                            '${totalRepairCost.toStringAsFixed(0)} руб.',
+                            bold: true),
+                        _buildDetailRow(
+                          'Итого расходы',
+                          '${totalExpenses.toStringAsFixed(0)} руб.',
+                          bold: true,
                           color: Colors.orange,
                         ),
                       ],
@@ -274,8 +297,14 @@ class OrderSummaryScreen extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Общее время', style: TextStyle(color: Color(0xFF888888), fontSize: 11)),
-                          Text(_formatTime(totalTime), style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                          const Text('Общее время',
+                              style: TextStyle(
+                                  color: Color(0xFF888888), fontSize: 11)),
+                          Text(_formatTime(totalTime),
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
@@ -283,8 +312,14 @@ class OrderSummaryScreen extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          const Text('Платный пробег', style: TextStyle(color: Color(0xFF888888), fontSize: 11)),
-                          Text('${totalPaidDistance.toStringAsFixed(2)} км', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                          const Text('Платный пробег',
+                              style: TextStyle(
+                                  color: Color(0xFF888888), fontSize: 11)),
+                          Text('${totalPaidDistance.toStringAsFixed(2)} км',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
@@ -297,8 +332,14 @@ class OrderSummaryScreen extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Стоимость заказа', style: TextStyle(color: Color(0xFF888888), fontSize: 11)),
-                          Text('${totalCostFinal.toStringAsFixed(0)} руб.', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                          const Text('Стоимость заказа',
+                              style: TextStyle(
+                                  color: Color(0xFF888888), fontSize: 11)),
+                          Text('${totalCostFinal.toStringAsFixed(0)} руб.',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
@@ -306,7 +347,9 @@ class OrderSummaryScreen extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          const Text('Чистая прибыль', style: TextStyle(color: Color(0xFF888888), fontSize: 11)),
+                          const Text('Чистая прибыль',
+                              style: TextStyle(
+                                  color: Color(0xFF888888), fontSize: 11)),
                           Text(
                             '${netProfit.toStringAsFixed(0)} руб.',
                             style: TextStyle(
@@ -328,7 +371,8 @@ class OrderSummaryScreen extends ConsumerWidget {
                     Expanded(
                       child: OutlinedButton(
                         onPressed: () {
-                          logMessage('🟢 Нажата кнопка "Добавить ещё доставку"');
+                          logMessage(
+                              '🟢 Нажата кнопка "Добавить ещё доставку"');
                           Navigator.pop(context, true);
                         },
                         style: OutlinedButton.styleFrom(
@@ -354,7 +398,8 @@ class OrderSummaryScreen extends ConsumerWidget {
                         onPressed: () {
                           logMessage('🟢 Нажата кнопка "Завершить заказ"');
                           ref.invalidate(dailyStatsProvider);
-                          logMessage('📊 Статистика обновлена', category: 'STATS');
+                          logMessage('📊 Статистика обновлена',
+                              category: 'STATS');
                           Navigator.pop(context, false);
                         },
                         style: ElevatedButton.styleFrom(
@@ -436,7 +481,9 @@ class OrderSummaryScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                _buildChip(Icons.route, '${(d.distanceToClient ?? 0.0).toStringAsFixed(2)} км', size: 12),
+                _buildChip(Icons.route,
+                    '${(d.distanceToClient ?? 0.0).toStringAsFixed(2)} км',
+                    size: 12),
               ],
             ),
           ),
@@ -485,7 +532,8 @@ class OrderSummaryScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, {bool bold = false, Color? color}) {
+  Widget _buildDetailRow(String label, String value,
+      {bool bold = false, Color? color}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(

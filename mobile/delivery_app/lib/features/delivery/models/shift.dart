@@ -41,7 +41,9 @@ class Shift {
     final s = value.toString();
     final parsed = DateTime.parse(s);
     // Если строка без таймзоны (нет 'Z' и нет '+/-' в конце) — считаем UTC
-    if (!s.contains('Z') && !s.contains('+') && !RegExp(r'-\d{2}:\d{2}$').hasMatch(s)) {
+    if (!s.contains('Z') &&
+        !s.contains('+') &&
+        !RegExp(r'-\d{2}:\d{2}$').hasMatch(s)) {
       return DateTime.utc(
         parsed.year,
         parsed.month,
@@ -64,8 +66,10 @@ class Shift {
       duration: json['durationSeconds'] != null
           ? Duration(seconds: json['durationSeconds'])
           : null,
-      totalPaidDistance: _roundToTwo((json['totalPaidDistance'] ?? 0).toDouble()),
-      totalIdleDistance: _roundToTwo((json['totalIdleDistance'] ?? 0).toDouble()),
+      totalPaidDistance:
+          _roundToTwo((json['totalPaidDistance'] ?? 0).toDouble()),
+      totalIdleDistance:
+          _roundToTwo((json['totalIdleDistance'] ?? 0).toDouble()),
       ordersCount: json['ordersCount'] ?? 0,
       totalIncome: _roundToTwo((json['totalIncome'] ?? 0).toDouble()),
       totalExpenses: _roundToTwo((json['totalExpenses'] ?? 0).toDouble()),

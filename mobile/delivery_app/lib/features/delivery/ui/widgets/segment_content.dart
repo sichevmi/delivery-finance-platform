@@ -18,11 +18,11 @@ class SegmentContent extends StatelessWidget {
   final bool isClientAddressManual;
   final String? manualClientAddress;
   final double tip;
-  
+
   // ===== ДОБАВЛЯЕМ КОНТРОЛЛЕРЫ =====
   final TextEditingController? shopAddressController;
   final TextEditingController? clientAddressController;
-  
+
   final ValueChanged<double> onWeightChanged;
   final ValueChanged<String> onApartmentChanged;
   final ValueChanged<bool> onPrivateHouseChanged;
@@ -33,7 +33,7 @@ class SegmentContent extends StatelessWidget {
   final ValueChanged<String> onManualClientAddressChanged;
   final VoidCallback onManualClientAddressConfirm;
   final ValueChanged<double> onTipChanged;
-  
+
   // ===== ДОБАВЛЯЕМ КОЛБЭК ВОЗВРАТА =====
   final VoidCallback? onReturnToShop;
 
@@ -54,11 +54,10 @@ class SegmentContent extends StatelessWidget {
     required this.isClientAddressManual,
     this.manualClientAddress,
     required this.tip,
-    
+
     // ===== ДОБАВЛЯЕМ КОНТРОЛЛЕРЫ =====
     this.shopAddressController,
     this.clientAddressController,
-    
     required this.onWeightChanged,
     required this.onApartmentChanged,
     required this.onPrivateHouseChanged,
@@ -69,7 +68,7 @@ class SegmentContent extends StatelessWidget {
     required this.onManualClientAddressChanged,
     required this.onManualClientAddressConfirm,
     required this.onTipChanged,
-    
+
     // ===== ДОБАВЛЯЕМ КОЛБЭК ВОЗВРАТА =====
     this.onReturnToShop,
   });
@@ -241,7 +240,8 @@ class _TipInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = TextEditingController(text: tip == 0 ? '' : tip.toString());
+    final controller =
+        TextEditingController(text: tip == 0 ? '' : tip.toString());
     controller.addListener(() {
       final value = double.tryParse(controller.text.replaceAll(',', '.'));
       if (value != null && value >= 0) {
@@ -314,7 +314,8 @@ class _TipInput extends StatelessWidget {
                     ),
                     border: InputBorder.none,
                     isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   ),
                 ),
               ),
@@ -333,21 +334,19 @@ class _TipInput extends StatelessWidget {
     );
   }
 
-  Widget _buildTipChip(String label, double value, double currentTip, ValueChanged<double> onTipChanged) {
+  Widget _buildTipChip(String label, double value, double currentTip,
+      ValueChanged<double> onTipChanged) {
     final isSelected = currentTip == value;
     return GestureDetector(
       onTap: () => onTipChanged(value),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFF6C63FF)
-              : const Color(0xFF2C2C2C),
+          color: isSelected ? const Color(0xFF6C63FF) : const Color(0xFF2C2C2C),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected
-                ? const Color(0xFF6C63FF)
-                : const Color(0xFF3C3C3C),
+            color:
+                isSelected ? const Color(0xFF6C63FF) : const Color(0xFF3C3C3C),
             width: 1,
           ),
         ),
@@ -388,8 +387,9 @@ class _AddressInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textController = controller ?? TextEditingController(text: manualAddress);
-    
+    final textController =
+        controller ?? TextEditingController(text: manualAddress);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -402,7 +402,8 @@ class _AddressInput extends StatelessWidget {
           ),
           child: Row(
             children: [
-              const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 20),
+              const Icon(Icons.warning_amber_rounded,
+                  color: Colors.orange, size: 20),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
